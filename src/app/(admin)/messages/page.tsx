@@ -6,9 +6,15 @@ import { Badge } from '@/components/ui/badge'
 import { MessageThread } from '@/components/features/message-thread'
 
 export default async function MessagesPage() {
+  // Verify admin is authenticated (route protected by middleware)
+  const supabase = createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  // Service client for property list — admin doesn't own properties, so RLS blocks them
+  // This is acceptable because the (admin) route group requires authentication via middleware
   const serviceClient = createServiceClient()
 
-  // Get all properties with their owners and unread message counts
   const { data: properties } = await serviceClient
     .from('properties')
     .select('id, name, owners(full_name)')
