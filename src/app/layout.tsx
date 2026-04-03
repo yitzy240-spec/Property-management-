@@ -1,12 +1,10 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Geist } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import { Providers } from '@/components/providers'
+import { cn } from '@/lib/utils'
 import '@/styles/globals.css'
-import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 
 export const metadata: Metadata = {
   title: 'ApartmentOS — Property Management',
@@ -27,8 +25,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
-      <body className="min-h-screen bg-gray-50 font-sans antialiased">
+    <html lang="en" className={cn('font-sans', inter.variable)}>
+      <body className="min-h-screen bg-background font-sans antialiased">
         <Providers>
           {children}
         </Providers>

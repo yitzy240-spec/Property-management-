@@ -9,6 +9,20 @@ const envSchema = z.object({
   ENCRYPTION_KEY: z.string().min(32).optional(),
 })
 
-export const env = envSchema.parse(process.env)
-
 export type Env = z.infer<typeof envSchema>
+
+let _env: Env | null = null
+
+/** Lazily validated environment variables. Throws on first access if invalid. */
+export const env = new Proxy({} as Env, {
+  get(_target, prop: string) {
+    if (!_env) {
+      // During build, env vars may not be available — use fallback
+      if (process.env.NEXT_PHASE === 'phase-production-build') {
+        return process.env[prop] ?? ''
+      }
+      _env = envSchema.parse(process.env)
+    }
+    return _env[prop as keyof Env]
+  },
+})

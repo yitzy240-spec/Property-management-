@@ -1,1 +1,1 @@
-- [ApartmentOS Design Language Concepts](project_design_concepts.md) — Four named concepts (Jerusalem Stone, Tel Aviv Office, Garden Apartment, Operations Mode) with full token specs
+- [ApartmentOS Design Language Concepts](project_design_concepts.md) — v1 rejected (color swaps). v2 defines 4 architecturally distinct UX paradigms: Command Center, Ledger, Property First, Shift Planner

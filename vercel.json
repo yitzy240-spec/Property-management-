@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/cleaning-tasks",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/seasonal-tasks",
+      "schedule": "0 8 1 * *"
+    },
+    {
+      "path": "/api/cron/ical-sync",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/parse-bills",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}

@@ -88,7 +88,7 @@ Admin dashboard (data density with warmth), Owner financial reports (the serif h
 
 ---
 
-## Concept 2: Tel Aviv Office
+## Concept 2: Clean Professional
 
 ### Mood / Personality
 Crisp, confident, systematized. The aesthetic of a well-run real estate tech company — no decorative elements, every pixel earns its place. Fast-scanning dashboard energy. This is for people who live in spreadsheets and want the app to move at their speed.
@@ -198,7 +198,7 @@ Fresh and approachable. The feeling of a well-kept garden apartment in the Germa
 | Inverse Surface | `--color-inverse-surface` | `#1B4332` | Dark hero (owner summary) |
 | Inverse Text | `--color-inverse-text` | `#F0F7F4` | Text on dark |
 | Status Safe | `--color-safe` | `#2D6A4F` | (Shares primary — available, income) |
-| Status Warning | `--color-warning` | `#E9C46A` | Pending, review needed |
+| Status Warning | `--color-warning` | `#B8860B` | Pending, review needed |
 | Status Danger | `--color-danger` | `#D62828` | Urgent, overdue |
 | Status Info | `--color-info` | `#457B9D` | In progress, informational |
 
