@@ -16,11 +16,19 @@ export function parseICalFeed(icalData: string): ICalEvent[] {
 
   return events.map((event) => {
     const vevent = new ICAL.Event(event)
+
+    // Extract date components directly to avoid timezone shift issues
+    // ical.js DATE values are date-only — use the raw year/month/day
+    const start = vevent.startDate
+    const end = vevent.endDate
+    const dtstart = `${start.year}-${String(start.month).padStart(2, '0')}-${String(start.day).padStart(2, '0')}`
+    const dtend = `${end.year}-${String(end.month).padStart(2, '0')}-${String(end.day).padStart(2, '0')}`
+
     return {
       uid: vevent.uid,
       summary: vevent.summary || null,
-      dtstart: vevent.startDate.toJSDate().toISOString().split('T')[0],
-      dtend: vevent.endDate.toJSDate().toISOString().split('T')[0],
+      dtstart,
+      dtend,
     }
   })
 }
