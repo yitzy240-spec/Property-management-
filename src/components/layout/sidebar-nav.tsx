@@ -11,6 +11,7 @@ import {
   DollarSign,
   Calendar,
   Package,
+  MessageSquare,
   FileText,
   Settings,
   LogOut,
@@ -28,6 +29,7 @@ const navItems = [
   { href: '/financials', label: 'Financials', icon: DollarSign },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/inventory', label: 'Inventory', icon: Package },
+  { href: '/messages', label: 'Messages', icon: MessageSquare },
   { href: '/vault', label: 'Vault', icon: FileText },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { formatILS } from '@/lib/utils'
 import { signOut } from '@/app/login/actions'
+import { MessageThread } from '@/components/features/message-thread'
 
 export default async function OwnerPortalPage() {
   const supabase = createServerSupabaseClient()
@@ -50,6 +51,7 @@ export default async function OwnerPortalPage() {
     { data: bills },
     { data: tasks },
     { data: documents },
+    { data: taskMedia },
   ] = await Promise.all([
     propertyIds.length > 0
       ? supabase.from('bookings').select('*').in('property_id', propertyIds).gte('check_in', new Date().toISOString().split('T')[0]).order('check_in').limit(5)
@@ -63,7 +65,16 @@ export default async function OwnerPortalPage() {
     propertyIds.length > 0
       ? supabase.from('documents').select('*').in('property_id', propertyIds).order('created_at', { ascending: false })
       : Promise.resolve({ data: [] }),
+    // Staging photos — cleaning verification media
+    propertyIds.length > 0
+      ? supabase.from('task_media').select('*, tasks(title, is_cleaning, property_id, properties(name))').eq('uploaded_by', 'contractor').order('created_at', { ascending: false }).limit(20)
+      : Promise.resolve({ data: [] }),
   ])
+
+  // Filter staging photos to only show cleaning task photos for this owner's properties
+  const stagingPhotos = ((taskMedia as unknown[]) ?? []).filter((m: any) =>
+    m.tasks?.is_cleaning && propertyIds.includes(m.tasks?.property_id)
+  )
 
   const showFinancials = owner.profile === 'investor' || owner.profile === 'hybrid'
   const showBookings = owner.profile === 'investor' || owner.profile === 'hybrid'
@@ -154,7 +165,17 @@ export default async function OwnerPortalPage() {
                             {(bill.properties as { name: string } | null)?.name}
                           </span>
                         </div>
-                        <span className="font-mono">{formatILS(bill.amount_agorot)}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono">{formatILS(bill.amount_agorot)}</span>
+                          {bill.pdf_storage_path && (
+                            <a
+                              href={`/api/download?path=${encodeURIComponent(bill.pdf_storage_path)}`}
+                              className="text-xs text-primary hover:underline"
+                            >
+                              PDF
+                            </a>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </CardContent>
@@ -221,6 +242,32 @@ export default async function OwnerPortalPage() {
           </>
         )}
 
+        {/* Staging Gallery — "Peace of Mind" photos from cleaners */}
+        {stagingPhotos.length > 0 && (
+          <>
+            <Separator />
+            <div>
+              <h2 className="text-lg font-bold">Peace of Mind Gallery</h2>
+              <p className="text-xs text-muted-foreground">Photos from recent cleaning and staging visits</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {stagingPhotos.slice(0, 8).map((photo: any) => (
+                  <a
+                    key={photo.id}
+                    href={`/api/download?path=${encodeURIComponent(photo.storage_path)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative aspect-[4/3] overflow-hidden rounded-lg bg-muted"
+                  >
+                    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                      {photo.media_type === 'video' ? '🎥' : '📷'} {(photo.tasks as any)?.properties?.name}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Document Vault — All profiles */}
         {showVault && (
           <>
@@ -243,6 +290,29 @@ export default async function OwnerPortalPage() {
               ) : (
                 <p className="mt-3 text-sm text-muted-foreground">No documents uploaded yet.</p>
               )}
+            </div>
+          </>
+        )}
+
+        {/* Messages — All profiles */}
+        {properties && properties.length > 0 && (
+          <>
+            <Separator />
+            <div>
+              <h2 className="text-lg font-bold">Messages</h2>
+              <p className="text-xs text-muted-foreground mb-3">
+                Send notes to your property manager
+              </p>
+              <div className="space-y-4">
+                {properties.map((property) => (
+                  <MessageThread
+                    key={property.id}
+                    propertyId={property.id}
+                    propertyName={property.name}
+                    currentRole="owner"
+                  />
+                ))}
+              </div>
             </div>
           </>
         )}

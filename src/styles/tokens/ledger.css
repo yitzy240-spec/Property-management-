@@ -1,0 +1,91 @@
+/*
+ * Ledger Direction — Financial data as primary surface
+ * Chosen by client 2026-04-03
+ *
+ * Palette: Navy + warm white + financial semantic colors
+ * Typography: Inter UI + IBM Plex Mono for all numbers
+ * Inspiration: Mercury bank, Plain.com, Airtable
+ */
+
+:root[data-direction="ledger"] {
+  /* --- Core surfaces --- */
+  --background: 0 0% 98%;          /* #FAFAFA */
+  --foreground: 222 47% 11%;       /* #111827 */
+  --card: 0 0% 100%;               /* #FFFFFF */
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+
+  /* --- Primary = Navy (Marcus Properties brand-aligned) --- */
+  --primary: 213 56% 24%;          /* #1E3A5F */
+  --primary-foreground: 40 23% 97%; /* #F8F7F4 */
+
+  /* --- Secondary = Light warm grey --- */
+  --secondary: 220 14% 96%;        /* #F1F5F9 */
+  --secondary-foreground: 222 47% 11%;
+
+  /* --- Muted --- */
+  --muted: 220 14% 96%;
+  --muted-foreground: 215 16% 47%;  /* #6B7280 */
+
+  /* --- Accent = Brand copper for CTAs --- */
+  --accent: 16 78% 60%;            /* #E8734A */
+  --accent-foreground: 0 0% 100%;
+
+  /* --- Destructive --- */
+  --destructive: 0 72% 51%;        /* #DC2626 */
+  --destructive-foreground: 0 0% 98%;
+
+  /* --- Border / Input --- */
+  --border: 220 13% 91%;           /* #E2E8F0 */
+  --input: 220 13% 91%;
+  --ring: 213 56% 24%;
+
+  /* --- Financial (Ledger signature colors) --- */
+  --fin-income: 152 54% 25%;       /* #15803D — strong dark green */
+  --fin-expense: 0 73% 41%;        /* #B91C1C — strong dark red */
+  --fin-net: 221 83% 53%;          /* #1D4ED8 — blue, distinct from both */
+
+  /* --- Status --- */
+  --status-safe: 152 54% 25%;
+  --status-warning: 38 92% 50%;
+  --status-danger: 0 72% 51%;
+  --status-info: 213 56% 24%;
+  --status-neutral: 215 16% 47%;
+
+  /* --- Typography --- */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* --- Elevation (crisp, cool shadows) --- */
+  --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.08), 0 1px 2px -1px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.10), 0 2px 4px -2px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.12), 0 4px 6px -4px rgba(15, 23, 42, 0.06);
+
+  /* --- Radii (slightly tighter than default — more financial) --- */
+  --radius: 0.5rem;
+  --radius-card: 0.625rem;         /* 10px */
+  --radius-badge: 0.25rem;
+  --radius-button: 0.375rem;
+}
+
+/* Ledger dark mode */
+:root[data-direction="ledger"].dark {
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+  --card: 217 33% 17%;
+  --card-foreground: 210 40% 98%;
+  --popover: 217 33% 17%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 16 78% 60%;
+  --accent-foreground: 0 0% 100%;
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+  --ring: 213 56% 50%;
+}

@@ -1,4 +1,5 @@
 @import './tokens/base.css';
+@import './tokens/ledger.css';
 
 @tailwind base;
 @tailwind components;
