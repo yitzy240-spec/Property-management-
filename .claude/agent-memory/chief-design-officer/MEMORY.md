@@ -1,0 +1,1 @@
+- [ApartmentOS Design Language Concepts](project_design_concepts.md) — Four named concepts (Jerusalem Stone, Tel Aviv Office, Garden Apartment, Operations Mode) with full token specs

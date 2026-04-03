@@ -1,0 +1,1 @@
+- [Initial Audit April 2026](audit_2026_04_03.md) -- Project in scaffolding stage, schema complete, all pages are stubs, P1 build not yet started
