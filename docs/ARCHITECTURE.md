@@ -93,9 +93,23 @@ Property management platform for Marcus Properties (marcus-properties.com), mana
 - `src/components/providers.tsx` — `QueryClientProvider` wrapper, imported in root layout
 
 ### Database Migrations
-- `00001_initial_schema.sql` — tables, enums, RLS policies, indexes, triggers, seed data
+- `00001_initial_schema.sql` — 16 tables, enums, RLS policies, indexes, triggers, seed data
 - `00002_rls_fixes.sql` — enables RLS on 6 missing tables, adds policies for 4 tables, performance indexes
 - `00003_schema_constraints.sql` — commission CHECK constraint, inventory model fix, `is_cleaning` flag
+- `00004_messages.sql` — messages table for owner-admin messaging, property-scoped threads
+- `00005_messages_admin_policies.sql` — admin RLS policies for messages (SELECT, INSERT, UPDATE)
+
+### Design Direction
+**Chosen: Ledger** (2026-04-03) — financial data as primary surface, entity-first navigation.
+- Token file: `src/styles/tokens/ledger.css`
+- DirectionProvider: `src/components/layout/direction-provider.tsx` (set to 'ledger')
+- Brand: Marcus Properties copper `#E8734A` for CTAs, navy `#1E3A5F` as primary
+
+### Modular Architecture
+- **Design tokens:** `src/styles/tokens/base.css` (slots) + `ledger.css` (direction values)
+- **Universal components:** CurrencyDisplay, DateDisplay, StatusBadge (work in any direction)
+- **Feature modules:** `src/components/modules/` — self-contained with co-located React Query hooks
+- **Direction shells:** `src/components/layout/shells/` — swap layout without touching modules
 
 ## Confirmed Decisions (from Client — 2026-04-03)
 - **Lodgify is single source of truth** — full plan, all bookings (including phone) logged there
