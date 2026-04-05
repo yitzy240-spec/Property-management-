@@ -12,6 +12,7 @@ export const config = {
      * Public routes (login, contractor/*, guest/*, api/webhooks/*, api/cron/*,
      * _next/*, favicon) are excluded by not being listed here.
      */
+    '/admin/:path*',
     '/dashboard/:path*',
     '/properties/:path*',
     '/bills/:path*',
