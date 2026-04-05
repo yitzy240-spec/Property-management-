@@ -78,8 +78,8 @@ export default async function OwnerPortalPage() {
 
   return (
     <div className="mx-auto min-h-screen max-w-2xl bg-[#FAFAFA]">
-      {/* Header */}
-      <div className="border-b border-border bg-card px-4 py-5">
+      {/* Header — sticky for scroll context */}
+      <div className="sticky top-0 z-30 border-b border-border bg-card px-4 py-5">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-0.5">
@@ -127,14 +127,18 @@ export default async function OwnerPortalPage() {
           <section>
             <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Financials</p>
             <div className="rounded-[10px] border border-border bg-card p-5 shadow-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">Total Bills (YTD)</p>
-                  <CurrencyDisplay agorot={totalBills} variant="expense" className="text-lg font-bold" />
-                </div>
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground">Properties</p>
                   <p className="font-mono text-lg font-bold">{properties?.length ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Bills (YTD)</p>
+                  <CurrencyDisplay agorot={totalBills} variant="expense" className="text-lg font-bold" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Bookings</p>
+                  <p className="font-mono text-lg font-bold">{bookings?.length ?? 0}</p>
                 </div>
               </div>
             </div>
@@ -227,9 +231,18 @@ export default async function OwnerPortalPage() {
                   rel="noopener noreferrer"
                   className="relative aspect-[4/3] overflow-hidden rounded-[10px] border border-border bg-muted"
                 >
-                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                    {photo.media_type === 'video' ? 'Video' : 'Photo'} · {(photo.tasks as any)?.properties?.name}
-                  </div>
+                  {photo.media_type === 'video' ? (
+                    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                      Video · {(photo.tasks as any)?.properties?.name}
+                    </div>
+                  ) : (
+                    <img
+                      src={`/api/download?path=${encodeURIComponent(photo.storage_path)}`}
+                      alt={`${(photo.tasks as any)?.properties?.name} — staging photo`}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  )}
                 </a>
               ))}
             </div>

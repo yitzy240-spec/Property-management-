@@ -199,7 +199,7 @@ export function ContractorTaskView({
               </div>
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-status-safe transition-all"
+                  className="h-full rounded-full bg-status-safe transition-[width] duration-500 ease-out"
                   style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
                 />
               </div>
@@ -209,7 +209,7 @@ export function ContractorTaskView({
                 <button
                   key={item.id}
                   onClick={() => toggleItem(item.id)}
-                  className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-muted/50"
+                  className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-safe focus-visible:ring-offset-2 active:scale-[0.98]"
                 >
                   <div
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${

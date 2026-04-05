@@ -96,9 +96,10 @@ export default async function CalendarPage() {
       </div>
 
       {days.length > 0 ? (
+        <>
         <div className="space-y-5">
           {days.map((day) => (
-            <section key={day.date}>
+            <section key={day.date} id={day.date === todayStr ? 'today' : undefined}>
               <div className="mb-2 flex items-center gap-2">
                 <h3 className="text-xs font-semibold text-muted-foreground">{day.label}</h3>
                 {day.date === todayStr && (
@@ -132,6 +133,13 @@ export default async function CalendarPage() {
             </section>
           ))}
         </div>
+        <a
+          href="#today"
+          className="fixed bottom-24 right-4 z-30 rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
+        >
+          Today
+        </a>
+        </>
       ) : (
         <div className="rounded-[10px] border border-border bg-card py-12 text-center shadow-sm">
           <p className="text-sm text-muted-foreground">No turnovers in the next 14 days</p>

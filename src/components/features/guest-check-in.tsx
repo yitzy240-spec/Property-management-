@@ -87,7 +87,7 @@ export function GuestCheckIn({ property, booking }: GuestCheckInProps) {
           codeVisible ? 'border-status-safe/30 bg-[hsl(152_54%_25%/0.04)]' : 'border-border bg-card'
         }`}>
           {codeVisible && property.entry_code ? (
-            <>
+            <div className="animate-code-reveal">
               <KeyRound className="mx-auto h-7 w-7 text-status-safe" />
               <p className="mt-2 text-xs font-semibold uppercase tracking-widest text-status-safe">Your Entry Code</p>
               <p className="mt-2 font-mono text-5xl font-bold tracking-[0.25em] text-foreground">
@@ -96,7 +96,7 @@ export function GuestCheckIn({ property, booking }: GuestCheckInProps) {
               <p className="mt-3 text-xs text-muted-foreground">
                 Use this code on the Simplex lock at the front door.
               </p>
-            </>
+            </div>
           ) : (
             <>
               <Lock className="mx-auto h-7 w-7 text-muted-foreground/50" />
@@ -152,11 +152,11 @@ export function GuestCheckIn({ property, booking }: GuestCheckInProps) {
             <div className="mt-2 flex justify-between">
               <div>
                 <p className="text-sm font-medium">Check-in</p>
-                <p className="font-mono text-xs text-muted-foreground">{booking.check_in}</p>
+                <p className="text-xs text-muted-foreground">{new Date(booking.check_in).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' })}</p>
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium">Check-out</p>
-                <p className="font-mono text-xs text-muted-foreground">{booking.check_out}</p>
+                <p className="text-xs text-muted-foreground">{new Date(booking.check_out).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' })}</p>
               </div>
             </div>
           </div>
@@ -164,7 +164,7 @@ export function GuestCheckIn({ property, booking }: GuestCheckInProps) {
 
         {/* Footer */}
         <div className="flex items-center justify-center gap-2 py-4">
-          <img src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400" alt="Marcus Properties" className="h-5 w-auto opacity-50" />
+          <img src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400" alt="Marcus Properties" className="h-5 w-auto opacity-80" />
           <p className="text-xs text-muted-foreground">
             Marcus Properties
           </p>

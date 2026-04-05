@@ -87,7 +87,7 @@ export default async function DashboardPage() {
         </div>
         <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <div
-            className={`h-full rounded-full transition-all ${isVatWarning ? 'bg-status-danger' : 'bg-primary'}`}
+            className={`h-full rounded-full transition-[width] duration-700 ease-out ${isVatWarning ? 'bg-status-danger' : 'bg-primary'}`}
             style={{ width: `${Math.min(vatPercent, 100)}%` }}
           />
         </div>

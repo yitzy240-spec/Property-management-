@@ -67,4 +67,13 @@
   .animate-fade-in {
     animation: fadeInPage 0.15s ease-out;
   }
+
+  @keyframes codeReveal {
+    0% { opacity: 0; transform: scale(0.92); }
+    60% { opacity: 1; transform: scale(1.02); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  .animate-code-reveal {
+    animation: codeReveal 0.35s ease-out;
+  }
 }

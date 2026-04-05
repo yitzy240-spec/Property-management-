@@ -38,8 +38,8 @@ export default async function OwnersPage() {
             const properties = owner.properties as { id: string; name: string }[] | null
             const profileStatus = owner.profile === 'investor' ? 'info' : owner.profile === 'hybrid' ? 'warning' : 'safe'
             return (
-              <div key={owner.id} className={`px-4 py-3.5 ${i > 0 ? 'border-t border-border' : ''}`}>
-                <div className="flex items-start justify-between">
+              <Link key={owner.id} href={`/owners/${owner.id}`} className="block">
+                <div className={`flex items-start justify-between px-4 py-3.5 transition-colors hover:bg-muted/40 ${i > 0 ? 'border-t border-border' : ''}`}>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold">{owner.full_name}</h3>
@@ -52,11 +52,9 @@ export default async function OwnersPage() {
                       </p>
                     )}
                   </div>
-                  {owner.phone && (
-                    <p className="shrink-0 font-mono text-xs text-muted-foreground">{owner.phone}</p>
-                  )}
+                  <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50" />
                 </div>
-              </div>
+              </Link>
             )
           })}
         </div>

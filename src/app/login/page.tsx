@@ -38,7 +38,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4">
       {/* Subtle grid-paper texture (Ledger signature) */}
       <div
-        className="pointer-events-none fixed inset-0 opacity-[0.03]"
+        className="pointer-events-none fixed inset-0 opacity-[0.05]"
         style={{
           backgroundImage:
             'linear-gradient(hsl(213 56% 24% / 0.4) 1px, transparent 1px), linear-gradient(90deg, hsl(213 56% 24% / 0.4) 1px, transparent 1px)',

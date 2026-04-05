@@ -136,7 +136,7 @@ export function SeasonalTemplateSettings() {
                   <Label htmlFor="description" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</Label>
                   <Input id="description" name="description" placeholder="Optional description" className="h-11" />
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Season Type</Label>
                     <Select name="season_type" defaultValue="rain_roof">

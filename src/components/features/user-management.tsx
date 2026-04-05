@@ -188,7 +188,7 @@ export function UserManagement() {
                 <div key={user.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
                   <div>
                     <p className="text-sm font-medium">{user.email}</p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Last sign in: {formatDate(user.last_sign_in)}
                     </p>
                   </div>
@@ -221,7 +221,7 @@ export function UserManagement() {
                 <div key={user.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
                   <div>
                     <p className="text-sm font-medium">{user.email}</p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {user.last_sign_in ? `Last login: ${formatDate(user.last_sign_in)}` : 'Never logged in'}
                     </p>
                   </div>
