@@ -37,26 +37,26 @@ export function GmailConnect({ isConnected }: { isConnected: boolean }) {
         </div>
       )}
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 space-y-3">
         {connected ? (
           <>
             <p className="text-xs text-muted-foreground">
               Gmail connected. Bills with PDF attachments are auto-parsed.
             </p>
-            <a href="/api/auth/gmail">
-              <button className="flex h-10 items-center gap-2.5 rounded-lg border border-border bg-card px-4 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
+            <a href="/api/auth/gmail" className="block">
+              <button className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border bg-card px-4 text-sm font-medium shadow-sm transition-colors hover:bg-muted sm:w-auto">
                 <GoogleLogo />
-                Reconnect
+                Reconnect Gmail
               </button>
             </a>
           </>
         ) : (
           <>
             <p className="text-xs text-muted-foreground">
-              Sign in with Google to authorize bill parsing.
+              Connect your Google account to auto-parse utility bills from email.
             </p>
-            <a href="/api/auth/gmail">
-              <button className="flex h-10 items-center gap-2.5 rounded-lg border border-border bg-card px-4 text-sm font-medium shadow-sm transition-colors hover:bg-muted">
+            <a href="/api/auth/gmail" className="block">
+              <button className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border bg-card px-4 text-sm font-medium shadow-sm transition-colors hover:bg-muted sm:w-auto">
                 <GoogleLogo />
                 Sign in with Google
               </button>

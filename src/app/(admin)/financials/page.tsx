@@ -4,6 +4,7 @@ import { TrendingUp } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { InvoicePushButton } from '@/components/features/invoice-push-button'
+import { FeeEntryAddButton } from '@/components/features/fee-entry-add'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { formatILS } from '@/lib/utils'
 
@@ -40,9 +41,12 @@ export default async function FinancialsPage() {
             {new Date(currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
           </p>
         </div>
-        {unpushedCount > 0 && (
-          <InvoicePushButton billingMonth={currentMonth} unpushedCount={unpushedCount} />
-        )}
+        <div className="flex items-center gap-2">
+          <FeeEntryAddButton />
+          {unpushedCount > 0 && (
+            <InvoicePushButton billingMonth={currentMonth} unpushedCount={unpushedCount} />
+          )}
+        </div>
       </div>
 
       {/* Fee Summary — Ledger KPI grid */}

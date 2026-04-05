@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { formatILS, formatDateJerusalem } from '@/lib/utils'
 import { MagicLinkGenerator } from '@/components/features/magic-link-generator'
+import { BookingAddButton } from '@/components/features/booking-add'
 
 export default async function PropertyDetailPage({
   params,
@@ -71,6 +72,46 @@ export default async function PropertyDetailPage({
         <span className="rounded-[var(--radius-badge)] border border-border px-2 py-1 text-xs font-medium font-mono">{Math.round(property.commission_rate * 100)}% commission</span>
       </div>
 
+      {/* Lodgify Hero Image + Pricing */}
+      {(() => {
+        const ld = property.lodgify_data as { image_url?: string; min_price?: number; max_price?: number; currency_code?: string; rooms?: { id: number; name: string }[] } | null
+        if (!ld) return null
+        return (
+          <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+            {ld.image_url && (
+              <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
+                <img
+                  src={`https:${ld.image_url}`}
+                  alt={property.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            )}
+            <div className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  {ld.min_price != null && (
+                    <>
+                      <p className="text-[10px] text-muted-foreground">Nightly rate</p>
+                      <p className="font-mono text-lg font-bold">
+                        {'$'}{Math.round(ld.min_price)}
+                        {ld.max_price && ld.max_price !== ld.min_price ? ` – $${Math.round(ld.max_price)}` : ''}
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">{ld.currency_code || 'USD'}</span>
+                      </p>
+                    </>
+                  )}
+                </div>
+                {ld.rooms && (
+                  <span className="text-xs text-muted-foreground">
+                    {ld.rooms.length} room type{ld.rooms.length === 1 ? '' : 's'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Entry Code */}
       {property.entry_code && (
         <div className="rounded-[10px] border border-border bg-card p-5 shadow-sm">
@@ -98,9 +139,12 @@ export default async function PropertyDetailPage({
 
       {/* Bookings */}
       <section>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Bookings ({bookings?.length ?? 0})
-        </p>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Bookings ({bookings?.length ?? 0})
+          </p>
+          <BookingAddButton propertyId={params.id} propertyName={property.name} />
+        </div>
         {bookings && bookings.length > 0 ? (
           <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
             {bookings.map((booking, i) => (

@@ -7,6 +7,9 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent'
 export type BillType = 'arnona' | 'iec' | 'water' | 'vaad_bayit' | 'internet' | 'gas' | 'other'
 export type BillStatus = 'pending_review' | 'approved' | 'flagged' | 'rejected'
+export type PaymentStatus = 'pending' | 'partial' | 'complete'
+export type PaymentMethod = 'bank_transfer' | 'cash' | 'bit' | 'credit_card' | 'paypal' | 'check' | 'other'
+export type CurrencyCode = 'ILS' | 'USD' | 'EUR' | 'GBP'
 export type MagicLinkType = 'contractor' | 'cleaner' | 'guest'
 export type InventoryStatus = 'in_closet' | 'at_laundry' | 'damaged' | 'retired'
 export type FeeType = 'commission' | 'hourly' | 'fixed'
@@ -74,6 +77,45 @@ export interface Booking {
   guest_language: string | null
   ical_uid: string | null
   synced_at: string | null
+  // Multi-currency
+  currency: CurrencyCode
+  original_amount_cents: number | null
+  exchange_rate: number | null
+  // Payment tracking
+  commission_amount_agorot: number | null
+  commission_currency: CurrencyCode
+  commission_original_cents: number | null
+  deposit_amount_agorot: number | null
+  payment_status: PaymentStatus
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PropertyUtilityAccount {
+  id: string
+  property_id: string
+  utility_type: BillType
+  label: string              // e.g. "מספר לקוח", "חשבון חוזה", "מספר מונה"
+  account_number: string
+  autopay: boolean
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BookingPayment {
+  id: string
+  booking_id: string
+  amount_agorot: number
+  currency: CurrencyCode
+  original_amount_cents: number | null
+  payment_method: PaymentMethod
+  payment_date: string | null
+  received_by: string | null
+  is_deposit: boolean
+  is_commission: boolean
+  notes: string | null
   created_at: string
   updated_at: string
 }
@@ -267,4 +309,12 @@ export interface PropertyWithOwner extends Property {
 
 export interface BookingWithGap extends Booking {
   gap_hours_after: number | null
+}
+
+export interface BookingWithPayments extends Booking {
+  payments: BookingPayment[]
+}
+
+export interface PropertyWithUtilities extends Property {
+  utility_accounts: PropertyUtilityAccount[]
 }

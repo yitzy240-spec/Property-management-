@@ -19,7 +19,7 @@ export default async function DashboardPage() {
     { data: revenueData },
     { data: upcomingBookings },
   ] = await Promise.all([
-    supabase.from('properties').select('*, owners(full_name)').eq('is_active', true).order('name'),
+    supabase.from('properties').select('*, owners(full_name), lodgify_data').eq('is_active', true).order('name'),
     supabase.from('tasks').select('*', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
     supabase.from('bills').select('*', { count: 'exact', head: true }).eq('status', 'pending_review'),
     supabase.from('revenue_tracking').select('total_revenue_agorot').eq('year', currentYear),
@@ -118,11 +118,19 @@ export default async function DashboardPage() {
         <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
           {properties && properties.length > 0 ? properties.map((property, i) => (
             <Link key={property.id} href={`/properties/${property.id}`} className="block">
-              <div className={`flex items-center justify-between px-4 py-3.5 transition-colors hover:bg-muted/40 ${i > 0 ? 'border-t border-border' : ''}`}>
+              <div className={`flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/40 ${i > 0 ? 'border-t border-border' : ''}`}>
+                {(() => {
+                  const ld = property.lodgify_data as { image_url?: string } | null
+                  return ld?.image_url ? (
+                    <img src={`https:${ld.image_url}`} alt="" className="h-12 w-16 shrink-0 rounded-md object-cover" />
+                  ) : (
+                    <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md bg-muted text-[10px] text-muted-foreground">No img</div>
+                  )
+                })()}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="truncate text-sm font-semibold">{property.name}</h3>
-                    <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
                       {Math.round(property.commission_rate * 100)}%
                     </span>
                   </div>

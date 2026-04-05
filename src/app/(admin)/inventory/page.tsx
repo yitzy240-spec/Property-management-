@@ -6,6 +6,7 @@ import { formatDateJerusalem } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { LinenForecast } from '@/components/features/linen-forecast'
+import { InventoryAddButton, InventoryAdjust, LaundryBatchButton, LaundryReturnButton } from '@/components/features/inventory-manage'
 
 export default async function InventoryPage() {
   const supabase = createServerSupabaseClient()
@@ -28,11 +29,14 @@ export default async function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Inventory & Laundry</h1>
-        <p className="text-xs text-muted-foreground">
-          Track linens across properties and manage laundry pickups.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight">Inventory & Laundry</h1>
+          <p className="text-xs text-muted-foreground">
+            Track linens across properties and manage laundry pickups.
+          </p>
+        </div>
+        <InventoryAddButton />
       </div>
 
       {/* AI Linen Forecast */}
@@ -83,11 +87,11 @@ export default async function InventoryPage() {
                     <p className="text-sm font-medium">{item.item_name}</p>
                     <p className="text-xs text-muted-foreground">{(item.properties as { name: string } | null)?.name}</p>
                   </div>
-                  <p className={`text-center font-mono text-sm ${belowPar ? 'font-bold text-status-warning' : ''}`}>
-                    {item.quantity_in_closet}
-                  </p>
-                  <p className="text-center font-mono text-sm">{item.quantity_at_laundry}</p>
-                  <p className="text-center font-mono text-sm text-muted-foreground">{item.quantity_damaged}</p>
+                  <div className={belowPar ? 'font-bold text-status-warning' : ''}>
+                    <InventoryAdjust itemId={item.id} field="quantity_in_closet" currentValue={item.quantity_in_closet} />
+                  </div>
+                  <InventoryAdjust itemId={item.id} field="quantity_at_laundry" currentValue={item.quantity_at_laundry} />
+                  <InventoryAdjust itemId={item.id} field="quantity_damaged" currentValue={item.quantity_damaged} />
                 </div>
               )
             })}
@@ -106,12 +110,15 @@ export default async function InventoryPage() {
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Active Laundry
           </p>
-          <a href="https://wa.me/?text=Laundry%20pickup%20request%20-%20ApartmentOS" target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-              <Phone className="h-3 w-3" />
-              Notify
-            </Button>
-          </a>
+          <div className="flex items-center gap-2">
+            <LaundryBatchButton />
+            <a href="https://wa.me/?text=Laundry%20pickup%20request%20-%20ApartmentOS" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                <Phone className="h-3 w-3" />
+                Notify
+              </Button>
+            </a>
+          </div>
         </div>
 
         {laundryBatches && laundryBatches.length > 0 ? (
@@ -133,6 +140,7 @@ export default async function InventoryPage() {
                   <span className="font-mono text-xs text-muted-foreground">
                     {(batch.items as { item_name: string; quantity: number }[])?.length ?? 0} items
                   </span>
+                  <LaundryReturnButton batchId={batch.id} />
                 </div>
               </div>
             ))}
