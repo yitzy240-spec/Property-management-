@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { DirectionProvider } from '@/components/layout/direction-provider'
 import { Toaster } from '@/components/ui/sonner'
+import { PwaInstallBanner } from '@/components/features/pwa-install-banner'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -23,6 +24,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <DirectionProvider direction="ledger">
         {children}
         <Toaster />
+        <PwaInstallBanner />
       </DirectionProvider>
     </QueryClientProvider>
   )
