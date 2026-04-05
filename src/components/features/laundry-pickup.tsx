@@ -23,7 +23,7 @@ interface LaundryPickupProps {
 }
 
 export function LaundryPickupButton({ properties, lowStockItems }: LaundryPickupProps) {
-  const [phone, setPhone] = useState('')
+  const [phone, setPhone] = useState('972542326146')
   const [open, setOpen] = useState(false)
 
   function generateWhatsAppUrl() {
