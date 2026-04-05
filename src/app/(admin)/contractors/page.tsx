@@ -1,7 +1,9 @@
 export const dynamic = 'force-dynamic'
 
+import { HardHat } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { ContractorAddButton, ContractorEditButton, ContractorDeactivateButton } from '@/components/features/contractor-manage'
 
 export default async function ContractorsPage() {
   const supabase = createServerSupabaseClient()
@@ -33,11 +35,14 @@ export default async function ContractorsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Contractor Itineraries</h1>
-        <p className="text-xs text-muted-foreground">
-          Open tasks by contractor — today&apos;s jobs at a glance.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight">Contractors</h1>
+          <p className="text-xs text-muted-foreground">
+            {contractors?.length ?? 0} active · manage team and view itineraries
+          </p>
+        </div>
+        <ContractorAddButton />
       </div>
 
       {contractorItineraries.length > 0 ? (
@@ -50,9 +55,14 @@ export default async function ContractorsPage() {
                 <p className="text-xs text-muted-foreground">
                   {contractor.specialty && `${contractor.specialty} · `}
                   {contractor.phone}
+                  {contractor.email && ` · ${contractor.email}`}
                 </p>
               </div>
-              <span className="font-mono text-xs font-medium text-muted-foreground">{totalOpen} open</span>
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-xs font-medium text-muted-foreground">{totalOpen} open</span>
+                <ContractorEditButton contractor={contractor} />
+                <ContractorDeactivateButton contractorId={contractor.id} contractorName={contractor.name} />
+              </div>
             </div>
 
             <div className="p-4">
@@ -116,8 +126,10 @@ export default async function ContractorsPage() {
           </section>
         ))
       ) : (
-        <div className="rounded-[10px] border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">
-          No active contractors.
+        <div className="rounded-[10px] border border-border bg-card py-12 text-center shadow-sm">
+          <HardHat className="mx-auto h-8 w-8 text-muted-foreground/50" />
+          <p className="mt-3 text-sm font-medium text-foreground">No contractors yet</p>
+          <p className="mt-1 text-xs text-muted-foreground">Add your first contractor to start assigning tasks.</p>
         </div>
       )}
     </div>

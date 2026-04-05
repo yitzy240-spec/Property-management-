@@ -1,10 +1,11 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Plus, ChevronRight } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { OwnerInviteButton } from '@/components/features/owner-invite-button'
 
 export default async function OwnersPage() {
   const supabase = createServerSupabaseClient()
@@ -25,7 +26,7 @@ export default async function OwnersPage() {
           </p>
         </div>
         <Link href="/owners/new">
-          <Button size="sm" className="h-9 gap-1.5 rounded-[var(--radius-button)] bg-accent text-accent-foreground hover:bg-accent/90">
+          <Button size="sm" className="h-9 gap-1.5 bg-accent text-accent-foreground hover:bg-accent/90">
             <Plus className="h-3.5 w-3.5" />
             Add
           </Button>
@@ -37,24 +38,39 @@ export default async function OwnersPage() {
           {owners.map((owner, i) => {
             const properties = owner.properties as { id: string; name: string }[] | null
             const profileStatus = owner.profile === 'investor' ? 'info' : owner.profile === 'hybrid' ? 'warning' : 'safe'
+            const hasAuth = !!owner.auth_user_id
             return (
-              <Link key={owner.id} href={`/owners/${owner.id}`} className="block">
-                <div className={`flex items-start justify-between px-4 py-3.5 transition-colors hover:bg-muted/40 ${i > 0 ? 'border-t border-border' : ''}`}>
+              <div key={owner.id} className={`px-4 py-3.5 ${i > 0 ? 'border-t border-border' : ''}`}>
+                <div className="flex items-start justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold">{owner.full_name}</h3>
                       <StatusBadge status={profileStatus} label={owner.profile} size="sm" />
+                      {hasAuth ? (
+                        <StatusBadge status="safe" label="Portal active" size="sm" />
+                      ) : (
+                        <StatusBadge status="neutral" label="No access" size="sm" />
+                      )}
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">{owner.email}</p>
                     {properties && properties.length > 0 && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {properties.length} {properties.length === 1 ? 'property' : 'properties'}: {properties.map(p => p.name).join(', ')}
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        {properties.map(p => p.name).join(', ')}
                       </p>
                     )}
                   </div>
-                  <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50" />
+                  <div className="flex shrink-0 items-center gap-2">
+                    <OwnerInviteButton
+                      ownerId={owner.id}
+                      ownerName={owner.full_name.split(' ')[0]}
+                      hasAuth={hasAuth}
+                    />
+                    {owner.phone && (
+                      <span className="hidden font-mono text-xs text-muted-foreground sm:inline">{owner.phone}</span>
+                    )}
+                  </div>
                 </div>
-              </Link>
+              </div>
             )
           })}
         </div>

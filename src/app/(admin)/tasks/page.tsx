@@ -1,5 +1,7 @@
 export const dynamic = 'force-dynamic'
 
+import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { TaskCreateDialog } from '@/components/features/task-create-dialog'
@@ -61,8 +63,8 @@ export default async function TasksPage() {
           {section.items.length > 0 ? (
             <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
               {section.items.map((task, i) => (
-                <div key={task.id} className={`px-4 py-3.5 ${i > 0 ? 'border-t border-border' : ''}`}>
-                  <div className="flex items-start justify-between gap-3">
+                <Link key={task.id} href={`/tasks/${task.id}`} className="block">
+                  <div className={`flex items-start justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-muted/40 ${i > 0 ? 'border-t border-border' : ''}`}>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <h3 className="truncate text-sm font-semibold">{task.title}</h3>
@@ -97,9 +99,12 @@ export default async function TasksPage() {
                         )}
                       </div>
                     </div>
-                    <StatusBadge status={task.status} size="sm" className="shrink-0" />
+                    <div className="flex shrink-0 items-center gap-2">
+                      <StatusBadge status={task.status} size="sm" />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
+                    </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (
