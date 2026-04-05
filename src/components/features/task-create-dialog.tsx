@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createClient } from '@/lib/supabase/client'
 import type { TaskPriority } from '@/types'
 
-export function TaskCreateDialog() {
+export function TaskCreateDialog({ preselectedPropertyId, preselectedPropertyName }: { preselectedPropertyId?: string; preselectedPropertyName?: string } = {}) {
   const supabase = createClient()
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -28,7 +28,7 @@ export function TaskCreateDialog() {
   const [priority, setPriority] = useState<TaskPriority>('normal')
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([])
   const [contractors, setContractors] = useState<{ id: string; name: string }[]>([])
-  const [propertyId, setPropertyId] = useState('')
+  const [propertyId, setPropertyId] = useState(preselectedPropertyId || '')
   const [contractorId, setContractorId] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
   const [titleVal, setTitleVal] = useState('')

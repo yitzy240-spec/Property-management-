@@ -18,13 +18,13 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import type { BillType } from '@/types'
 
-export function BillAddButton() {
+export function BillAddButton({ preselectedPropertyId }: { preselectedPropertyId?: string } = {}) {
   const supabase = createClient()
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([])
-  const [propertyId, setPropertyId] = useState('')
+  const [propertyId, setPropertyId] = useState(preselectedPropertyId || '')
   const [billType, setBillType] = useState<BillType>('other')
 
   useEffect(() => {

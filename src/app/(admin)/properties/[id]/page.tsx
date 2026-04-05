@@ -10,6 +10,9 @@ import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { formatILS, formatDateJerusalem } from '@/lib/utils'
 import { MagicLinkGenerator } from '@/components/features/magic-link-generator'
 import { BookingAddButton } from '@/components/features/booking-add'
+import { TaskCreateDialog } from '@/components/features/task-create-dialog'
+import { BillAddButton } from '@/components/features/bill-add'
+import { LaundryPickupButton } from '@/components/features/laundry-pickup'
 import { UtilityAccountsSection } from '@/components/features/utility-accounts'
 import { BookingList } from '@/components/features/booking-list'
 
@@ -179,9 +182,12 @@ export default async function PropertyDetailPage({
 
       {/* Bills */}
       <section>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Bills ({bills?.length ?? 0})
-        </p>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Bills ({bills?.length ?? 0})
+          </p>
+          <BillAddButton preselectedPropertyId={params.id} />
+        </div>
         {bills && bills.length > 0 ? (
           <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
             {bills.map((bill, i) => (
@@ -206,9 +212,12 @@ export default async function PropertyDetailPage({
 
       {/* Tasks */}
       <section>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Tasks ({tasks?.length ?? 0})
-        </p>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Tasks ({tasks?.length ?? 0})
+          </p>
+          <TaskCreateDialog preselectedPropertyId={params.id} preselectedPropertyName={property.name} />
+        </div>
         {tasks && tasks.length > 0 ? (
           <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
             {tasks.map((task, i) => (
@@ -251,8 +260,19 @@ export default async function PropertyDetailPage({
         )}
       </section>
 
-      {/* Generate Magic Link */}
-      <MagicLinkGenerator propertyId={params.id} propertyName={property.name} />
+      {/* Quick Actions */}
+      <section>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Quick Actions
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <MagicLinkGenerator propertyId={params.id} propertyName={property.name} />
+          <LaundryPickupButton
+            properties={[{ id: params.id, name: property.name, address: property.address }]}
+            lowStockItems={[]}
+          />
+        </div>
+      </section>
     </div>
   )
 }
