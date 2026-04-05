@@ -41,6 +41,7 @@ export default async function OwnersPage() {
             const hasAuth = !!owner.auth_user_id
             return (
               <div key={owner.id} className={`px-4 py-3.5 ${i > 0 ? 'border-t border-border' : ''}`}>
+                <Link href={`/owners/${owner.id}`} className="block">
                 <div className="flex items-start justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -70,6 +71,7 @@ export default async function OwnersPage() {
                     )}
                   </div>
                 </div>
+                </Link>
               </div>
             )
           })}

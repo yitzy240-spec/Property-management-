@@ -63,21 +63,20 @@ export function IntegrationHealth() {
     async function check() {
       const results: IntegrationStatus[] = []
 
-      // Lodgify
+      // Lodgify — check via properties list
       try {
-        const res = await fetch('/api/lodgify/properties')
+        const res = await fetch('/api/properties/list')
         if (res.ok) {
           const data = await res.json()
+          const linked = (data.properties || []).filter((p: { lodgify_property_id?: string }) => p.lodgify_property_id)
           results.push({
             key: 'lodgify',
             name: 'Lodgify',
-            status: 'connected',
-            detail: `${data.properties?.length || 0} properties`,
+            status: linked.length > 0 ? 'connected' : 'not_configured',
+            detail: `${linked.length}/${(data.properties || []).length} linked`,
           })
-        } else if (res.status === 401 || res.status === 403) {
-          results.push({ key: 'lodgify', name: 'Lodgify', status: 'connected', detail: 'API key set' })
         } else {
-          results.push({ key: 'lodgify', name: 'Lodgify', status: 'error', detail: 'Connection failed' })
+          results.push({ key: 'lodgify', name: 'Lodgify', status: 'error', detail: 'Auth required' })
         }
       } catch {
         results.push({ key: 'lodgify', name: 'Lodgify', status: 'not_configured' })

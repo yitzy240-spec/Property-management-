@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
+import { createOwner, updateOwner } from '@/app/(admin)/properties/actions'
 import type { Owner, OwnerProfile } from '@/types'
 
 interface OwnerFormProps {
@@ -16,7 +17,6 @@ interface OwnerFormProps {
 
 export function OwnerForm({ owner }: OwnerFormProps) {
   const router = useRouter()
-  const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [profile, setProfile] = useState<OwnerProfile>(owner?.profile ?? 'hybrid')
@@ -36,25 +36,24 @@ export function OwnerForm({ owner }: OwnerFormProps) {
     }
 
     if (isEditing) {
-      const { error: updateError } = await supabase
-        .from('owners')
-        .update(data)
-        .eq('id', owner.id)
-      if (updateError) {
-        setError(updateError.message)
+      const result = await updateOwner(owner.id, data)
+      if (result.error) {
+        setError(result.error)
+        toast.error(result.error)
         setLoading(false)
         return
       }
+      toast.success('Owner updated')
       router.push(`/owners/${owner.id}`)
     } else {
-      const { error: insertError } = await supabase
-        .from('owners')
-        .insert(data)
-      if (insertError) {
-        setError(insertError.message)
+      const result = await createOwner(data)
+      if (result.error) {
+        setError(result.error)
+        toast.error(result.error)
         setLoading(false)
         return
       }
+      toast.success('Owner created')
       router.push('/owners')
     }
 
