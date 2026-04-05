@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   description: 'Property management platform for Jerusalem rentals',
   manifest: '/manifest.json',
   icons: {
-    icon: '/favicon.svg',
+    icon: '/favicon.png',
     apple: '/icons/icon-192.svg',
   },
   appleWebApp: {
