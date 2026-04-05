@@ -16,7 +16,7 @@ export default async function FinancialsPage() {
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
 
   // Get fee entries for current month
-  const { data: feeEntries } = await supabase
+  const { data: feeEntries } = await serviceClient
     .from('fee_entries')
     .select('*, properties(name)')
     .eq('billing_month', currentMonth)

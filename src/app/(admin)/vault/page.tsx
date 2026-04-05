@@ -19,7 +19,7 @@ export default async function VaultPage() {
   const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
 
-  const { data: documents } = await supabase
+  const { data: documents } = await serviceClient
     .from('documents')
     .select('*, properties(name), owners(full_name)')
     .order('created_at', { ascending: false })

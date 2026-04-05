@@ -11,7 +11,7 @@ export default async function ContractorsPage() {
   const serviceClient = createServiceClient()
 
   // Get all active contractors with their open tasks
-  const { data: contractors } = await supabase
+  const { data: contractors } = await serviceClient
     .from('contractors')
     .select('*')
     .eq('is_active', true)
@@ -22,7 +22,7 @@ export default async function ContractorsPage() {
   // For each contractor, get their open tasks with property info
   const contractorItineraries = await Promise.all(
     (contractors ?? []).map(async (contractor) => {
-      const { data: tasks } = await supabase
+      const { data: tasks } = await serviceClient
         .from('tasks')
         .select('*, properties(name, address, entry_code)')
         .eq('contractor_id', contractor.id)

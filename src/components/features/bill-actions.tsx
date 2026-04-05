@@ -3,10 +3,9 @@
 import { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
+import { updateBillStatus } from '@/app/(admin)/properties/actions'
 
 export function BillActions({ billId }: { billId: string }) {
-  const supabase = createClient()
   const [loading, setLoading] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -15,16 +14,10 @@ export function BillActions({ billId }: { billId: string }) {
     setLoading(action)
     setError(null)
 
-    const { error: updateError } = await supabase
-      .from('bills')
-      .update({
-        status: action,
-        approved_at: action === 'approved' ? new Date().toISOString() : null,
-      })
-      .eq('id', billId)
+    const result = await updateBillStatus(billId, action)
 
-    if (updateError) {
-      setError(updateError.message)
+    if (result.error) {
+      setError(result.error)
       setLoading(null)
       return
     }

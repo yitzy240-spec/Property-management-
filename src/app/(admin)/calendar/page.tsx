@@ -16,7 +16,7 @@ export default async function CalendarPage() {
   const endStr = twoWeeksOut.toISOString().split('T')[0]
 
   // Get bookings in the next 2 weeks with property info
-  const { data: bookings } = await supabase
+  const { data: bookings } = await serviceClient
     .from('bookings')
     .select('*, properties(name)')
     .or(`check_in.gte.${todayStr},check_out.gte.${todayStr}`)
@@ -24,7 +24,7 @@ export default async function CalendarPage() {
     .order('check_in')
 
   // Get cleaning tasks in the next 2 weeks
-  const { data: cleaningTasks } = await supabase
+  const { data: cleaningTasks } = await serviceClient
     .from('tasks')
     .select('*, properties(name)')
     .eq('is_cleaning', true)

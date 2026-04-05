@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
 export async function loginWithEmail(formData: FormData) {
@@ -23,9 +23,9 @@ export async function sendOwnerMagicLink(formData: FormData) {
 
   const email = formData.get('email') as string
 
-  // Verify email belongs to a registered owner before sending magic link
-  // Prevents use as email oracle or spam vector
-  const { data: owner } = await supabase
+  // Use service client for owner lookup — no auth session exists at login time
+  const serviceClient = createServiceClient()
+  const { data: owner } = await serviceClient
     .from('owners')
     .select('id')
     .eq('email', email)

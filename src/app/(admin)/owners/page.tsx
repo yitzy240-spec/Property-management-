@@ -17,7 +17,7 @@ export default async function OwnersPage() {
   const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
 
-  const { data: owners } = await supabase
+  const { data: owners } = await serviceClient
     .from('owners')
     .select('*, properties(id, name)')
     .order('full_name')
@@ -44,8 +44,8 @@ export default async function OwnersPage() {
           {owners.map((owner) => {
             const properties = owner.properties as { id: string; name: string }[] | null
             return (
-              <Link key={owner.id} href={`/owners/${owner.id}`}>
-                <Card className="transition-shadow hover:shadow-md">
+              <div key={owner.id}>
+                <Card>
                   <CardContent className="flex items-center justify-between p-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -66,7 +66,7 @@ export default async function OwnersPage() {
                     )}
                   </CardContent>
                 </Card>
-              </Link>
+              </div>
             )
           })}
         </div>

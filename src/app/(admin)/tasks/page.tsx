@@ -25,7 +25,7 @@ export default async function TasksPage() {
   const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
 
-  const { data: tasks } = await supabase
+  const { data: tasks } = await serviceClient
     .from('tasks')
     .select('*, properties(name), contractors(name)')
     .order('created_at', { ascending: false })

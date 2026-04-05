@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { createClient } from '@/lib/supabase/client'
+import { createProperty, updateProperty } from '@/app/(admin)/properties/actions'
 import type { Property } from '@/types'
 
 interface PropertyFormProps {
@@ -16,7 +16,6 @@ interface PropertyFormProps {
 
 export function PropertyForm({ property }: PropertyFormProps) {
   const router = useRouter()
-  const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,22 +39,17 @@ export function PropertyForm({ property }: PropertyFormProps) {
     }
 
     if (isEditing) {
-      const { error: updateError } = await supabase
-        .from('properties')
-        .update(data)
-        .eq('id', property.id)
-      if (updateError) {
-        setError(updateError.message)
+      const result = await updateProperty(property.id, data)
+      if (result.error) {
+        setError(result.error)
         setLoading(false)
         return
       }
       router.push(`/properties/${property.id}`)
     } else {
-      const { error: insertError } = await supabase
-        .from('properties')
-        .insert(data)
-      if (insertError) {
-        setError(insertError.message)
+      const result = await createProperty(data)
+      if (result.error) {
+        setError(result.error)
         setLoading(false)
         return
       }

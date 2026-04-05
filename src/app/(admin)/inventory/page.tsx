@@ -19,7 +19,7 @@ export default async function InventoryPage() {
   const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
 
-  const { data: inventory } = await supabase
+  const { data: inventory } = await serviceClient
     .from('inventory_items')
     .select('*, properties(name)')
     .order('item_name')
@@ -30,7 +30,7 @@ export default async function InventoryPage() {
   ) ?? []
 
   // Get laundry batches
-  const { data: laundryBatches } = await supabase
+  const { data: laundryBatches } = await serviceClient
     .from('laundry_batches')
     .select('*, properties(name)')
     .is('returned_at', null)

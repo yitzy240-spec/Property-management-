@@ -125,6 +125,70 @@ PNGs: `C:\Users\yitzym\Desktop\Property-management-\docs\design-previews\`
 | 12 | Shift Planner — Conflict Scenario | haD7X |
 | 13 | Shift Planner — Components | 84YEJ |
 
+---
+
+## Ledger Implementation State — Design Review 2026-04-03
+
+### What is working well
+- Token architecture: base.css + ledger.css direction override is correctly structured
+- `CurrencyDisplay` component: correct — font-mono, tabular-nums, agorot conversion, semantic variants
+- `StatusBadge` / `StatusDot`: correctly uses token classes (`text-status-warning`, etc.)
+- IBM Plex Mono is loaded and used for financial figures consistently in most screens
+- `DateDisplay`: Jerusalem timezone, semantic time element, good
+- Bottom nav 4-tab pattern is correct Ledger architecture
+- Loading skeleton (`loading.tsx`) exists and uses animate-pulse pattern
+- DirectionProvider correctly sets `data-direction="ledger"` on `<html>`
+
+### Critical Issues Found
+
+#### 1. Hardcoded Tailwind color classes bypassing the token system (CRITICAL)
+Locations: `bills/page.tsx`, `tasks/page.tsx`, `calendar/page.tsx`, `owners/page.tsx`, `financials/page.tsx`, `contractor-task-view.tsx`, `guest-check-in.tsx`, `bill-actions.tsx`, `gmail-connect.tsx`, `inventory/page.tsx`
+Pattern: `bg-yellow-100 text-yellow-800`, `bg-green-100 text-green-800`, `bg-red-100 text-red-800`, `text-green-700`, `bg-green-600`, `bg-red-100 text-red-600`
+Fix: Replace with `StatusBadge` component or token classes (`bg-status-warning/15 text-status-warning`)
+The `StatusBadge` component already exists and handles this correctly — it just isn't being used in page files.
+
+#### 2. globals.css bare :root conflicts with ledger.css (HIGH)
+The bare `:root` block in globals.css (shadcn defaults — black primary, grey accent) loads before ledger.css direction tokens. Since `data-direction` is applied in `useEffect` (client-side), there is an SSR flash window where the page renders with grey/black shadcn defaults before the navy/copper palette kicks in. Fix: Set `data-direction="ledger"` in the Next.js root layout's `<html>` tag directly, not via useEffect.
+
+#### 3. Bottom nav touch targets are undersized (HIGH)
+Bottom tabs render as `py-2` with icon + 10px label. Total height ~48px. However the tap target width is `flex-1` over `max-w-lg` — on a 375px phone that is ~93px wide per tab which is fine. But the vertical touch target is borderline. Add `min-h-[52px]` to each tab link.
+
+#### 4. Hamburger button touch target is too small (CRITICAL)
+`SheetTrigger` is `h-8 w-8` = 32px × 32px. WCAG minimum is 44×44px. Fix: `h-11 w-11` or wrap with a larger invisible tap area.
+
+#### 5. Sidebar-nav.tsx is dead code (MEDIUM)
+The old `sidebar-nav.tsx` still exists but is not imported anywhere in the admin layout (which uses `LedgerShell`). It uses `bg-primary text-primary-foreground` for active state — which is correct — but the component is unused. Should be deleted or formally deprecated.
+
+#### 6. Bills and Tasks pages do not use StatusBadge (HIGH)
+Both pages define local `statusColors` Record<string,string> objects with hardcoded Tailwind classes. These duplicate the logic already in `StatusBadge` and bypass the token system. The existing `StatusBadge` component handles every status these pages use.
+
+#### 7. Contractor complete button uses hardcoded green (MEDIUM)
+`bg-green-600 hover:bg-green-700` on the primary CTA. This should use `bg-status-safe hover:bg-status-safe/90` or ideally the primary/accent button variant. The contractor context intentionally uses high-contrast green for confidence, but it should still pull from the token.
+
+#### 8. Guest check-in entry code uses hardcoded green (MEDIUM)
+`border-green-200 bg-green-50`, `text-green-700`, `text-green-900` — the "code revealed" state should use status-safe tokens. The green is semantically correct but bypasses the system.
+
+#### 9. Guest check-in YouTube card uses hardcoded red (LOW)
+`bg-red-100` / `text-red-600` for the YouTube play icon. This is a brand color (YouTube red), not a status. Acceptable but should be extracted to a constant.
+
+#### 10. Empty state text for module loading is inadequate (MEDIUM)
+`bill-module.tsx` shows plain `<p>Loading bills...</p>` text. Should use the skeleton pattern from `loading.tsx`.
+
+#### 11. `text-[10px]` usage is widespread — below minimum readable size on mobile (HIGH)
+Section labels, badge text, and metadata use `text-[10px]` (10px). WCAG 1.4.4 requires text be resizable; 10px is below the 12px practical floor for mobile body text. Replace labels with `text-xs` (12px) minimum.
+
+#### 12. Property detail TabsList has no scroll on narrow viewports (MEDIUM)
+Four tabs (Bookings, Bills, Tasks, Vault) in `TabsList` without `overflow-x-auto`. On 375px with commission badge info row above, the tabs risk clipping. Add `overflow-x-auto` to the TabsList wrapper.
+
+#### 13. Login page has no brand visual identity (MEDIUM)
+The login page is a generic `CardTitle="ApartmentOS"` + `CardDescription="Property Management Platform"`. No logo, no navy header, no copper accent. First impression of the product. Add navy header band matching guest check-in pattern.
+
+#### 14. Dashboard missing section for "Today's check-ins" urgency (MEDIUM)
+The dashboard shows upcoming bookings but the Ledger direction spec called for the property cards to be mini income statements. The current property cards show only name/address/commission — no revenue figure, no occupancy indicator. This is the most important gap from the Ledger concept.
+
+#### 15. No pull-to-refresh, no optimistic updates (LOW — future)
+These are PWA patterns not yet implemented. Flag for future sprint.
+
 ## v1 Presentation Node IDs (pencil-new.pen) — kept for reference
 
 - Frame 1 — Cover: `EVuwv`

@@ -38,6 +38,11 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/financials') ||
     request.nextUrl.pathname.startsWith('/calendar') ||
     request.nextUrl.pathname.startsWith('/settings') ||
+    request.nextUrl.pathname.startsWith('/inventory') ||
+    request.nextUrl.pathname.startsWith('/vault') ||
+    request.nextUrl.pathname.startsWith('/contractors') ||
+    request.nextUrl.pathname.startsWith('/messages') ||
+    request.nextUrl.pathname.startsWith('/owners') ||
     request.nextUrl.pathname.startsWith('/owner')
 
   if (isProtectedRoute && !user) {

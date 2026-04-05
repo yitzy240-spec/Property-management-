@@ -29,7 +29,7 @@ export default async function BillsPage() {
   const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
 
-  const { data: bills } = await supabase
+  const { data: bills } = await serviceClient
     .from('bills')
     .select('*, properties(name)')
     .order('created_at', { ascending: false })

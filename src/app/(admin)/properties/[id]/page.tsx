@@ -19,7 +19,7 @@ export default async function PropertyDetailPage({
   const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
 
-  const { data: property } = await supabase
+  const { data: property } = await serviceClient
     .from('properties')
     .select('*, owners(full_name, email, profile)')
     .eq('id', params.id)
@@ -57,12 +57,10 @@ export default async function PropertyDetailPage({
             <p className="text-sm text-muted-foreground">{property.address}</p>
           </div>
         </div>
-        <Link href={`/properties/${params.id}/edit`}>
-          <Button variant="outline" size="sm">
-            <Pencil className="mr-2 h-3.5 w-3.5" />
-            Edit
-          </Button>
-        </Link>
+        <Button variant="outline" size="sm" disabled title="Edit coming soon">
+          <Pencil className="mr-2 h-3.5 w-3.5" />
+          Edit
+        </Button>
       </div>
 
       {/* Info row */}
