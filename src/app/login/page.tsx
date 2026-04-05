@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,9 +16,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState<'admin' | 'owner'>('admin')
 
-  async function handleAdminLogin(formData: FormData) {
+  async function handleAdminLogin(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
     setLoading(true)
     setError(null)
+    const formData = new FormData(e.currentTarget)
     const result = await loginWithEmail(formData)
     if (result?.error) {
       setError(result.error)
@@ -25,9 +28,11 @@ export default function LoginPage() {
     }
   }
 
-  async function handleResetPassword(formData: FormData) {
+  async function handleResetPassword(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
     setLoading(true)
     setError(null)
+    const formData = new FormData(e.currentTarget)
     const result = await resetPassword(formData)
     if (result?.error) {
       setError(result.error)
@@ -37,9 +42,11 @@ export default function LoginPage() {
     setLoading(false)
   }
 
-  async function handleOwnerLogin(formData: FormData) {
+  async function handleOwnerLogin(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
     setLoading(true)
     setError(null)
+    const formData = new FormData(e.currentTarget)
     const result = await sendOwnerMagicLink(formData)
     if (result?.error) {
       setError(result.error)
@@ -128,7 +135,7 @@ export default function LoginPage() {
                     </button>
                   </div>
                 ) : (
-                  <form action={handleResetPassword} className="space-y-4">
+                  <form onSubmit={handleResetPassword} className="space-y-4">
                     <p className="text-sm text-muted-foreground">
                       Enter your email and we&apos;ll send a reset link.
                     </p>
@@ -157,7 +164,7 @@ export default function LoginPage() {
                       disabled={loading}
                       className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
                     >
-                      {loading ? 'Sending...' : 'Send Reset Link'}
+                      {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : 'Send Reset Link'}
                     </Button>
                     <button
                       type="button"
@@ -169,7 +176,7 @@ export default function LoginPage() {
                   </form>
                 )
               ) : (
-                <form action={handleAdminLogin} className="space-y-4">
+                <form onSubmit={handleAdminLogin} className="space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="admin-email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Email
@@ -216,7 +223,7 @@ export default function LoginPage() {
                     disabled={loading}
                     className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
                   >
-                    {loading ? 'Signing in...' : 'Sign In'}
+                    {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</> : 'Sign In'}
                   </Button>
                 </form>
               )
@@ -242,7 +249,7 @@ export default function LoginPage() {
                 </button>
               </div>
             ) : (
-              <form action={handleOwnerLogin} className="space-y-4">
+              <form onSubmit={handleOwnerLogin} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="owner-email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Email
@@ -271,7 +278,7 @@ export default function LoginPage() {
                   disabled={loading}
                   className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
                 >
-                  {loading ? 'Sending...' : 'Send Login Link'}
+                  {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : 'Send Login Link'}
                 </Button>
               </form>
             )}

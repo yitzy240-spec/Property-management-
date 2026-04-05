@@ -6,6 +6,7 @@ import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/
 import { StatusBadge } from '@/components/ui/status-badge'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { BillActions } from '@/components/features/bill-actions'
+import { BillAddButton } from '@/components/features/bill-add'
 import { cn } from '@/lib/utils'
 
 const billTypeLabels: Record<string, string> = {
@@ -46,11 +47,14 @@ export default async function BillsPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Bill Verification</h1>
-        <p className="text-xs text-muted-foreground">
-          AI-parsed bills awaiting review. Approve to make visible to owners.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight">Bill Verification</h1>
+          <p className="text-xs text-muted-foreground">
+            AI-parsed bills awaiting review. Approve to make visible to owners.
+          </p>
+        </div>
+        <BillAddButton />
       </div>
 
       {/* Tab bar — clickable KPI counts */}
