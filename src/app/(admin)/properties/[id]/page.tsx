@@ -10,6 +10,8 @@ import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { formatILS, formatDateJerusalem } from '@/lib/utils'
 import { MagicLinkGenerator } from '@/components/features/magic-link-generator'
 import { BookingAddButton } from '@/components/features/booking-add'
+import { UtilityAccountsSection } from '@/components/features/utility-accounts'
+import { BookingList } from '@/components/features/booking-list'
 
 export default async function PropertyDetailPage({
   params,

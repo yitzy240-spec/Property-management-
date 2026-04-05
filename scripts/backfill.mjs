@@ -208,6 +208,97 @@ WHERE NOT EXISTS (SELECT 1 FROM auth.identities i WHERE i.user_id = u.id);`)
   }
   console.log('  Created: ' + created + ', Updated: ' + updated + ', Skipped: ' + skipped)
 
+  // ── Step 7: Green Invoice backfill ──
+  console.log('\n=== STEP 7: Green Invoice Backfill ===')
+
+  const GI_ID = '4a904d6b-c33d-452c-a39f-724db7ff3ab6'
+  const GI_SECRET = 'Z9u%Oko4EL.WoWOJr<X!s?,>17_,9FHg'
+  const GI_BASE = 'https://api.greeninvoice.co.il/api/v1'
+
+  const giTokenRes = await fetch(GI_BASE + '/account/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: GI_ID, secret: GI_SECRET }),
+  })
+  const { token: giToken } = await giTokenRes.json()
+
+  if (!giToken) {
+    console.log('  ERROR: Could not get Green Invoice JWT')
+  } else {
+    async function gi(path, body) {
+      const r = await fetch(GI_BASE + path, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + giToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      return r.json()
+    }
+
+    // Sync GI clients to owners
+    console.log('  Syncing Green Invoice clients...')
+    const giClients = await gi('/clients/search', {})
+    console.log('  Found ' + (giClients.total || giClients.items?.length || 0) + ' GI clients')
+
+    for (const client of giClients.items || []) {
+      // Try to match to local owner by name
+      const ownerRes = await sb('/rest/v1/owners?select=id,full_name,green_invoice_client_id&full_name=ilike.*' + encodeURIComponent(client.name.split(' ')[0]) + '*')
+      const owners = await ownerRes.json()
+      if (owners.length > 0 && !owners[0].green_invoice_client_id) {
+        await sb('/rest/v1/owners?id=eq.' + owners[0].id, {
+          method: 'PATCH',
+          body: JSON.stringify({ green_invoice_client_id: client.id }),
+          headers: { Prefer: 'return=minimal' },
+        })
+        console.log('  Linked GI client ' + client.name + ' -> owner ' + owners[0].full_name)
+      }
+    }
+
+    // Pull all documents
+    console.log('  Pulling documents...')
+    const allDocs = []
+    for (let page = 1; page <= 10; page++) {
+      const res = await gi('/documents/search', page > 1 ? { page } : {})
+      allDocs.push(...(res.items || []))
+      if (!res.items || res.items.length < 25) break
+    }
+    console.log('  Found ' + allDocs.length + ' documents')
+
+    // Store document summaries in app_settings for now
+    const docSummary = allDocs.map(d => ({
+      id: d.id,
+      type: d.type,
+      number: d.number,
+      date: d.documentDate,
+      client: d.client?.name || null,
+      amount: d.amount,
+      currency: d.currency,
+      status: d.status,
+    }))
+
+    await sb('/rest/v1/app_settings', {
+      method: 'POST',
+      body: JSON.stringify({
+        key: 'green_invoice_documents',
+        value: JSON.stringify(docSummary),
+        description: 'Green Invoice document history (backfill ' + new Date().toISOString() + ')',
+      }),
+      headers: { Prefer: 'return=minimal,resolution=merge-duplicates' },
+    })
+    console.log('  Stored ' + allDocs.length + ' document records')
+
+    // Summary by type
+    const typeNames = { 10: 'Quote', 300: 'Proforma', 305: 'Tax Invoice', 320: 'Tax Invoice/Receipt', 400: 'Receipt' }
+    const byType = {}
+    for (const d of allDocs) {
+      if (!byType[d.type]) byType[d.type] = { count: 0, total: 0 }
+      byType[d.type].count++
+      byType[d.type].total += d.amount || 0
+    }
+    for (const [type, data] of Object.entries(byType)) {
+      console.log('    ' + (typeNames[type] || 'Type ' + type) + ': ' + data.count + ' docs, ' + Math.round(data.total) + ' ILS')
+    }
+  }
+
   // ── Summary ──
   console.log('\n=== BACKFILL COMPLETE ===')
   console.log('Things you need to provide manually (not in Lodgify):')

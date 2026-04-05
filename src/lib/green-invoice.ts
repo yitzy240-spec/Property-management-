@@ -312,7 +312,7 @@ export async function searchDocuments(params: DocumentSearchParams): Promise<{ i
       type: params.type,
       status: params.status,
       sort: params.sort || 'documentDate',
-      page: params.page || 0,
+      page: params.page || 1,
       pageSize: params.pageSize || 25,
     }),
   })
