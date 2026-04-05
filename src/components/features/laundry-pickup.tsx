@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Phone, MessageCircle } from 'lucide-react'
-import { toast } from 'sonner'
+import { MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Drawer,
   DrawerClose,
@@ -23,36 +23,33 @@ interface LaundryPickupProps {
 }
 
 export function LaundryPickupButton({ properties, lowStockItems }: LaundryPickupProps) {
-  const [phone, setPhone] = useState('972542326146')
+  const [phone] = useState('972542326146')
   const [open, setOpen] = useState(false)
+  const [selectedProperty, setSelectedProperty] = useState('')
+  const [pickupTime, setPickupTime] = useState('')
 
   function generateWhatsAppUrl() {
-    // Build a smart pickup message
-    const lines = ['🧺 *Laundry Pickup Request*', `📅 ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`, '']
+    const property = properties.find(p => p.id === selectedProperty)
+    const propertyName = property?.name || 'הדירה'
+    const address = property?.address || ''
 
-    if (lowStockItems.length > 0) {
-      lines.push('*Low Stock — Priority Pickup:*')
-      // Group by property
-      const byProperty = lowStockItems.reduce((acc, item) => {
-        if (!acc[item.propertyName]) acc[item.propertyName] = []
-        acc[item.propertyName].push(item)
-        return acc
-      }, {} as Record<string, typeof lowStockItems>)
+    // Hebrew template from Marcus:
+    // אשמח לאיסוף מ (דירה) כביסה מוכנה בשקיות.
+    // צריך איסוף היום עד השעה y
+    const lines = [
+      `אשמח לאיסוף מ*${propertyName}*${address ? ' (' + address + ')' : ''} כביסה מוכנה בשקיות.`,
+      pickupTime ? `צריך איסוף היום עד השעה *${pickupTime}*` : 'צריך איסוף היום',
+    ]
 
-      for (const [propName, items] of Object.entries(byProperty)) {
-        lines.push(`\n📍 *${propName}*`)
-        for (const item of items) {
-          lines.push(`  • ${item.itemName}: ${item.quantity}/${item.parLevel} (need ${item.parLevel - item.quantity} more)`)
-        }
-      }
-    } else {
-      lines.push('*Pickup locations:*')
-      for (const p of properties) {
-        lines.push(`📍 ${p.name} — ${p.address}`)
+    // Add low stock details if relevant
+    const propertyLowStock = lowStockItems.filter(i => i.propertyName === propertyName)
+    if (propertyLowStock.length > 0) {
+      lines.push('')
+      lines.push('פריטים חסרים:')
+      for (const item of propertyLowStock) {
+        lines.push(`• ${item.itemName}: ${item.quantity}/${item.parLevel}`)
       }
     }
-
-    lines.push('', 'Sent via ApartmentOS — Marcus Properties')
 
     const message = encodeURIComponent(lines.join('\n'))
     const phoneNum = phone.replace(/\D/g, '')
@@ -72,25 +69,33 @@ export function LaundryPickupButton({ properties, lowStockItems }: LaundryPickup
         <DrawerHeader>
           <DrawerTitle>Request Laundry Pickup</DrawerTitle>
           <DrawerDescription>
-            Send a WhatsApp message to your laundry service with pickup details.
+            Send Rafael&apos;s Dry Cleaning a WhatsApp message.
           </DrawerDescription>
         </DrawerHeader>
         <div className="space-y-4 p-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Laundry Service Phone</Label>
+            <Label className="text-xs font-medium">Property</Label>
+            <Select value={selectedProperty} onValueChange={(v) => setSelectedProperty(v || '')}>
+              <SelectTrigger className="h-11"><SelectValue placeholder="Select property" /></SelectTrigger>
+              <SelectContent>
+                {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Pickup by (time)</Label>
             <Input
-              type="tel"
-              placeholder="972501234567"
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
-              className="h-11 font-mono"
+              type="time"
+              value={pickupTime}
+              onChange={e => setPickupTime(e.target.value)}
+              className="h-11"
             />
-            <p className="text-[10px] text-muted-foreground">Include country code, no + or dashes</p>
           </div>
 
           {lowStockItems.length > 0 && (
             <div className="rounded-[10px] border border-status-warning/30 bg-[hsl(38_92%_50%/0.04)] p-3">
-              <p className="text-xs font-semibold text-foreground">Low Stock Items ({lowStockItems.length})</p>
+              <p className="text-xs font-semibold text-foreground">Low Stock ({lowStockItems.length})</p>
               {lowStockItems.map((item, i) => (
                 <p key={i} className="mt-1 text-xs text-muted-foreground">
                   {item.propertyName} — {item.itemName}: {item.quantity}/{item.parLevel}
@@ -99,15 +104,21 @@ export function LaundryPickupButton({ properties, lowStockItems }: LaundryPickup
             </div>
           )}
 
-          <div className="rounded-[10px] border border-border bg-muted/30 p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Pickup Locations</p>
-            {properties.map(p => (
-              <p key={p.id} className="mt-1 text-xs text-muted-foreground">{p.name} — {p.address}</p>
-            ))}
-          </div>
+          {/* Message preview */}
+          {selectedProperty && (
+            <div className="rounded-[10px] border border-border bg-muted/30 p-3" dir="rtl">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1" dir="ltr">Message Preview</p>
+              <p className="text-sm text-foreground leading-relaxed">
+                אשמח לאיסוף מ<strong>{properties.find(p => p.id === selectedProperty)?.name}</strong> כביסה מוכנה בשקיות.
+              </p>
+              <p className="text-sm text-foreground">
+                {pickupTime ? `צריך איסוף היום עד השעה ${pickupTime}` : 'צריך איסוף היום'}
+              </p>
+            </div>
+          )}
         </div>
         <DrawerFooter>
-          {phone ? (
+          {selectedProperty ? (
             <a href={generateWhatsAppUrl()} target="_blank" rel="noopener noreferrer" className="block">
               <Button className="h-11 w-full gap-1.5 bg-[#25D366] text-white hover:bg-[#25D366]/90">
                 <MessageCircle className="h-4 w-4" />
@@ -115,7 +126,7 @@ export function LaundryPickupButton({ properties, lowStockItems }: LaundryPickup
               </Button>
             </a>
           ) : (
-            <Button disabled className="h-11 w-full">Enter phone number above</Button>
+            <Button disabled className="h-11 w-full">Select a property above</Button>
           )}
           <DrawerClose asChild>
             <Button variant="outline">Cancel</Button>
