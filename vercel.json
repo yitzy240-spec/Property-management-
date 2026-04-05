@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/ical-sync",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/cron/parse-bills",
@@ -18,7 +18,7 @@
     },
     {
       "path": "/api/cron/lodgify-sync",
-      "schedule": "0 */2 * * *"
+      "schedule": "0 7 * * *"
     }
   ]
 }
