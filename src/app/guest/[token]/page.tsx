@@ -42,7 +42,7 @@ export default async function GuestCheckInPage({
     if (payload.booking_id) {
       const { data } = await serviceClient
         .from('bookings')
-        .select('check_in, check_out, guest_name')
+        .select('check_in, check_out, guest_name, guest_language')
         .eq('id', payload.booking_id)
         .single()
       booking = data
@@ -60,10 +60,26 @@ export default async function GuestCheckInPage({
       entryCode = property.entry_code
     }
 
+    // Fetch AI guest guide (non-blocking)
+    let guideText: string | null = null
+    try {
+      const lang = (booking as Record<string, unknown>)?.guest_language as string || 'en'
+      const guideRes = await fetch(
+        `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/ai/guest-guide?property_id=${payload.property_id}&lang=${lang}`,
+      )
+      if (guideRes.ok) {
+        const guideData = await guideRes.json()
+        guideText = guideData.content
+      }
+    } catch {
+      // Guide fetch failed — page still works without it
+    }
+
     return (
       <GuestCheckIn
         property={{ ...property, entry_code: entryCode }}
         booking={booking}
+        guideText={guideText}
       />
     )
   } catch {

@@ -23,16 +23,19 @@ export function DocumentUpload() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [classifying, setClassifying] = useState(false)
   const [category, setCategory] = useState<DocumentCategory>('other')
+  const [title, setTitle] = useState('')
+  const [expiryDate, setExpiryDate] = useState('')
 
   async function handleUpload(formData: FormData) {
     setLoading(true)
 
     const file = formData.get('file') as File
-    const title = formData.get('title') as string
+    const titleVal = formData.get('title') as string
     const propertyId = formData.get('property_id') as string || null
 
-    if (!file || !title) {
+    if (!file || !titleVal) {
       setLoading(false)
       return
     }
@@ -48,14 +51,36 @@ export function DocumentUpload() {
       return
     }
 
+    // AI classification
+    let aiClassified = false
+    let aiData = null
+    try {
+      setClassifying(true)
+      const res = await fetch('/api/ai/classify-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storage_path: filePath, filename: file.name }),
+      })
+      if (res.ok) {
+        aiData = await res.json()
+        aiClassified = true
+      }
+    } catch {
+      // AI failed silently — use manual values
+    } finally {
+      setClassifying(false)
+    }
+
     await supabase.from('documents').insert({
-      title,
-      category,
+      title: titleVal,
+      category: aiClassified && aiData?.category ? aiData.category : category,
       storage_path: filePath,
       file_size: file.size,
       uploaded_by: 'admin',
       property_id: propertyId,
-      expiry_date: formData.get('expiry_date') as string || null,
+      expiry_date: (aiClassified && aiData?.expiry_date) || formData.get('expiry_date') as string || null,
+      ai_classified: aiClassified,
+      ai_classification_data: aiData,
     })
 
     setOpen(false)
@@ -115,8 +140,8 @@ export function DocumentUpload() {
               <Input id="property_id" name="property_id" placeholder="Property UUID (optional)" className="h-11" />
             </div>
 
-            <Button type="submit" className="h-11 w-full" disabled={loading}>
-              {loading ? 'Uploading...' : 'Upload Document'}
+            <Button type="submit" className="h-11 w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={loading}>
+              {classifying ? 'AI Classifying...' : loading ? 'Uploading...' : 'Upload Document'}
             </Button>
           </form>
         </div>

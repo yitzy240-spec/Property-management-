@@ -12,6 +12,7 @@ export type InventoryStatus = 'in_closet' | 'at_laundry' | 'damaged' | 'retired'
 export type FeeType = 'commission' | 'hourly' | 'fixed'
 export type DocumentCategory = 'tabu' | 'insurance' | 'contract' | 'warranty' | 'receipt' | 'other'
 export type SeasonType = 'rain_roof' | 'boiler_heating' | 'ac_clean'
+export type ReportStatus = 'draft' | 'approved' | 'sent'
 
 // ============================================
 // Core Entities
@@ -45,6 +46,8 @@ export interface Property {
   canva_design_url: string | null
   ical_feed_urls: ICalFeed[]
   lodgify_property_id: string | null
+  maintenance_notes: string | null
+  guest_guide_base_text: string | null
   management_fee_agorot: number
   hourly_rate_agorot: number
   commission_rate: number
@@ -68,6 +71,7 @@ export interface Booking {
   check_out: string
   gross_rental_agorot: number | null
   channel_fees_agorot: number | null
+  guest_language: string | null
   ical_uid: string | null
   synced_at: string | null
   created_at: string
@@ -133,6 +137,7 @@ export interface TaskChecklistItem {
   is_completed: boolean
   completed_at: string | null
   sort_order: number
+  ai_generated: boolean
 }
 
 export interface TaskMedia {
@@ -207,8 +212,36 @@ export interface Document {
   file_size: number | null
   uploaded_by: 'admin' | 'owner'
   expiry_date: string | null
+  ai_classified: boolean
+  ai_classification_data: Record<string, unknown> | null
   notes: string | null
   created_at: string
+}
+
+export interface OwnerReport {
+  id: string
+  owner_id: string
+  quarter: number
+  year: number
+  report_data: Record<string, unknown>
+  ai_narrative_en: string | null
+  ai_narrative_he: string | null
+  edited_narrative_en: string | null
+  edited_narrative_he: string | null
+  status: ReportStatus
+  approved_at: string | null
+  sent_at: string | null
+  sent_via: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface GuestGuideCache {
+  id: string
+  property_id: string
+  language_code: string
+  guide_content: string
+  generated_at: string
 }
 
 // ============================================

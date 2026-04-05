@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Camera, Sparkles } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,40 @@ export function TaskCreateDialog() {
   const [contractors, setContractors] = useState<{ id: string; name: string }[]>([])
   const [propertyId, setPropertyId] = useState('')
   const [contractorId, setContractorId] = useState('')
+  const [analyzing, setAnalyzing] = useState(false)
+  const [titleVal, setTitleVal] = useState('')
+  const [descVal, setDescVal] = useState('')
+  const [checklistVal, setChecklistVal] = useState('')
+
+  async function handlePhotoAnalyze(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setAnalyzing(true)
+    try {
+      const buffer = await file.arrayBuffer()
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+
+      const res = await fetch('/api/ai/analyze-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: base64, mime_type: file.type }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        if (data.title) setTitleVal(data.title)
+        if (data.description) setDescVal(data.description)
+        if (data.priority) setPriority(data.priority as TaskPriority)
+        if (data.checklist?.length) setChecklistVal(data.checklist.join('\n'))
+        toast.success('AI analyzed the photo')
+      }
+    } catch {
+      toast.error('Photo analysis failed')
+    } finally {
+      setAnalyzing(false)
+    }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -91,14 +125,26 @@ export function TaskCreateDialog() {
 
   const formContent = (
     <form action={handleCreate} className="space-y-4 p-4">
+      {/* Snap-to-Task: AI photo analysis */}
+      <div className="rounded-[10px] border border-dashed border-border bg-muted/30 p-3">
+        <label className="flex cursor-pointer items-center justify-center gap-2 text-sm text-muted-foreground">
+          {analyzing ? (
+            <><Sparkles className="h-4 w-4 animate-pulse text-accent" /> AI analyzing photo...</>
+          ) : (
+            <><Camera className="h-4 w-4" /> Snap a photo — AI fills the form</>
+          )}
+          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoAnalyze} disabled={analyzing} />
+        </label>
+      </div>
+
       <div className="space-y-1.5">
         <Label htmlFor="title" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Task Title</Label>
-        <Input id="title" name="title" placeholder="Fix boiler pilot light" required className="h-11" />
+        <Input id="title" name="title" placeholder="Fix boiler pilot light" required className="h-11" value={titleVal} onChange={e => setTitleVal(e.target.value)} />
       </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="description" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</Label>
-        <Input id="description" name="description" placeholder="Optional details..." className="h-11" />
+        <Input id="description" name="description" placeholder="Optional details..." className="h-11" value={descVal} onChange={e => setDescVal(e.target.value)} />
       </div>
 
       <div className="space-y-1.5">
@@ -146,6 +192,8 @@ export function TaskCreateDialog() {
           name="checklist_items"
           className="flex min-h-[80px] w-full rounded-[var(--radius-button)] border border-input bg-background px-3 py-2 text-sm"
           placeholder={"Check boiler ignition\nTest thermostat\nVerify gas connection"}
+          value={checklistVal}
+          onChange={e => setChecklistVal(e.target.value)}
         />
       </div>
 

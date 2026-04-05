@@ -5,6 +5,7 @@ import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/
 import { formatDateJerusalem } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { LinenForecast } from '@/components/features/linen-forecast'
 
 export default async function InventoryPage() {
   const supabase = createServerSupabaseClient()
@@ -33,6 +34,9 @@ export default async function InventoryPage() {
           Track linens across properties and manage laundry pickups.
         </p>
       </div>
+
+      {/* AI Linen Forecast */}
+      <LinenForecast />
 
       {/* Par Level Alerts */}
       {lowStockItems.length > 0 && (

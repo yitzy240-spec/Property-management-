@@ -39,3 +39,6 @@ next-env.d.ts
 marcus-properties-homepage.png
 marcus-lodgify.png
 .playwright-mcp/
+
+.vercel
+.env.vercel

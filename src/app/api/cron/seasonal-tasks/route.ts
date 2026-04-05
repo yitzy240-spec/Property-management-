@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { callGeminiJSON } from '@/lib/ai'
 
 /**
  * GET /api/cron/seasonal-tasks
@@ -68,15 +69,62 @@ export async function GET(request: Request) {
 
       if (taskError || !task) continue
 
-      // Create checklist items for the task
+      // Create template checklist items
       if (checklistItems && checklistItems.length > 0) {
         const items = checklistItems.map((label, index) => ({
           task_id: task.id,
           label,
           sort_order: index,
         }))
-
         await serviceClient.from('task_checklist_items').insert(items)
+      }
+
+      // AI-generated property-specific checklist items
+      try {
+        const { data: recentTasks } = await serviceClient
+          .from('tasks')
+          .select('title')
+          .eq('property_id', property.id)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
+          .limit(10)
+
+        const seasonNames: Record<string, string> = {
+          rain_roof: 'winter rain/roof season',
+          boiler_heating: 'winter heating season',
+          ac_clean: 'summer AC season',
+        }
+
+        const aiItems = await callGeminiJSON<string[]>('fast', [
+          {
+            parts: [
+              {
+                text: `Generate 3-5 additional seasonal maintenance checklist items for a short-term rental apartment in Jerusalem.
+
+Property: ${property.name}
+Season: ${seasonNames[template.season_type] || template.season_type}
+Standard items already included: ${(checklistItems || []).join(', ')}
+Recent completed maintenance: ${(recentTasks ?? []).map(t => t.title).join(', ') || 'None'}
+
+Return a JSON array of strings, each a specific actionable checklist item. Focus on items specific to Jerusalem climate and Israeli building standards. Do not repeat the standard items.`,
+              },
+            ],
+          },
+        ])
+
+        if (aiItems && aiItems.length > 0) {
+          const baseIndex = (checklistItems?.length ?? 0)
+          await serviceClient.from('task_checklist_items').insert(
+            aiItems.slice(0, 5).map((label, i) => ({
+              task_id: task.id,
+              label,
+              sort_order: baseIndex + i,
+              ai_generated: true,
+            }))
+          )
+        }
+      } catch {
+        // AI enhancement failed — template items are sufficient
       }
 
       created++

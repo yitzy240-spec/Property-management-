@@ -19,9 +19,10 @@ interface GuestCheckInProps {
     check_out: string
     guest_name: string | null
   } | null
+  guideText?: string | null
 }
 
-export function GuestCheckIn({ property, booking }: GuestCheckInProps) {
+export function GuestCheckIn({ property, booking, guideText }: GuestCheckInProps) {
   const [codeVisible, setCodeVisible] = useState(false)
   const [countdown, setCountdown] = useState('')
 
@@ -143,6 +144,16 @@ export function GuestCheckIn({ property, booking }: GuestCheckInProps) {
               </div>
             </div>
           </a>
+        )}
+
+        {/* AI Guest Guide */}
+        {guideText && (
+          <div className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your Guide</p>
+            <div className="mt-2 whitespace-pre-line text-sm leading-relaxed text-foreground">
+              {guideText}
+            </div>
+          </div>
         )}
 
         {/* Booking Info */}

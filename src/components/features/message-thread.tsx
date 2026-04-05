@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Send } from 'lucide-react'
+import { Send, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
@@ -26,6 +26,23 @@ export function MessageThread({ propertyId, propertyName, currentRole }: Message
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
+  const [drafting, setDrafting] = useState(false)
+
+  async function handleDraftReply() {
+    setDrafting(true)
+    try {
+      const res = await fetch('/api/ai/draft-reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: propertyId }),
+      })
+      if (res.ok) {
+        const { draft } = await res.json()
+        if (draft) setNewMessage(draft)
+      }
+    } catch { /* silently fail */ }
+    setDrafting(false)
+  }
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -156,6 +173,11 @@ export function MessageThread({ propertyId, propertyName, currentRole }: Message
             className="flex-1"
             disabled={sending}
           />
+          {currentRole === 'admin' && (
+            <Button type="button" size="icon" variant="outline" onClick={handleDraftReply} disabled={drafting} title="AI draft reply">
+              <Sparkles className={`h-4 w-4 ${drafting ? 'animate-pulse text-accent' : ''}`} />
+            </Button>
+          )}
           <Button type="submit" size="icon" disabled={sending || !newMessage.trim()}>
             <Send className="h-4 w-4" />
           </Button>

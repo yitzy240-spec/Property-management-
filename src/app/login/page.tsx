@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { FullScreenLoader } from '@/components/ui/logo-spinner'
 import { loginWithEmail, sendOwnerMagicLink } from './actions'
 
 export default function LoginPage() {
@@ -32,6 +33,10 @@ export default function LoginPage() {
       setMagicLinkSent(true)
     }
     setLoading(false)
+  }
+
+  if (loading) {
+    return <FullScreenLoader text={tab === 'admin' ? 'Signing in...' : 'Sending link...'} />
   }
 
   return (

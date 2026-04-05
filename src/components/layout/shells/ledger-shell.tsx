@@ -18,6 +18,7 @@ import {
   Settings,
   LogOut,
   HardHat,
+  Sparkles,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -39,6 +40,7 @@ const menuItems = [
   { href: '/owners', label: 'Owners', icon: Users },
   { href: '/tasks', label: 'Tasks', icon: ClipboardList },
   { href: '/contractors', label: 'Contractors', icon: HardHat },
+  { href: '/reports', label: 'Owner Reports', icon: Sparkles },
   { href: '/inventory', label: 'Inventory', icon: Package },
   { href: '/messages', label: 'Messages', icon: MessageSquare },
   { href: '/vault', label: 'Vault', icon: FileText },
