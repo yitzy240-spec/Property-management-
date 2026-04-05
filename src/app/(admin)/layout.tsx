@@ -1,9 +1,9 @@
-import { AdminShell } from '@/components/layout/admin-shell'
+import { LedgerShell } from '@/components/layout/shells/ledger-shell'
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  return <AdminShell>{children}</AdminShell>
+  return <LedgerShell>{children}</LedgerShell>
 }
