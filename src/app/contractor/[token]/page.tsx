@@ -38,7 +38,7 @@ export default async function ContractorMagicLinkPage({
 
     const { data: property } = await serviceClient
       .from('properties')
-      .select('id, name, address, entry_code, youtube_tutorial_url')
+      .select('id, name, address, entry_code, building_entry_code, youtube_tutorial_url')
       .eq('id', payload.property_id)
       .single()
 

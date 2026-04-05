@@ -25,6 +25,7 @@ interface ContractorTaskViewProps {
     name: string
     address: string
     entry_code: string | null
+    building_entry_code: string | null
     youtube_tutorial_url: string | null
   }
   task: {
@@ -155,12 +156,20 @@ export function ContractorTaskView({
           <h2 className="text-sm font-semibold">{property.name}</h2>
           <p className="text-xs text-muted-foreground">{property.address}</p>
 
-          {property.entry_code && (
-            <div className="mt-3 rounded-lg bg-primary/5 p-3 text-center">
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Entry Code</p>
-              <p className="mt-1 font-mono text-4xl font-bold tracking-[0.2em]">
-                {property.entry_code}
-              </p>
+          {(property.entry_code || property.building_entry_code) && (
+            <div className="mt-3 space-y-2">
+              {property.building_entry_code && (
+                <div className="rounded-lg bg-muted/50 p-3 text-center">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Building Entrance</p>
+                  <p className="mt-1 font-mono text-2xl font-bold tracking-[0.15em]">{property.building_entry_code}</p>
+                </div>
+              )}
+              {property.entry_code && (
+                <div className="rounded-lg bg-primary/5 p-3 text-center">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Apartment Code</p>
+                  <p className="mt-1 font-mono text-4xl font-bold tracking-[0.2em]">{property.entry_code}</p>
+                </div>
+              )}
             </div>
           )}
 

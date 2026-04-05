@@ -33,6 +33,7 @@ export function PropertyForm({ property }: PropertyFormProps) {
       num_bedrooms: parseInt(formData.get('num_bedrooms') as string) || 1,
       num_beds: parseInt(formData.get('num_beds') as string) || 1,
       entry_code: formData.get('entry_code') as string || null,
+      building_entry_code: formData.get('building_entry_code') as string || null,
       youtube_tutorial_url: formData.get('youtube_tutorial_url') as string || null,
       canva_design_url: formData.get('canva_design_url') as string || null,
       owner_id: formData.get('owner_id') as string,
@@ -102,8 +103,12 @@ export function PropertyForm({ property }: PropertyFormProps) {
                 <Input id="neighborhood" name="neighborhood" placeholder="Old City" defaultValue={property?.neighborhood ?? ''} className="h-11" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="entry_code" className="text-xs font-medium">Entry Code</Label>
-                <Input id="entry_code" name="entry_code" placeholder="4829" className="h-11 font-mono" defaultValue={property?.entry_code ?? ''} />
+                <Label htmlFor="entry_code" className="text-xs font-medium">Apartment Code</Label>
+                <Input id="entry_code" name="entry_code" placeholder="13245" className="h-11 font-mono" defaultValue={property?.entry_code ?? ''} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="building_entry_code" className="text-xs font-medium">Building Code</Label>
+                <Input id="building_entry_code" name="building_entry_code" placeholder="2580 (optional)" className="h-11 font-mono" defaultValue={property?.building_entry_code ?? ''} />
               </div>
             </div>
 

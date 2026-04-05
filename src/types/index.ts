@@ -44,6 +44,7 @@ export interface Property {
   num_bedrooms: number
   num_beds: number
   entry_code: string | null
+  building_entry_code: string | null
   entry_code_updated_at: string | null
   youtube_tutorial_url: string | null
   canva_design_url: string | null

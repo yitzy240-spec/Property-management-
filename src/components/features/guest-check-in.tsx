@@ -11,6 +11,7 @@ interface GuestCheckInProps {
     neighborhood: string | null
     city: string
     entry_code: string | null
+    building_entry_code: string | null
     youtube_tutorial_url: string | null
     canva_design_url: string | null
   }
@@ -94,8 +95,16 @@ export function GuestCheckIn({ property, booking, guideText }: GuestCheckInProps
               <p className="mt-2 font-mono text-5xl font-bold tracking-[0.25em] text-foreground">
                 {property.entry_code}
               </p>
+              {property.building_entry_code && (
+                <div className="mt-3 rounded-lg bg-muted/50 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Building Entrance</p>
+                  <p className="font-mono text-lg font-bold tracking-[0.15em]">{property.building_entry_code}</p>
+                </div>
+              )}
               <p className="mt-3 text-xs text-muted-foreground">
-                Use this code on the Simplex lock at the front door.
+                {property.building_entry_code
+                  ? 'Use the building code at the main entrance, then the apartment code on the Simplex lock.'
+                  : 'Use this code on the Simplex lock at the front door.'}
               </p>
             </div>
           ) : (

@@ -32,7 +32,7 @@ export default async function GuestCheckInPage({
 
     const { data: property } = await serviceClient
       .from('properties')
-      .select('name, address, neighborhood, city, entry_code, youtube_tutorial_url, canva_design_url')
+      .select('name, address, neighborhood, city, entry_code, building_entry_code, youtube_tutorial_url, canva_design_url')
       .eq('id', payload.property_id)
       .single()
 
@@ -78,7 +78,7 @@ export default async function GuestCheckInPage({
 
     return (
       <GuestCheckIn
-        property={{ ...property, entry_code: entryCode }}
+        property={{ ...property, entry_code: entryCode, building_entry_code: entryCode ? property.building_entry_code : null }}
         booking={booking}
         guideText={guideText}
       />
