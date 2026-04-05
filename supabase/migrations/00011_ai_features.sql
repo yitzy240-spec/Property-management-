@@ -28,6 +28,20 @@ CREATE TABLE IF NOT EXISTS guest_guide_cache (
 
 CREATE INDEX IF NOT EXISTS idx_guest_guide_cache_property ON guest_guide_cache(property_id);
 
+ALTER TABLE guest_guide_cache ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public read guest guides"
+  ON guest_guide_cache FOR SELECT
+  USING (true);
+
+CREATE POLICY "Service role write guest guides"
+  ON guest_guide_cache FOR INSERT
+  WITH CHECK (auth.role() = 'service_role');
+
+CREATE POLICY "Service role update guest guides"
+  ON guest_guide_cache FOR UPDATE
+  USING (auth.role() = 'service_role');
+
 -- 6. Owner reports with approval flow
 DO $$ BEGIN
   CREATE TYPE report_status AS ENUM ('draft', 'approved', 'sent');
@@ -60,9 +74,16 @@ CREATE POLICY "Owners see own reports"
   ON owner_reports FOR SELECT
   USING (owner_id IN (SELECT id FROM owners WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY "Service role full access on owner_reports"
+-- Admin can manage all reports (via authenticated client)
+CREATE POLICY "Admin full access on owner_reports"
   ON owner_reports FOR ALL
-  USING (auth.role() = 'service_role');
+  USING (
+    EXISTS (
+      SELECT 1 FROM auth.users
+      WHERE auth.users.id = auth.uid()
+      AND (auth.users.raw_app_meta_data->>'role' = 'admin')
+    )
+  );
 
 CREATE INDEX IF NOT EXISTS idx_owner_reports_owner ON owner_reports(owner_id);
 CREATE INDEX IF NOT EXISTS idx_owner_reports_status ON owner_reports(status);

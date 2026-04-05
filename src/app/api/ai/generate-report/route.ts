@@ -81,12 +81,12 @@ export async function POST(request: Request) {
     return {
       property_name: property.name,
       bookings_count: pb.length,
-      gross_revenue: formatILS(gross),
-      channel_fees: formatILS(channelFees),
-      bills: formatILS(totalBills),
-      management_fees: formatILS(mgmtFees),
-      maintenance_expenses: formatILS(expenses),
-      net_income: formatILS(gross - channelFees - totalBills - mgmtFees - expenses),
+      gross_revenue_agorot: gross,
+      channel_fees_agorot: channelFees,
+      bills_agorot: totalBills,
+      management_fees_agorot: mgmtFees,
+      maintenance_expenses_agorot: expenses,
+      net_income_agorot: gross - channelFees - totalBills - mgmtFees - expenses,
       tasks_completed: pTasks.filter(t => t.status === 'completed').length,
       cleaning_turnovers: pTasks.filter(t => t.is_cleaning).length,
     }
@@ -99,8 +99,20 @@ export async function POST(request: Request) {
     properties: propertySummaries,
   }
 
-  // Generate AI narratives (English + Hebrew)
-  const dataStr = JSON.stringify(reportData, null, 2)
+  // Generate AI narratives — format agorot as ILS for readability in the prompt
+  const formattedForAI = {
+    ...reportData,
+    properties: propertySummaries.map(p => ({
+      ...p,
+      gross_revenue: formatILS(p.gross_revenue_agorot),
+      channel_fees: formatILS(p.channel_fees_agorot),
+      bills: formatILS(p.bills_agorot),
+      management_fees: formatILS(p.management_fees_agorot),
+      maintenance_expenses: formatILS(p.maintenance_expenses_agorot),
+      net_income: formatILS(p.net_income_agorot),
+    })),
+  }
+  const dataStr = JSON.stringify(formattedForAI, null, 2)
 
   const [narrativeEn, narrativeHe] = await Promise.all([
     callGemini('pro', [{

@@ -5,8 +5,23 @@ import { callGemini } from '@/lib/ai'
 /**
  * GET /api/ai/guest-guide?property_id=xxx&lang=he
  * Returns a translated guest guide. Caches per property+language.
+ * Internal-only: requires CRON_SECRET or admin auth.
  */
 export async function GET(request: Request) {
+  // Auth: internal server calls use CRON_SECRET, admin calls use session
+  const authHeader = request.headers.get('authorization')
+  const isInternal = authHeader === `Bearer ${process.env.CRON_SECRET}`
+
+  if (!isInternal) {
+    // Try admin auth as fallback
+    try {
+      const { requireAdmin } = await import('@/lib/auth')
+      await requireAdmin()
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  }
+
   const { searchParams } = new URL(request.url)
   const propertyId = searchParams.get('property_id')
   const lang = searchParams.get('lang') || 'en'

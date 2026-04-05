@@ -19,6 +19,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'image_base64 required' }, { status: 400 })
   }
 
+  // Max 10MB base64 (~13.3MB string)
+  if (image_base64.length > 14_000_000) {
+    return NextResponse.json({ error: 'Image too large (max 10MB)' }, { status: 413 })
+  }
+
   const result = await callGeminiJSON<{
     title: string
     description: string

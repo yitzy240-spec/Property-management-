@@ -62,10 +62,13 @@ export async function testGeminiKey(apiKey: string): Promise<{
 }> {
   const model = GEMINI_MODELS.lite
   const res = await fetch(
-    `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`,
+    `${GEMINI_API_BASE}/${model}:generateContent`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
       body: JSON.stringify({
         contents: [{ parts: [{ text: 'Reply with just the word OK' }] }],
       }),

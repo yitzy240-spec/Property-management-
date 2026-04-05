@@ -41,8 +41,14 @@ export function TaskCreateDialog() {
 
     setAnalyzing(true)
     try {
-      const buffer = await file.arrayBuffer()
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const dataUrl = reader.result as string
+          resolve(dataUrl.split(',')[1])
+        }
+        reader.readAsDataURL(file)
+      })
 
       const res = await fetch('/api/ai/analyze-photo', {
         method: 'POST',

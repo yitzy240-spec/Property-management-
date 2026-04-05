@@ -32,6 +32,12 @@ export async function POST(request: Request) {
   }
 
   const buffer = Buffer.from(await fileData.arrayBuffer())
+
+  // Max 10MB for AI classification
+  if (buffer.byteLength > 10 * 1024 * 1024) {
+    return NextResponse.json({ category: 'other', expiry_date: null, title_suggestion: filename || 'Document' })
+  }
+
   const base64 = buffer.toString('base64')
   const mimeType = filename?.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'
 
