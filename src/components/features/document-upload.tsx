@@ -1,17 +1,26 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Upload } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer'
 import { createClient } from '@/lib/supabase/client'
 import type { DocumentCategory } from '@/types'
 
 export function DocumentUpload() {
   const supabase = createClient()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [category, setCategory] = useState<DocumentCategory>('other')
@@ -28,18 +37,17 @@ export function DocumentUpload() {
       return
     }
 
-    // Upload to Supabase Storage
     const filePath = `vault/${Date.now()}_${file.name}`
     const { error: uploadError } = await supabase.storage
       .from('documents')
       .upload(filePath, file)
 
     if (uploadError) {
+      toast.error('Upload failed', { description: uploadError.message })
       setLoading(false)
       return
     }
 
-    // Create document record
     await supabase.from('documents').insert({
       title,
       category,
@@ -52,62 +60,67 @@ export function DocumentUpload() {
 
     setOpen(false)
     setLoading(false)
-    window.location.reload()
+    toast.success('Document uploaded')
+    router.refresh()
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-        <Upload className="h-4 w-4" />
-        Upload
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Upload Document</DialogTitle>
-        </DialogHeader>
-        <form action={handleUpload} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Document Title</Label>
-            <Input id="title" name="title" placeholder="Insurance Policy 2026" required />
-          </div>
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
+        <Button size="sm" className="h-9 gap-1.5 rounded-[var(--radius-button)] bg-accent text-accent-foreground hover:bg-accent/90">
+          <Upload className="h-3.5 w-3.5" />
+          Upload
+        </Button>
+      </DrawerTrigger>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Upload Document</DrawerTitle>
+        </DrawerHeader>
+        <div className="max-h-[70vh] overflow-y-auto">
+          <form action={handleUpload} className="space-y-4 p-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="title" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Document Title</Label>
+              <Input id="title" name="title" placeholder="Insurance Policy 2026" required className="h-11" />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Category</Label>
-            <Select value={category} onValueChange={(v) => setCategory(v as DocumentCategory)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tabu">Tabu</SelectItem>
-                <SelectItem value="insurance">Insurance</SelectItem>
-                <SelectItem value="contract">Contract</SelectItem>
-                <SelectItem value="warranty">Warranty</SelectItem>
-                <SelectItem value="receipt">Receipt</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Category</Label>
+              <Select value={category} onValueChange={(v) => setCategory(v as DocumentCategory)}>
+                <SelectTrigger className="h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tabu">Tabu</SelectItem>
+                  <SelectItem value="insurance">Insurance</SelectItem>
+                  <SelectItem value="contract">Contract</SelectItem>
+                  <SelectItem value="warranty">Warranty</SelectItem>
+                  <SelectItem value="receipt">Receipt</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="file">File</Label>
-            <Input id="file" name="file" type="file" required />
-          </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="file" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">File</Label>
+              <Input id="file" name="file" type="file" required className="h-11" />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="expiry_date">Expiry Date (optional)</Label>
-            <Input id="expiry_date" name="expiry_date" type="date" />
-          </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="expiry_date" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Expiry Date</Label>
+              <Input id="expiry_date" name="expiry_date" type="date" className="h-11" />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="property_id">Property (optional)</Label>
-            <Input id="property_id" name="property_id" placeholder="Property UUID" />
-          </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="property_id" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Property</Label>
+              <Input id="property_id" name="property_id" placeholder="Property UUID (optional)" className="h-11" />
+            </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Uploading...' : 'Upload Document'}
-          </Button>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <Button type="submit" className="h-11 w-full" disabled={loading}>
+              {loading ? 'Uploading...' : 'Upload Document'}
+            </Button>
+          </form>
+        </div>
+      </DrawerContent>
+    </Drawer>
   )
 }

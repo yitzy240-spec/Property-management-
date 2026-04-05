@@ -1,1 +1,2 @@
 - [Initial Audit April 2026](audit_2026_04_03.md) -- Project in scaffolding stage, schema complete, all pages are stubs, P1 build not yet started
+- [Full Audit April 5 2026](audit_2026_04_05.md) -- 85% complete, 21 pages, 33 routes, all 6 integrations working, gaps: PWA wiring + E2E tests

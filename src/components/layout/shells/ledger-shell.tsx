@@ -17,6 +17,7 @@ import {
   FileText,
   Settings,
   LogOut,
+  HardHat,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -32,16 +33,12 @@ const bottomTabs = [
   { href: '/financials', label: 'Reports', icon: FileBarChart },
 ]
 
-/** Secondary nav — accessible via hamburger menu */
+/** Secondary nav — only items NOT in bottom tabs */
 const menuItems = [
-  { href: '/dashboard', label: 'Portfolio', icon: LayoutDashboard },
   { href: '/properties', label: 'Properties', icon: Building2 },
   { href: '/owners', label: 'Owners', icon: Users },
   { href: '/tasks', label: 'Tasks', icon: ClipboardList },
-  { href: '/bills', label: 'Bills', icon: Receipt },
-  { href: '/financials', label: 'Financials', icon: FileBarChart },
-  { href: '/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/contractors', label: 'Contractors', icon: Users },
+  { href: '/contractors', label: 'Contractors', icon: HardHat },
   { href: '/inventory', label: 'Inventory', icon: Package },
   { href: '/messages', label: 'Messages', icon: MessageSquare },
   { href: '/vault', label: 'Vault', icon: FileText },
@@ -58,11 +55,12 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b bg-card px-4">
         <div className="flex items-center gap-3">
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-            <SheetTrigger className="flex h-11 w-11 items-center justify-center rounded-md hover:bg-muted -ml-2">
+            <SheetTrigger className="flex h-11 w-11 items-center justify-center rounded-md hover:bg-muted -ml-2" aria-label="Open navigation menu">
               <Menu className="h-5 w-5" />
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0">
-              <div className="flex h-12 items-center justify-between border-b px-4">
+              <div className="flex h-12 items-center gap-2.5 border-b px-4">
+                <img src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400" alt="Marcus Properties" className="h-7 w-auto" />
                 <span className="text-sm font-bold tracking-tight text-primary">ApartmentOS</span>
               </div>
               <nav className="flex flex-col gap-0.5 p-2">
@@ -99,6 +97,7 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
               </nav>
             </SheetContent>
           </Sheet>
+          <img src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400" alt="Marcus Properties" className="h-6 w-auto" />
           <span className="text-sm font-bold tracking-tight text-primary">
             ApartmentOS
           </span>
@@ -108,7 +107,7 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
 
       {/* Main content — scrollable */}
       <main className="flex-1 overflow-auto pb-20">
-        <div className="mx-auto max-w-2xl px-4 py-4 lg:max-w-5xl lg:py-6">
+        <div key={pathname} className="mx-auto max-w-2xl animate-fade-in px-4 py-4 lg:max-w-5xl lg:py-6">
           {children}
         </div>
       </main>
@@ -122,6 +121,7 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={tab.href}
                 href={tab.href}
+                aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition-colors',
                   isActive

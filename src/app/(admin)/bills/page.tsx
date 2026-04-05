@@ -1,12 +1,12 @@
 export const dynamic = 'force-dynamic'
 
-import { AlertTriangle, Check, X, FileDown } from 'lucide-react'
+import Link from 'next/link'
+import { AlertTriangle } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { formatILS } from '@/lib/utils'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { BillActions } from '@/components/features/bill-actions'
+import { cn } from '@/lib/utils'
 
 const billTypeLabels: Record<string, string> = {
   arnona: 'Arnona',
@@ -18,14 +18,11 @@ const billTypeLabels: Record<string, string> = {
   other: 'Other',
 }
 
-const statusColors: Record<string, string> = {
-  pending_review: 'bg-yellow-100 text-yellow-800',
-  approved: 'bg-green-100 text-green-800',
-  flagged: 'bg-red-100 text-red-800',
-  rejected: 'bg-gray-100 text-gray-600',
-}
-
-export default async function BillsPage() {
+export default async function BillsPage({
+  searchParams,
+}: {
+  searchParams: { tab?: string }
+}) {
   const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
 
@@ -38,100 +35,108 @@ export default async function BillsPage() {
   const flagged = bills?.filter((b) => b.status === 'flagged') ?? []
   const approved = bills?.filter((b) => b.status === 'approved') ?? []
 
-  function BillList({ items }: { items: typeof bills }) {
-    if (!items || items.length === 0) {
-      return (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          No bills in this status
-        </p>
-      )
-    }
+  const tabs = [
+    { key: 'pending', label: 'Pending', count: pending.length, items: pending },
+    { key: 'flagged', label: 'Flagged', count: flagged.length, items: flagged },
+    { key: 'approved', label: 'Approved', count: approved.length, items: approved },
+  ]
 
-    return (
-      <div className="space-y-3">
-        {items.map((bill) => (
-          <Card key={bill.id}>
-            <CardContent className="p-4">
+  const activeTab = searchParams.tab || 'pending'
+  const activeItems = tabs.find(t => t.key === activeTab)?.items ?? pending
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-lg font-semibold tracking-tight">Bill Verification</h1>
+        <p className="text-xs text-muted-foreground">
+          AI-parsed bills awaiting review. Approve to make visible to owners.
+        </p>
+      </div>
+
+      {/* Tab bar — clickable KPI counts */}
+      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[10px] border border-border bg-border">
+        {tabs.map((tab) => (
+          <Link
+            key={tab.key}
+            href={`/bills?tab=${tab.key}`}
+            className={cn(
+              'bg-card px-3 py-3 text-center transition-colors',
+              activeTab === tab.key && 'bg-primary/5'
+            )}
+          >
+            <p className={cn(
+              'font-mono text-lg font-bold',
+              tab.key === 'pending' && 'text-status-warning',
+              tab.key === 'flagged' && 'text-status-danger',
+              tab.key === 'approved' && 'text-status-safe',
+            )}>{tab.count}</p>
+            <p className={cn(
+              'text-xs',
+              activeTab === tab.key ? 'font-medium text-foreground' : 'text-muted-foreground'
+            )}>{tab.label}</p>
+          </Link>
+        ))}
+      </div>
+
+      {/* Active tab content */}
+      {activeItems.length > 0 ? (
+        <div className="space-y-2">
+          {activeItems.map((bill) => (
+            <div key={bill.id} className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold">
                       {billTypeLabels[bill.bill_type] || bill.bill_type}
                     </h3>
                     {bill.is_anomaly && (
-                      <Badge variant="destructive" className="gap-1 text-[10px]">
+                      <span className="inline-flex items-center gap-0.5 rounded-[var(--radius-badge)] bg-status-danger/15 px-1.5 py-0.5 text-xs font-medium text-status-danger">
                         <AlertTriangle className="h-3 w-3" />
                         High
-                      </Badge>
+                      </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     {(bill.properties as { name: string } | null)?.name}
                     {bill.due_date && ` · Due ${bill.due_date}`}
                   </p>
                   {bill.anomaly_note && (
-                    <p className="mt-1 text-xs text-destructive">{bill.anomaly_note}</p>
+                    <p className="mt-1 text-xs text-status-danger">{bill.anomaly_note}</p>
                   )}
                   {bill.billing_period_start && bill.billing_period_end && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Period: {bill.billing_period_start} → {bill.billing_period_end}
+                    <p className="mt-1 font-mono text-xs text-muted-foreground">
+                      {bill.billing_period_start} → {bill.billing_period_end}
                     </p>
                   )}
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold font-mono">
-                    {formatILS(bill.amount_agorot)}
-                  </p>
-                  <Badge className={`text-[10px] ${statusColors[bill.status]}`}>
-                    {bill.status.replace('_', ' ')}
-                  </Badge>
+                <div className="shrink-0 text-right">
+                  <CurrencyDisplay agorot={bill.amount_agorot} className="text-lg font-bold" />
+                  <div className="mt-1">
+                    <StatusBadge status={bill.status} size="sm" />
+                  </div>
                 </div>
               </div>
 
-              {bill.status === 'pending_review' || bill.status === 'flagged' ? (
-                <div className="mt-3">
-                  <BillActions billId={bill.id} />
+              {(bill.status === 'pending_review' || bill.status === 'flagged') && (
+                <div className="mt-3 border-t border-border pt-3">
+                  <BillActions
+                    billId={bill.id}
+                    propertyId={bill.property_id}
+                    propertyName={(bill.properties as { name: string } | null)?.name || null}
+                    matchMethod={(bill.ai_parsed_data as Record<string, unknown> | null)?.match_method as string || null}
+                  />
                 </div>
-              ) : null}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Bill Verification Queue</h1>
-        <p className="text-sm text-muted-foreground">
-          AI-parsed bills awaiting review. Approve to make visible to owners.
-        </p>
-      </div>
-
-      <Tabs defaultValue="pending">
-        <TabsList>
-          <TabsTrigger value="pending">
-            Pending ({pending.length})
-          </TabsTrigger>
-          <TabsTrigger value="flagged">
-            Flagged ({flagged.length})
-          </TabsTrigger>
-          <TabsTrigger value="approved">
-            Approved ({approved.length})
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="pending" className="mt-4">
-          <BillList items={pending} />
-        </TabsContent>
-        <TabsContent value="flagged" className="mt-4">
-          <BillList items={flagged} />
-        </TabsContent>
-        <TabsContent value="approved" className="mt-4">
-          <BillList items={approved} />
-        </TabsContent>
-      </Tabs>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-[10px] border border-border bg-card py-6 text-center text-sm text-muted-foreground shadow-sm">
+          {activeTab === 'pending' ? 'No bills awaiting review. Bills are parsed from Gmail every 15 minutes.' :
+           activeTab === 'flagged' ? 'No flagged bills. Bills with unusual amounts appear here.' :
+           'No approved bills yet.'}
+        </div>
+      )}
     </div>
   )
 }

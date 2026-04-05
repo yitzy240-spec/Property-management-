@@ -130,7 +130,7 @@ export function MessageThread({ propertyId, propertyName, currentRole }: Message
                   <p className="text-sm">{msg.body}</p>
                   <p
                     className={cn(
-                      'mt-1 text-[10px]',
+                      'mt-1 text-xs',
                       isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'
                     )}
                   >

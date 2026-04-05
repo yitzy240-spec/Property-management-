@@ -1,16 +1,12 @@
 export const dynamic = 'force-dynamic'
 
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { Separator } from '@/components/ui/separator'
 
 export default async function ContractorsPage() {
   const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
 
-  // Get all active contractors with their open tasks
   const { data: contractors } = await serviceClient
     .from('contractors')
     .select('*')
@@ -19,7 +15,6 @@ export default async function ContractorsPage() {
 
   const today = new Date().toISOString().split('T')[0]
 
-  // For each contractor, get their open tasks with property info
   const contractorItineraries = await Promise.all(
     (contractors ?? []).map(async (contractor) => {
       const { data: tasks } = await serviceClient
@@ -39,33 +34,31 @@ export default async function ContractorsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Contractor Itineraries</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-lg font-semibold tracking-tight">Contractor Itineraries</h1>
+        <p className="text-xs text-muted-foreground">
           Open tasks by contractor — today&apos;s jobs at a glance.
         </p>
       </div>
 
       {contractorItineraries.length > 0 ? (
         contractorItineraries.map(({ contractor, todayTasks, upcomingTasks, totalOpen }) => (
-          <Card key={contractor.id}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">{contractor.name}</CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    {contractor.specialty && `${contractor.specialty} · `}
-                    {contractor.phone}
-                  </p>
-                </div>
-                <Badge variant={totalOpen > 0 ? 'default' : 'secondary'}>
-                  {totalOpen} open
-                </Badge>
+          <section key={contractor.id} className="rounded-[10px] border border-border bg-card shadow-sm">
+            {/* Contractor header */}
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div>
+                <h3 className="text-sm font-semibold">{contractor.name}</h3>
+                <p className="text-xs text-muted-foreground">
+                  {contractor.specialty && `${contractor.specialty} · `}
+                  {contractor.phone}
+                </p>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
+              <span className="font-mono text-xs font-medium text-muted-foreground">{totalOpen} open</span>
+            </div>
+
+            <div className="p-4">
               {todayTasks.length > 0 && (
                 <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Today&apos;s Jobs
                   </p>
                   {todayTasks.map((task) => {
@@ -79,7 +72,7 @@ export default async function ContractorsPage() {
                               {property?.name} — {property?.address}
                             </p>
                           </div>
-                          <StatusBadge status={task.status} />
+                          <StatusBadge status={task.status} size="sm" />
                         </div>
                         {property?.entry_code && (
                           <p className="mt-1 font-mono text-xs text-muted-foreground">
@@ -93,9 +86,8 @@ export default async function ContractorsPage() {
               )}
 
               {upcomingTasks.length > 0 && (
-                <div>
-                  {todayTasks.length > 0 && <Separator className="my-2" />}
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <div className={todayTasks.length > 0 ? 'mt-4 border-t border-border pt-4' : ''}>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Upcoming
                   </p>
                   {upcomingTasks.map((task) => {
@@ -109,7 +101,7 @@ export default async function ContractorsPage() {
                               {property?.name} · Due {task.due_date}
                             </p>
                           </div>
-                          <StatusBadge status={task.priority} />
+                          <StatusBadge status={task.priority} size="sm" />
                         </div>
                       </div>
                     )
@@ -120,15 +112,13 @@ export default async function ContractorsPage() {
               {totalOpen === 0 && (
                 <p className="py-2 text-sm text-muted-foreground">No open tasks</p>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         ))
       ) : (
-        <Card>
-          <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            No active contractors. Add contractors in the database to see their itineraries.
-          </CardContent>
-        </Card>
+        <div className="rounded-[10px] border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">
+          No active contractors.
+        </div>
       )}
     </div>
   )

@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { encrypt, decrypt } from '@/lib/encryption'
+import { requireAdmin, AuthError } from '@/lib/auth'
 
 /**
  * GET /api/owners/sensitive?owner_id=xxx
  * Returns decrypted sensitive data for an owner (admin only)
  */
 export async function GET(request: Request) {
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    await requireAdmin()
+  } catch (err) {
+    if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const url = new URL(request.url)
   const ownerId = url.searchParams.get('owner_id')
@@ -48,9 +52,12 @@ export async function GET(request: Request) {
  * Body: { owner_id, data_type, value?, card_last_four?, card_type?, label, notes? }
  */
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    await requireAdmin()
+  } catch (err) {
+    if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const body = await request.json()
   const { owner_id, data_type, value, card_last_four, card_type, label, notes } = body
@@ -93,9 +100,12 @@ export async function POST(request: Request) {
  * Remove a sensitive data record (admin only)
  */
 export async function DELETE(request: Request) {
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    await requireAdmin()
+  } catch (err) {
+    if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const url = new URL(request.url)
   const id = url.searchParams.get('id')

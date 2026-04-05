@@ -1,11 +1,10 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Plus, Building2 } from 'lucide-react'
+import { Plus, ChevronRight } from 'lucide-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
+import { StatusBadge } from '@/components/ui/status-badge'
 
 export default async function PropertiesPage() {
   const supabase = createServiceClient()
@@ -20,68 +19,64 @@ export default async function PropertiesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Properties</h1>
-          <p className="text-sm text-muted-foreground">
-            {properties?.length ?? 0} active properties
+          <h1 className="text-lg font-semibold tracking-tight">Properties</h1>
+          <p className="text-xs text-muted-foreground">
+            {properties?.length ?? 0} active
           </p>
         </div>
         <Link href="/properties/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Property
+          <Button size="sm" className="h-9 gap-1.5 rounded-[var(--radius-button)] bg-accent text-accent-foreground hover:bg-accent/90">
+            <Plus className="h-3.5 w-3.5" />
+            Add
           </Button>
         </Link>
       </div>
 
       {properties && properties.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {properties.map((property) => (
-            <Link key={property.id} href={`/properties/${property.id}`}>
-              <Card className="transition-shadow hover:shadow-md">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <h3 className="font-semibold leading-tight">{property.name}</h3>
-                      <p className="text-sm text-muted-foreground">{property.address}</p>
-                    </div>
-                    <Building2 className="h-5 w-5 shrink-0 text-muted-foreground" />
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{property.num_bedrooms} bed</span>
-                    <span>·</span>
-                    <span>{property.neighborhood || property.city}</span>
-                  </div>
-                  {property.owners && (
-                    <div className="mt-3 flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {(property.owners as unknown as { full_name: string }).full_name}
+        <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+          {properties.map((property, i) => {
+            const owner = property.owners as { full_name: string; profile: string } | null
+            return (
+              <Link key={property.id} href={`/properties/${property.id}`} className="block">
+                <div className={`flex items-center justify-between px-4 py-3.5 transition-colors hover:bg-muted/40 ${i > 0 ? 'border-t border-border' : ''}`}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate text-sm font-semibold">{property.name}</h3>
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                        {Math.round(property.commission_rate * 100)}%
                       </span>
-                      <Badge variant="secondary" className="text-[10px]">
-                        {(property.owners as unknown as { profile: string }).profile}
-                      </Badge>
                     </div>
-                  )}
-                  {property.entry_code && (
-                    <div className="mt-2">
-                      <Badge variant="outline" className="font-mono text-xs">Code: {property.entry_code}</Badge>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{property.address}</p>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {property.num_bedrooms} bed · {property.neighborhood || property.city}
+                      </span>
+                      {owner && (
+                        <>
+                          <span className="text-xs text-border">·</span>
+                          <span className="text-xs text-muted-foreground">{owner.full_name}</span>
+                          <StatusBadge status={owner.profile === 'investor' ? 'info' : owner.profile === 'hybrid' ? 'warning' : 'safe'} label={owner.profile} size="sm" />
+                        </>
+                      )}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                </div>
+              </Link>
+            )
+          })}
         </div>
       ) : (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Building2 className="h-10 w-10 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-semibold">No properties yet</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Add your first property to get started.</p>
-            <Link href="/properties/new" className="mt-4">
-              <Button><Plus className="mr-2 h-4 w-4" />Add Property</Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="rounded-[10px] border border-border bg-card py-12 text-center shadow-sm">
+          <p className="text-sm font-medium text-foreground">No properties yet</p>
+          <p className="mt-1 text-xs text-muted-foreground">Add your first property to get started.</p>
+          <Link href="/properties/new" className="mt-4 inline-block">
+            <Button size="sm" className="gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              Add Property
+            </Button>
+          </Link>
+        </div>
       )}
     </div>
   )

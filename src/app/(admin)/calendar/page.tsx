@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/status-badge'
 
 export default async function CalendarPage() {
   const supabase = createServerSupabaseClient()
@@ -15,7 +14,6 @@ export default async function CalendarPage() {
   const todayStr = today.toISOString().split('T')[0]
   const endStr = twoWeeksOut.toISOString().split('T')[0]
 
-  // Get bookings in the next 2 weeks with property info
   const { data: bookings } = await serviceClient
     .from('bookings')
     .select('*, properties(name)')
@@ -23,7 +21,6 @@ export default async function CalendarPage() {
     .lte('check_in', endStr)
     .order('check_in')
 
-  // Get cleaning tasks in the next 2 weeks
   const { data: cleaningTasks } = await serviceClient
     .from('tasks')
     .select('*, properties(name)')
@@ -33,7 +30,7 @@ export default async function CalendarPage() {
     .lte('due_date', endStr)
     .order('due_date')
 
-  // Build a day-by-day view
+  // Build day-by-day view
   const days: { date: string; label: string; events: { type: string; title: string; property: string; detail: string; gapHours?: number }[] }[] = []
 
   for (let d = new Date(today); d <= twoWeeksOut; d.setDate(d.getDate() + 1)) {
@@ -41,40 +38,33 @@ export default async function CalendarPage() {
     const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     const events: typeof days[0]['events'] = []
 
-    // Check-outs today
     const checkouts = bookings?.filter(b => b.check_out === dateStr) ?? []
     for (const co of checkouts) {
-      const propertyName = (co.properties as { name: string } | null)?.name || 'Unknown'
       events.push({
         type: 'checkout',
         title: `Check-out: ${co.guest_name || 'Guest'}`,
-        property: propertyName,
-        detail: `10:00 AM`,
+        property: (co.properties as { name: string } | null)?.name || 'Unknown',
+        detail: '10:00 AM',
       })
     }
 
-    // Cleaning tasks today
     const cleans = cleaningTasks?.filter(t => t.due_date === dateStr) ?? []
     for (const clean of cleans) {
-      const propertyName = (clean.properties as { name: string } | null)?.name || 'Unknown'
       events.push({
         type: 'cleaning',
         title: clean.title,
-        property: propertyName,
+        property: (clean.properties as { name: string } | null)?.name || 'Unknown',
         detail: clean.status === 'in_progress' ? 'In progress' : 'Scheduled',
       })
     }
 
-    // Check-ins today
     const checkins = bookings?.filter(b => b.check_in === dateStr) ?? []
     for (const ci of checkins) {
       const propertyName = (ci.properties as { name: string } | null)?.name || 'Unknown'
-
-      // Calculate gap hours from previous checkout at same property
       const prevCheckout = checkouts.find(co =>
         (co.properties as { name: string } | null)?.name === propertyName
       )
-      const gapHours = prevCheckout ? 4 : undefined // Simplified: assume 10am checkout, 2pm checkin = 4h
+      const gapHours = prevCheckout ? 4 : undefined
 
       events.push({
         type: 'checkin',
@@ -90,46 +80,42 @@ export default async function CalendarPage() {
     }
   }
 
-  const eventTypeColors: Record<string, string> = {
-    checkout: 'bg-purple-100 text-purple-800 border-purple-200',
-    cleaning: 'bg-gray-100 text-gray-800 border-gray-200',
-    checkin: 'bg-blue-100 text-blue-800 border-blue-200',
-  }
-
-  const eventTypeLabels: Record<string, string> = {
-    checkout: 'Check-out',
-    cleaning: 'Cleaning',
-    checkin: 'Check-in',
+  const eventTypeMap: Record<string, { label: string; status: string; borderColor: string }> = {
+    checkout: { label: 'Check-out', status: 'info', borderColor: 'border-l-[hsl(var(--event-checkout))]' },
+    cleaning: { label: 'Cleaning', status: 'neutral', borderColor: 'border-l-[hsl(var(--event-clean))]' },
+    checkin: { label: 'Check-in', status: 'info', borderColor: 'border-l-[hsl(var(--event-checkin))]' },
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Turnover Calendar</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-lg font-semibold tracking-tight">Turnover Calendar</h1>
+        <p className="text-xs text-muted-foreground">
           Next 14 days — check-outs, cleaning windows, and check-ins.
         </p>
       </div>
 
       {days.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {days.map((day) => (
-            <div key={day.date}>
-              <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
-                {day.label}
+            <section key={day.date}>
+              <div className="mb-2 flex items-center gap-2">
+                <h3 className="text-xs font-semibold text-muted-foreground">{day.label}</h3>
                 {day.date === todayStr && (
-                  <Badge variant="default" className="ml-2 text-[10px]">Today</Badge>
+                  <span className="rounded-[var(--radius-badge)] bg-primary px-1.5 py-0.5 text-xs font-medium text-primary-foreground">Today</span>
                 )}
-              </h3>
-              <div className="space-y-2">
-                {day.events.map((event, i) => (
-                  <Card key={i} className={`border-l-4 ${eventTypeColors[event.type]?.split(' ').pop() || ''}`}>
-                    <CardContent className="flex items-center justify-between p-3">
+              </div>
+              <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+                {day.events.map((event, i) => {
+                  const config = eventTypeMap[event.type] || eventTypeMap.cleaning
+                  return (
+                    <div
+                      key={i}
+                      className={`flex items-center justify-between border-l-4 px-4 py-3 ${config.borderColor} ${i > 0 ? 'border-t border-border' : ''}`}
+                    >
                       <div>
                         <div className="flex items-center gap-2">
-                          <Badge className={`text-[10px] ${eventTypeColors[event.type]}`}>
-                            {eventTypeLabels[event.type]}
-                          </Badge>
+                          <StatusBadge status={config.status} label={config.label} size="sm" />
                           <span className="text-sm font-medium">{event.title}</span>
                         </div>
                         <p className="mt-0.5 text-xs text-muted-foreground">
@@ -137,23 +123,19 @@ export default async function CalendarPage() {
                         </p>
                       </div>
                       {event.gapHours !== undefined && event.gapHours < 5 && (
-                        <Badge variant="destructive" className="text-[10px]">
-                          {event.gapHours}h gap
-                        </Badge>
+                        <StatusBadge status="danger" label={`${event.gapHours}h gap`} size="sm" />
                       )}
-                    </CardContent>
-                  </Card>
-                ))}
+                    </div>
+                  )
+                })}
               </div>
-            </div>
+            </section>
           ))}
         </div>
       ) : (
-        <Card>
-          <CardContent className="flex flex-col items-center py-12">
-            <p className="text-sm text-muted-foreground">No turnovers in the next 14 days</p>
-          </CardContent>
-        </Card>
+        <div className="rounded-[10px] border border-border bg-card py-12 text-center shadow-sm">
+          <p className="text-sm text-muted-foreground">No turnovers in the next 14 days</p>
+        </div>
       )}
     </div>
   )

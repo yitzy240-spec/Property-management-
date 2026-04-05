@@ -1,9 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { AlertTriangle, Calendar as CalendarIcon, ArrowRight } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { AlertTriangle, Calendar as CalendarIcon, ArrowRight, ChevronRight, TrendingUp } from 'lucide-react'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -34,120 +32,141 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-primary/10 bg-gradient-to-br from-card to-primary/[0.03]">
-        <CardContent className="p-5">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">MTD Portfolio Summary</p>
-          <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Revenue</p>
-              <CurrencyDisplay agorot={ytdRevenue} variant="income" className="text-xl font-bold" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Properties</p>
-              <p className="font-mono text-xl font-bold">{properties?.length ?? 0}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Open Tasks</p>
-              <p className="font-mono text-xl font-bold text-status-warning">{openTaskCount ?? 0}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Pending Bills</p>
-              <p className="font-mono text-xl font-bold text-status-danger">{pendingBillCount ?? 0}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* ── Hero: Portfolio Summary ── */}
+      <section>
+        <div className="mb-4 flex items-center justify-between">
+          <h1 className="text-lg font-semibold tracking-tight">Portfolio</h1>
+          <span className="font-mono text-xs text-muted-foreground">{currentYear}</span>
+        </div>
 
-      <Card className={isVatWarning ? 'border-status-danger' : ''}>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <p className="text-xs font-medium">VAT Threshold</p>
-              {isVatWarning && (
-                <Badge variant="destructive" className="gap-1 text-[10px]">
-                  <AlertTriangle className="h-3 w-3" />90%+
-                </Badge>
-              )}
+        <div className="rounded-[10px] border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-baseline justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                YTD Revenue
+              </p>
+              <CurrencyDisplay agorot={ytdRevenue} variant="income" className="mt-1 text-2xl font-bold" />
             </div>
-            <p className="font-mono text-xs text-muted-foreground">
-              {formatILS(ytdRevenue)} / {formatILS(VAT_THRESHOLD_AGOROT)}
-            </p>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(152_54%_25%/0.08)]">
+              <TrendingUp className="h-4 w-4 text-financial-income" />
+            </div>
           </div>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className={`h-full rounded-full transition-all ${isVatWarning ? 'bg-status-danger' : 'bg-primary'}`}
-              style={{ width: `${Math.min(vatPercent, 100)}%` }}
-            />
-          </div>
-        </CardContent>
-      </Card>
 
+          {/* KPI row */}
+          <div className="mt-5 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-border bg-border">
+            <div className="bg-card px-3 py-3 text-center">
+              <p className="font-mono text-lg font-bold">{properties?.length ?? 0}</p>
+              <p className="text-xs text-muted-foreground">Properties</p>
+            </div>
+            <div className="bg-card px-3 py-3 text-center">
+              <p className="font-mono text-lg font-bold text-status-warning">{openTaskCount ?? 0}</p>
+              <p className="text-xs text-muted-foreground">Open Tasks</p>
+            </div>
+            <div className="bg-card px-3 py-3 text-center">
+              <p className="font-mono text-lg font-bold text-status-danger">{pendingBillCount ?? 0}</p>
+              <p className="text-xs text-muted-foreground">Pending Bills</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── VAT Threshold ── */}
+      <section className={`rounded-[10px] border bg-card p-4 shadow-sm ${isVatWarning ? 'border-status-danger/40' : 'border-border'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-medium">VAT Threshold</p>
+            {isVatWarning && (
+              <span className="inline-flex items-center gap-1 rounded-[var(--radius-badge)] bg-status-danger/15 px-1.5 py-0.5 text-xs font-medium text-status-danger">
+                <AlertTriangle className="h-3 w-3" />90%+
+              </span>
+            )}
+          </div>
+          <p className="font-mono text-xs text-muted-foreground">
+            {formatILS(ytdRevenue)} / {formatILS(VAT_THRESHOLD_AGOROT)}
+          </p>
+        </div>
+        <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full rounded-full transition-all ${isVatWarning ? 'bg-status-danger' : 'bg-primary'}`}
+            style={{ width: `${Math.min(vatPercent, 100)}%` }}
+          />
+        </div>
+      </section>
+
+      {/* ── Action banner: Pending bills ── */}
       {(pendingBillCount ?? 0) > 0 && (
-        <Link href="/bills">
-          <Card className="border-status-warning/30 transition-shadow hover:shadow-md">
-            <CardContent className="flex items-center justify-between p-3">
-              <div className="flex items-center gap-2">
-                <StatusBadge status="pending_review" label={`${pendingBillCount} bills`} size="md" />
-                <span className="text-xs text-muted-foreground">need review</span>
-              </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-            </CardContent>
-          </Card>
+        <Link href="/bills" className="block">
+          <div className="flex items-center justify-between rounded-[10px] border border-status-warning/25 bg-[hsl(38_92%_50%/0.04)] px-4 py-3 transition-shadow hover:shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <StatusBadge status="pending_review" label={`${pendingBillCount} bills`} size="md" />
+              <span className="text-xs text-muted-foreground">need review</span>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          </div>
         </Link>
       )}
 
-      <div>
+      {/* ── Properties list ── */}
+      <section>
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Properties</p>
-          <Link href="/properties" className="text-xs text-primary hover:underline">View all</Link>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Properties</p>
+          <Link href="/properties" className="flex items-center gap-0.5 text-xs font-medium text-primary hover:underline">
+            View all <ChevronRight className="h-3 w-3" />
+          </Link>
         </div>
-        <div className="space-y-2">
-          {properties && properties.length > 0 ? properties.map((property) => (
-            <Link key={property.id} href={`/properties/${property.id}`}>
-              <Card className="transition-shadow hover:shadow-md">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold">{property.name}</h3>
-                      <p className="text-xs text-muted-foreground">{property.neighborhood || property.address}</p>
-                    </div>
-                    <Badge variant="outline" className="font-mono text-[10px]">
+
+        <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+          {properties && properties.length > 0 ? properties.map((property, i) => (
+            <Link key={property.id} href={`/properties/${property.id}`} className="block">
+              <div className={`flex items-center justify-between px-4 py-3.5 transition-colors hover:bg-muted/40 ${i > 0 ? 'border-t border-border' : ''}`}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="truncate text-sm font-semibold">{property.name}</h3>
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground">
                       {Math.round(property.commission_rate * 100)}%
-                    </Badge>
+                    </span>
                   </div>
-                  <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                     <span>{property.num_bedrooms} bed</span>
-                    <span>·</span>
-                    <span>{(property.owners as unknown as { full_name: string } | null)?.full_name}</span>
+                    <span className="text-border">·</span>
+                    <span className="truncate">{(property.owners as unknown as { full_name: string } | null)?.full_name}</span>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+              </div>
             </Link>
           )) : (
-            <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">No properties yet.</CardContent></Card>
+            <div className="py-10 text-center text-sm text-muted-foreground">No properties yet.</div>
           )}
         </div>
-      </div>
+      </section>
 
+      {/* ── Upcoming check-ins ── */}
       {upcomingBookings && upcomingBookings.length > 0 && (
-        <div>
-          <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Upcoming Check-ins</p>
-          <div className="space-y-2">
-            {upcomingBookings.map((booking) => (
-              <Card key={booking.id}>
-                <CardContent className="flex items-center justify-between p-3">
-                  <div>
-                    <p className="text-sm font-medium">{booking.guest_name || 'Guest'}</p>
-                    <p className="text-xs text-muted-foreground">{(booking.properties as unknown as { name: string })?.name}</p>
-                  </div>
-                  <div className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
-                    <CalendarIcon className="h-3 w-3" />{booking.check_in}
-                  </div>
-                </CardContent>
-              </Card>
+        <section>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Upcoming Check-ins
+          </p>
+          <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+            {upcomingBookings.map((booking, i) => (
+              <div
+                key={booking.id}
+                className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{booking.guest_name || 'Guest'}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(booking.properties as unknown as { name: string })?.name}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5 font-mono text-xs text-muted-foreground">
+                  <CalendarIcon className="h-3 w-3" />
+                  {booking.check_in}
+                </div>
+              </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
     </div>
   )

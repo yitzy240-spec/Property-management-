@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/parse-bills",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/lodgify-sync",
+      "schedule": "0 */2 * * *"
     }
   ]
 }

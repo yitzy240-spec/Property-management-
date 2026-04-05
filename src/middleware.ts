@@ -8,17 +8,23 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Run middleware on all routes EXCEPT:
-     * - _next/static, _next/image (Next.js internals)
-     * - favicon.ico
-     * - contractor/[token] (public magic link pages)
-     * - guest/[token] (public check-in pages)
-     * - api/webhooks (incoming webhook endpoints)
-     * - login (auth page must be accessible)
-     *
-     * Note: contractor exclusion uses contractor/[^/]+ to avoid
-     * accidentally excluding /dashboard/contractors (admin page)
+     * Run middleware ONLY on protected routes.
+     * Public routes (login, contractor/*, guest/*, api/webhooks/*, api/cron/*,
+     * _next/*, favicon) are excluded by not being listed here.
      */
-    '/((?!_next/static|_next/image|favicon.ico|contractor/[^/]+|guest/[^/]+|api/webhooks|login).*)',
+    '/dashboard/:path*',
+    '/properties/:path*',
+    '/bills/:path*',
+    '/tasks/:path*',
+    '/financials/:path*',
+    '/calendar/:path*',
+    '/settings/:path*',
+    '/inventory/:path*',
+    '/vault/:path*',
+    '/contractors/:path*',
+    '/messages/:path*',
+    '/owners/:path*',
+    '/owner/:path*',
+    '/api/((?!webhooks|cron|contractor|auth).*)',
   ],
 }

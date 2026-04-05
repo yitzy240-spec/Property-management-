@@ -114,7 +114,7 @@ export function OwnerSensitiveData({ ownerId }: { ownerId: string }) {
                   <div className="space-y-2">
                     <Label htmlFor="value">Passport Number</Label>
                     <Input id="value" name="value" placeholder="A12345678" required />
-                    <p className="text-[10px] text-muted-foreground">Stored encrypted (AES-256-GCM)</p>
+                    <p className="text-xs text-muted-foreground">Stored encrypted (AES-256-GCM)</p>
                   </div>
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -126,7 +126,7 @@ export function OwnerSensitiveData({ ownerId }: { ownerId: string }) {
                       <Label htmlFor="card_type">Card Type</Label>
                       <Input id="card_type" name="card_type" placeholder="Visa" />
                     </div>
-                    <p className="col-span-2 text-[10px] text-muted-foreground">Only last 4 digits stored — full CC numbers are never saved (PCI compliance)</p>
+                    <p className="col-span-2 text-xs text-muted-foreground">Only last 4 digits stored — full CC numbers are never saved (PCI compliance)</p>
                   </div>
                 )}
                 <div className="space-y-2">
@@ -164,7 +164,7 @@ export function OwnerSensitiveData({ ownerId }: { ownerId: string }) {
                       </p>
                     )}
                     {item.notes && (
-                      <p className="text-[10px] text-muted-foreground">{item.notes}</p>
+                      <p className="text-xs text-muted-foreground">{item.notes}</p>
                     )}
                   </div>
                 </div>

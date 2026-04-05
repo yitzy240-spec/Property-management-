@@ -15,6 +15,15 @@ export const metadata: Metadata = {
   title: 'ApartmentOS — Property Management',
   description: 'Property management platform for Jerusalem rentals',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.svg',
+    apple: '/icons/icon-192.svg',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'ApartmentOS',
+  },
 }
 
 export const viewport: Viewport = {

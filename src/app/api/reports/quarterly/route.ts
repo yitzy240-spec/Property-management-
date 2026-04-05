@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { formatILS } from '@/lib/utils'
+import { requireAdmin, AuthError } from '@/lib/auth'
 
 /**
  * POST /api/reports/quarterly
@@ -11,9 +12,10 @@ import { formatILS } from '@/lib/utils'
  * Body: { owner_id: string, quarter: number (1-4), year: number }
  */
 export async function POST(request: Request) {
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  try {
+    await requireAdmin()
+  } catch (err) {
+    if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

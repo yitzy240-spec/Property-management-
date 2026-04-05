@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
+import { requireAuth, AuthError } from '@/lib/auth'
 
 /**
  * GET /api/download?path=bills/abc.pdf&type=bill|document|media
@@ -8,13 +9,14 @@ import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/
  * Verifies the requesting user has access to the file's associated property.
  */
 export async function GET(request: Request) {
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  try {
+    await requireAuth()
+  } catch (err) {
+    if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const supabase = createServerSupabaseClient()
   const url = new URL(request.url)
   const path = url.searchParams.get('path')
 

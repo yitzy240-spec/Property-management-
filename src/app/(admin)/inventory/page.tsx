@@ -3,17 +3,8 @@ export const dynamic = 'force-dynamic'
 import { AlertTriangle, Package, Phone } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { formatDateJerusalem } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { StatusBadge } from '@/components/ui/status-badge'
 
 export default async function InventoryPage() {
   const supabase = createServerSupabaseClient()
@@ -24,12 +15,10 @@ export default async function InventoryPage() {
     .select('*, properties(name)')
     .order('item_name')
 
-  // Check par level alerts
   const lowStockItems = inventory?.filter(
     (item) => item.par_level && item.quantity_in_closet < item.par_level
   ) ?? []
 
-  // Get laundry batches
   const { data: laundryBatches } = await serviceClient
     .from('laundry_batches')
     .select('*, properties(name)')
@@ -39,129 +28,117 @@ export default async function InventoryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Inventory & Laundry</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-lg font-semibold tracking-tight">Inventory & Laundry</h1>
+        <p className="text-xs text-muted-foreground">
           Track linens across properties and manage laundry pickups.
         </p>
       </div>
 
       {/* Par Level Alerts */}
       {lowStockItems.length > 0 && (
-        <Card className="border-amber-300 bg-amber-50">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base text-amber-800">
-              <AlertTriangle className="h-4 w-4" />
-              Low Stock Alerts ({lowStockItems.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {lowStockItems.map((item) => (
-                <div key={item.id} className="flex items-center justify-between text-sm">
-                  <span className="text-amber-900">
-                    {(item.properties as { name: string } | null)?.name} — {item.item_name}
-                  </span>
-                  <Badge variant="outline" className="border-amber-400 text-amber-800">
-                    {item.quantity_in_closet} / {item.par_level} min
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="rounded-[10px] border border-status-warning/30 bg-[hsl(38_92%_50%/0.04)] p-4 shadow-sm">
+          <div className="mb-3 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-status-warning" />
+            <p className="text-xs font-semibold text-foreground">Low Stock ({lowStockItems.length})</p>
+          </div>
+          <div className="space-y-2">
+            {lowStockItems.map((item) => (
+              <div key={item.id} className="flex items-center justify-between text-sm">
+                <span className="text-foreground">
+                  {(item.properties as { name: string } | null)?.name} — {item.item_name}
+                </span>
+                <span className="font-mono text-xs text-status-warning">
+                  {item.quantity_in_closet} / {item.par_level}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Inventory Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Linen Inventory</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {inventory && inventory.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Property</TableHead>
-                  <TableHead>Item</TableHead>
-                  <TableHead className="text-center">In Closet</TableHead>
-                  <TableHead className="text-center">At Laundry</TableHead>
-                  <TableHead className="text-center">Damaged</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {inventory.map((item) => {
-                  const belowPar = item.par_level && item.quantity_in_closet < item.par_level
-                  return (
-                    <TableRow key={item.id}>
-                      <TableCell className="text-sm">
-                        {(item.properties as { name: string } | null)?.name}
-                      </TableCell>
-                      <TableCell className="text-sm font-medium">{item.item_name}</TableCell>
-                      <TableCell className={`text-center font-mono ${belowPar ? 'font-bold text-amber-600' : ''}`}>
-                        {item.quantity_in_closet}
-                      </TableCell>
-                      <TableCell className="text-center font-mono">{item.quantity_at_laundry}</TableCell>
-                      <TableCell className="text-center font-mono text-muted-foreground">{item.quantity_damaged}</TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="flex flex-col items-center py-8">
-              <Package className="h-10 w-10 text-muted-foreground" />
-              <p className="mt-4 text-sm text-muted-foreground">No inventory items tracked yet</p>
+      <section>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Linen Inventory
+        </p>
+
+        {inventory && inventory.length > 0 ? (
+          <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+            {/* Table header */}
+            <div className="grid grid-cols-5 gap-0 border-b border-border bg-muted/30 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <span className="col-span-2">Item</span>
+              <span className="text-center">Closet</span>
+              <span className="text-center">Laundry</span>
+              <span className="text-center">Damaged</span>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            {inventory.map((item, i) => {
+              const belowPar = item.par_level && item.quantity_in_closet < item.par_level
+              return (
+                <div key={item.id} className={`grid grid-cols-5 items-center gap-0 px-4 py-2.5 ${i > 0 ? 'border-t border-border' : ''}`}>
+                  <div className="col-span-2">
+                    <p className="text-sm font-medium">{item.item_name}</p>
+                    <p className="text-xs text-muted-foreground">{(item.properties as { name: string } | null)?.name}</p>
+                  </div>
+                  <p className={`text-center font-mono text-sm ${belowPar ? 'font-bold text-status-warning' : ''}`}>
+                    {item.quantity_in_closet}
+                  </p>
+                  <p className="text-center font-mono text-sm">{item.quantity_at_laundry}</p>
+                  <p className="text-center font-mono text-sm text-muted-foreground">{item.quantity_damaged}</p>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="rounded-[10px] border border-border bg-card py-10 text-center shadow-sm">
+            <Package className="mx-auto h-8 w-8 text-muted-foreground/50" />
+            <p className="mt-3 text-sm text-muted-foreground">No inventory items tracked yet</p>
+          </div>
+        )}
+      </section>
 
       {/* Active Laundry Batches */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Active Laundry Batches</CardTitle>
-            <a href="https://wa.me/?text=Laundry%20pickup%20request%20-%20ApartmentOS" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm">
-                <Phone className="mr-2 h-3.5 w-3.5" />
-                Notify Laundry
-              </Button>
-            </a>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {laundryBatches && laundryBatches.length > 0 ? (
-            <div className="space-y-3">
-              {laundryBatches.map((batch) => (
-                <div key={batch.id} className="rounded-lg border p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">
-                        {(batch.properties as { name: string } | null)?.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Sent: {batch.sent_at ? formatDateJerusalem(batch.sent_at) : 'Not sent'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {batch.laundry_provider_notified && (
-                        <Badge variant="secondary" className="text-[10px]">Notified</Badge>
-                      )}
-                      <Badge variant="outline" className="text-[10px]">
-                        {(batch.items as { item_name: string; quantity: number }[])?.length ?? 0} items
-                      </Badge>
-                    </div>
-                  </div>
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Active Laundry
+          </p>
+          <a href="https://wa.me/?text=Laundry%20pickup%20request%20-%20ApartmentOS" target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+              <Phone className="h-3 w-3" />
+              Notify
+            </Button>
+          </a>
+        </div>
+
+        {laundryBatches && laundryBatches.length > 0 ? (
+          <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+            {laundryBatches.map((batch, i) => (
+              <div key={batch.id} className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}>
+                <div>
+                  <p className="text-sm font-medium">
+                    {(batch.properties as { name: string } | null)?.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Sent: {batch.sent_at ? formatDateJerusalem(batch.sent_at) : 'Not sent'}
+                  </p>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No pending laundry batches
-            </p>
-          )}
-        </CardContent>
-      </Card>
+                <div className="flex items-center gap-2">
+                  {batch.laundry_provider_notified && (
+                    <StatusBadge status="safe" label="Notified" size="sm" />
+                  )}
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {(batch.items as { item_name: string; quantity: number }[])?.length ?? 0} items
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-[10px] border border-border bg-card py-6 text-center text-sm text-muted-foreground shadow-sm">
+            No pending laundry batches
+          </div>
+        )}
+      </section>
     </div>
   )
 }

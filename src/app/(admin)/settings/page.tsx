@@ -1,9 +1,9 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
-import { Separator } from '@/components/ui/separator'
-import { ApiKeySettings } from '@/components/features/api-key-settings'
 import { GmailConnect } from '@/components/features/gmail-connect'
+import { LodgifyPropertyMapper } from '@/components/features/lodgify-property-mapper'
+import { UserManagement } from '@/components/features/user-management'
 import { SeasonalTemplateSettings } from '@/components/features/seasonal-template-settings'
 import { isGmailConnected } from '@/lib/gmail'
 
@@ -16,25 +16,43 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage integrations, API keys, and system configuration.
+        <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
+        <p className="text-xs text-muted-foreground">
+          Manage integrations and system configuration.
         </p>
       </div>
 
-      <ApiKeySettings />
+      <section>
+        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Team & Access
+        </p>
+        <UserManagement />
+      </section>
 
-      <Separator />
+      <section>
+        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Lodgify Integration
+        </p>
+        <LodgifyPropertyMapper />
+      </section>
 
-      <Suspense fallback={null}>
-        <GmailConnect isConnected={gmailConnected} />
-      </Suspense>
+      <section>
+        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Gmail Integration
+        </p>
+        <Suspense fallback={null}>
+          <GmailConnect isConnected={gmailConnected} />
+        </Suspense>
+      </section>
 
-      <Separator />
-
-      <SeasonalTemplateSettings />
+      <section>
+        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Seasonal Templates
+        </p>
+        <SeasonalTemplateSettings />
+      </section>
     </div>
   )
 }

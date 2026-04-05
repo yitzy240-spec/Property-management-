@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { generateMagicLinkToken } from '@/lib/magic-links'
+import { requireAdmin, AuthError } from '@/lib/auth'
 import type { MagicLinkType } from '@/types'
 
 /** POST /api/magic-links — Generate a new magic link */
 export async function POST(request: Request) {
-  // Verify authenticated admin
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  try {
+    await requireAdmin()
+  } catch (err) {
+    if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

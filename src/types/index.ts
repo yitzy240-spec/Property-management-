@@ -25,6 +25,7 @@ export interface Owner {
   phone: string | null
   profile: OwnerProfile
   notes: string | null
+  green_invoice_client_id: string | null
   created_at: string
   updated_at: string
 }

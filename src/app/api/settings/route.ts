@@ -1,18 +1,16 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { encrypt } from '@/lib/encryption'
+import { requireAdmin, AuthError } from '@/lib/auth'
 
 export async function POST(request: Request) {
-  // Verify user is authenticated
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  let user
+  try {
+    user = await requireAdmin()
+  } catch (err) {
+    if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-
-  // TODO: verify user is admin (not just any authenticated user)
 
   const { key, value } = await request.json()
 

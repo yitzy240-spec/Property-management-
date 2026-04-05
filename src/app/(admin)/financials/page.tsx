@@ -1,11 +1,10 @@
 export const dynamic = 'force-dynamic'
 
-import { DollarSign, FileText, TrendingUp } from 'lucide-react'
+import { TrendingUp } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { InvoicePushButton } from '@/components/features/invoice-push-button'
+import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { formatILS } from '@/lib/utils'
 
 export default async function FinancialsPage() {
@@ -15,14 +14,12 @@ export default async function FinancialsPage() {
   const now = new Date()
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
 
-  // Get fee entries for current month
   const { data: feeEntries } = await serviceClient
     .from('fee_entries')
     .select('*, properties(name)')
     .eq('billing_month', currentMonth)
     .order('created_at', { ascending: false })
 
-  // Totals by type
   const totals = (feeEntries ?? []).reduce(
     (acc, entry) => {
       acc[entry.fee_type] = (acc[entry.fee_type] || 0) + entry.amount_agorot
@@ -32,120 +29,93 @@ export default async function FinancialsPage() {
     { commission: 0, hourly: 0, fixed: 0, total: 0 } as Record<string, number>
   )
 
-  // Get unpushed entries for invoice generation
   const unpushedCount = (feeEntries ?? []).filter((e) => !e.pushed_to_invoice).length
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Financials</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-lg font-semibold tracking-tight">Financials</h1>
+          <p className="text-xs text-muted-foreground">
             {new Date(currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
           </p>
         </div>
         {unpushedCount > 0 && (
-          <Button>
-            <FileText className="mr-2 h-4 w-4" />
-            Push to Green Invoice ({unpushedCount})
-          </Button>
+          <InvoicePushButton billingMonth={currentMonth} unpushedCount={unpushedCount} />
         )}
       </div>
 
-      {/* Fee Summary */}
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs font-medium text-muted-foreground">Commission (20%)</p>
-            <p className="text-xl font-bold font-mono text-financial-income">
-              {formatILS(totals.commission)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs font-medium text-muted-foreground">Hourly</p>
-            <p className="text-xl font-bold font-mono">
-              {formatILS(totals.hourly)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs font-medium text-muted-foreground">Fixed Fees</p>
-            <p className="text-xl font-bold font-mono">
-              {formatILS(totals.fixed)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="p-4">
-            <p className="text-xs font-medium text-muted-foreground">Total Earnings</p>
-            <p className="text-xl font-bold font-mono">
-              {formatILS(totals.total)}
-            </p>
-          </CardContent>
-        </Card>
+      {/* Fee Summary — Ledger KPI grid */}
+      <div className="rounded-[10px] border border-border bg-card p-5 shadow-sm">
+        <div className="flex items-baseline justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Total Earnings</p>
+            <CurrencyDisplay agorot={totals.total} variant="income" className="mt-1 text-2xl font-bold" />
+          </div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(152_54%_25%/0.08)]">
+            <TrendingUp className="h-4 w-4 text-financial-income" />
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-border bg-border">
+          <div className="bg-card px-3 py-3 text-center">
+            <CurrencyDisplay agorot={totals.commission} className="text-base font-bold" />
+            <p className="text-xs text-muted-foreground">Commission</p>
+          </div>
+          <div className="bg-card px-3 py-3 text-center">
+            <CurrencyDisplay agorot={totals.hourly} className="text-base font-bold" />
+            <p className="text-xs text-muted-foreground">Hourly</p>
+          </div>
+          <div className="bg-card px-3 py-3 text-center">
+            <CurrencyDisplay agorot={totals.fixed} className="text-base font-bold" />
+            <p className="text-xs text-muted-foreground">Fixed</p>
+          </div>
+        </div>
       </div>
 
-      <Separator />
-
       {/* Fee Entries List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Fee Entries</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {feeEntries && feeEntries.length > 0 ? (
-            <div className="space-y-2">
-              {feeEntries.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">
-                        {(entry.properties as { name: string } | null)?.name}
-                      </p>
-                      <Badge variant="secondary" className="text-[10px]">
-                        {entry.fee_type}
-                      </Badge>
-                    </div>
-                    {entry.description && (
-                      <p className="text-xs text-muted-foreground">{entry.description}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {entry.pushed_to_invoice ? (
-                      <Badge variant="outline" className="text-[10px] text-financial-income">
-                        Invoiced
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px]">
-                        Pending
-                      </Badge>
-                    )}
-                    <p className="text-sm font-mono font-semibold">
-                      {formatILS(entry.amount_agorot)}
+      <section>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Fee Entries
+        </p>
+
+        {feeEntries && feeEntries.length > 0 ? (
+          <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+            {feeEntries.map((entry, i) => (
+              <div
+                key={entry.id}
+                className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">
+                      {(entry.properties as { name: string } | null)?.name}
                     </p>
+                    <StatusBadge status="neutral" label={entry.fee_type} size="sm" />
                   </div>
+                  {entry.description && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{entry.description}</p>
+                  )}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center py-8">
-              <TrendingUp className="h-10 w-10 text-muted-foreground" />
-              <p className="mt-4 text-sm text-muted-foreground">
-                No fee entries for this month yet
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Fees are calculated from completed bookings and tasks
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <div className="flex shrink-0 items-center gap-3">
+                  {entry.pushed_to_invoice ? (
+                    <StatusBadge status="safe" label="Invoiced" size="sm" />
+                  ) : (
+                    <StatusBadge status="warning" label="Pending" size="sm" />
+                  )}
+                  <CurrencyDisplay agorot={entry.amount_agorot} className="text-sm font-semibold" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-[10px] border border-border bg-card py-10 text-center shadow-sm">
+            <TrendingUp className="mx-auto h-8 w-8 text-muted-foreground/50" />
+            <p className="mt-3 text-sm text-muted-foreground">No fee entries this month</p>
+            <p className="mt-1 text-xs text-muted-foreground">Fees are calculated from completed bookings and tasks</p>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { fetchBillEmails, getGmailAccessToken } from '@/lib/gmail'
-import { decrypt } from '@/lib/encryption'
+import { geminiGenerate } from '@/lib/gemini'
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
 
 /**
  * GET /api/cron/parse-bills
  *
- * Fetches recent bill emails from Gmail, downloads PDF attachments,
- * sends them to AI for extraction, and creates bill records in pending_review status.
- *
- * Runs daily or on-demand. Skips already-processed Gmail message IDs.
+ * 1. Fetch bill emails from Gmail (filtered by utility keywords + PDF attachment)
+ * 2. Download PDF, upload to storage
+ * 3. AI-extract bill data (type, amount, due date, address, account holder name)
+ * 4. Match to property: learned mappings first, then owner name fuzzy match
+ * 5. Create bill in verification queue (pending_review or flagged if anomaly)
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
@@ -21,7 +22,6 @@ export async function GET(request: Request) {
 
   const serviceClient = createServiceClient()
 
-  // Check if Gmail is connected
   const { data: tokenSetting } = await serviceClient
     .from('app_settings')
     .select('key')
@@ -31,6 +31,17 @@ export async function GET(request: Request) {
   if (!tokenSetting) {
     return NextResponse.json({ message: 'Gmail not connected — skipping', parsed: 0 })
   }
+
+  // Preload data for matching
+  const [
+    { data: properties },
+    { data: owners },
+    { data: senderMappings },
+  ] = await Promise.all([
+    serviceClient.from('properties').select('id, name, address, owner_id').eq('is_active', true),
+    serviceClient.from('owners').select('id, full_name'),
+    serviceClient.from('bill_sender_mappings').select('*').eq('confirmed', true),
+  ])
 
   try {
     const { messages } = await fetchBillEmails(10)
@@ -42,7 +53,6 @@ export async function GET(request: Request) {
     let parsed = 0
 
     for (const msg of messages) {
-      // Skip already-processed messages
       const { data: existing } = await serviceClient
         .from('bills')
         .select('id')
@@ -51,7 +61,6 @@ export async function GET(request: Request) {
 
       if (existing && existing.length > 0) continue
 
-      // Download the first PDF attachment
       const attachment = msg.attachments[0]
       const accessToken = await getGmailAccessToken()
 
@@ -63,9 +72,8 @@ export async function GET(request: Request) {
       if (!attachResponse.ok) continue
 
       const attachData = await attachResponse.json()
-      const pdfBase64 = attachData.data // URL-safe base64
+      const pdfBase64 = attachData.data
 
-      // Upload PDF to Supabase Storage
       const pdfBuffer = Buffer.from(pdfBase64, 'base64url')
       const storagePath = `bills/${msg.id}_${attachment.filename}`
 
@@ -73,33 +81,85 @@ export async function GET(request: Request) {
         .from('documents')
         .upload(storagePath, pdfBuffer, { contentType: 'application/pdf' })
 
-      // Get AI API key for bill parsing
-      const { data: aiKeySetting } = await serviceClient
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'ai_api_key')
-        .single()
-
+      // AI extraction
       let aiParsedData = null
-
-      if (aiKeySetting) {
+      if (process.env.GEMINI_API_KEY) {
         try {
-          const aiApiKey = await decrypt(aiKeySetting.value)
-          aiParsedData = await parseWithAI(pdfBase64, aiApiKey)
+          aiParsedData = await parseWithAI(pdfBase64, process.env.GEMINI_API_KEY)
         } catch {
-          // AI parsing failed — bill created with null parsed data for manual entry
+          // AI parsing failed — continue with null data
         }
       }
 
-      // Determine bill type and amount from AI parsing or defaults
       const billType = aiParsedData?.bill_type || 'other'
       const amountAgorot = aiParsedData?.amount_agorot || 0
       const dueDate = aiParsedData?.due_date || null
       const periodStart = aiParsedData?.period_start || null
       const periodEnd = aiParsedData?.period_end || null
-      const propertyId = aiParsedData?.property_id || null // AI might match by address
 
-      // Check for anomaly (>20% above 3-month average)
+      // ── Property matching ──
+      let propertyId: string | null = null
+      let matchMethod: string | null = null
+
+      // 1. Check learned sender mappings (highest confidence)
+      const senderEmail = msg.from.replace(/.*<(.+)>.*/, '$1').toLowerCase()
+      const learnedMapping = (senderMappings ?? []).find(
+        m => m.sender_email === senderEmail && m.bill_type === billType
+      )
+
+      if (learnedMapping) {
+        propertyId = learnedMapping.property_id
+        matchMethod = 'learned_mapping'
+      }
+
+      // 2. Match by owner name in subject or AI-extracted account holder
+      if (!propertyId) {
+        const searchText = `${msg.subject} ${aiParsedData?.account_holder || ''}`.toLowerCase()
+
+        for (const owner of (owners ?? [])) {
+          const nameParts = owner.full_name.toLowerCase().split(' ')
+          // Match if ALL parts of the owner name appear in subject/bill
+          const allPartsMatch = nameParts.length >= 2 && nameParts.every(
+            (part: string) => part.length > 2 && searchText.includes(part)
+          )
+
+          if (allPartsMatch) {
+            // Find property belonging to this owner
+            const ownerProperty = (properties ?? []).find(p => p.owner_id === owner.id)
+            if (ownerProperty) {
+              propertyId = ownerProperty.id
+              matchMethod = 'owner_name'
+
+              // Auto-create a mapping for future use (unconfirmed)
+              await serviceClient.from('bill_sender_mappings').upsert({
+                sender_email: senderEmail,
+                sender_name_pattern: msg.from,
+                subject_pattern: owner.full_name,
+                property_id: propertyId,
+                bill_type: billType,
+                confirmed: false,
+              }, { onConflict: 'sender_email,property_id,bill_type' }).select()
+
+              break
+            }
+          }
+        }
+      }
+
+      // 3. Match by address from AI extraction
+      if (!propertyId && aiParsedData?.address) {
+        const billAddress = aiParsedData.address.toLowerCase()
+        const matched = (properties ?? []).find(p =>
+          billAddress.includes(p.address.toLowerCase()) ||
+          p.address.toLowerCase().includes(billAddress)
+        )
+        if (matched) {
+          propertyId = matched.id
+          matchMethod = 'address'
+        }
+      }
+
+      // Anomaly detection
       let isAnomaly = false
       let anomalyNote = null
 
@@ -122,7 +182,6 @@ export async function GET(request: Request) {
         }
       }
 
-      // Create bill in pending_review (or flagged if anomaly)
       const { error: billError } = await serviceClient
         .from('bills')
         .insert({
@@ -137,7 +196,7 @@ export async function GET(request: Request) {
           anomaly_note: anomalyNote,
           pdf_storage_path: storagePath,
           gmail_message_id: msg.id,
-          ai_parsed_data: aiParsedData,
+          ai_parsed_data: { ...aiParsedData, match_method: matchMethod },
         })
 
       if (!billError) parsed++
@@ -154,8 +213,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * Use AI (Gemini Flash or Claude Haiku) to extract bill data from a PDF.
- * Returns structured data or null on failure.
+ * AI extraction using Gemini 3.1 Flash-Lite (structured PDF extraction)
  */
 async function parseWithAI(
   pdfBase64: string,
@@ -166,54 +224,37 @@ async function parseWithAI(
   due_date: string | null
   period_start: string | null
   period_end: string | null
-  property_id: string | null
+  address: string | null
+  account_holder: string | null
 } | null> {
-  // Using Gemini Flash API (cheaper for this volume)
-  const response = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+  const text = await geminiGenerate('lite', apiKey, [
     {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `Extract the following from this Israeli utility bill PDF:
+      parts: [
+        {
+          text: `Extract the following from this Israeli utility bill PDF:
 - bill_type: one of "arnona", "iec", "water", "vaad_bayit", "internet", "gas", "other"
 - amount: the total amount due in ILS (as a number, e.g. 842.50)
 - due_date: payment due date in YYYY-MM-DD format
 - period_start: billing period start in YYYY-MM-DD
 - period_end: billing period end in YYYY-MM-DD
 - address: the property address on the bill
+- account_holder: the name of the person/entity the bill is addressed to (שם בעל החשבון)
 
 Return ONLY valid JSON with these fields. If you can't determine a field, use null.`,
-              },
-              {
-                inline_data: {
-                  mime_type: 'application/pdf',
-                  data: pdfBase64,
-                },
-              },
-            ],
+        },
+        {
+          inline_data: {
+            mime_type: 'application/pdf',
+            data: pdfBase64,
           },
-        ],
-      }),
-    }
-  )
-
-  if (!response.ok) return null
-
-  const data = await response.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+        },
+      ],
+    },
+  ])
 
   if (!text) return null
 
   try {
-    // Extract JSON from response (may be wrapped in markdown code block)
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) return null
 
@@ -225,7 +266,8 @@ Return ONLY valid JSON with these fields. If you can't determine a field, use nu
       due_date: parsed.due_date || null,
       period_start: parsed.period_start || null,
       period_end: parsed.period_end || null,
-      property_id: null, // TODO: match address against properties table
+      address: parsed.address || null,
+      account_holder: parsed.account_holder || null,
     }
   } catch {
     return null

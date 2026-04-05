@@ -10,35 +10,21 @@ interface GmailTokens {
   expires_at: number
 }
 
-/** Get Gmail OAuth credentials from app_settings */
-async function getOAuthCredentials(): Promise<{ clientId: string; clientSecret: string }> {
-  const serviceClient = createServiceClient()
+/** Get Gmail OAuth credentials from environment variables */
+function getOAuthCredentials(): { clientId: string; clientSecret: string } {
+  const clientId = process.env.GMAIL_CLIENT_ID
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET
 
-  const { data: clientIdSetting } = await serviceClient
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'gmail_client_id')
-    .single()
-
-  const { data: clientSecretSetting } = await serviceClient
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'gmail_client_secret')
-    .single()
-
-  if (!clientIdSetting || !clientSecretSetting) {
-    throw new Error('Gmail OAuth credentials not configured. Add them in Settings.')
+  if (!clientId || !clientSecret) {
+    throw new Error('Gmail OAuth not configured. Set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET in environment variables.')
   }
 
-  return {
-    clientId: await decrypt(clientIdSetting.value),
-    clientSecret: await decrypt(clientSecretSetting.value),
-  }
+  return { clientId, clientSecret }
 }
 
 /** Build the Google OAuth authorization URL */
 export async function getGmailAuthUrl(redirectUri: string): Promise<string> {
-  const { clientId } = await getOAuthCredentials()
+  const { clientId } = getOAuthCredentials()
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -57,7 +43,7 @@ export async function exchangeCodeForTokens(
   code: string,
   redirectUri: string
 ): Promise<GmailTokens> {
-  const { clientId, clientSecret } = await getOAuthCredentials()
+  const { clientId, clientSecret } = getOAuthCredentials()
 
   const response = await fetch(GOOGLE_TOKEN_URL, {
     method: 'POST',
@@ -88,7 +74,7 @@ export async function exchangeCodeForTokens(
 
 /** Refresh an expired access token */
 async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_at: number }> {
-  const { clientId, clientSecret } = await getOAuthCredentials()
+  const { clientId, clientSecret } = getOAuthCredentials()
 
   const response = await fetch(GOOGLE_TOKEN_URL, {
     method: 'POST',

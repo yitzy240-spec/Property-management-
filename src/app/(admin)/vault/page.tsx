@@ -1,9 +1,7 @@
 export const dynamic = 'force-dynamic'
 
-import { FileText, Upload } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DocumentUpload } from '@/components/features/document-upload'
 
 const categoryLabels: Record<string, string> = {
@@ -24,7 +22,6 @@ export default async function VaultPage() {
     .select('*, properties(name), owners(full_name)')
     .order('created_at', { ascending: false })
 
-  // Group by category
   const grouped = (documents ?? []).reduce<Record<string, typeof documents>>((acc, doc) => {
     const cat = doc.category
     if (!acc[cat]) acc[cat] = []
@@ -36,9 +33,9 @@ export default async function VaultPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Document Vault</h1>
-          <p className="text-sm text-muted-foreground">
-            {documents?.length ?? 0} documents across all properties
+          <h1 className="text-lg font-semibold tracking-tight">Document Vault</h1>
+          <p className="text-xs text-muted-foreground">
+            {documents?.length ?? 0} documents
           </p>
         </div>
         <DocumentUpload />
@@ -46,23 +43,21 @@ export default async function VaultPage() {
 
       {Object.keys(grouped).length > 0 ? (
         Object.entries(grouped).map(([category, docs]) => (
-          <Card key={category}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">
+          <section key={category}>
+            <div className="mb-3 flex items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 {categoryLabels[category] || category}
-                <Badge variant="secondary" className="ml-2 text-[10px]">
-                  {docs?.length}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {docs?.map((doc) => (
+              </p>
+              <span className="font-mono text-xs text-muted-foreground">{docs?.length}</span>
+            </div>
+            <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+              {docs?.map((doc, i) => (
                 <div
                   key={doc.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
+                  className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}
                 >
                   <div className="flex items-center gap-3">
-                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground/50" />
                     <div>
                       <p className="text-sm font-medium">{doc.title}</p>
                       <p className="text-xs text-muted-foreground">
@@ -72,24 +67,20 @@ export default async function VaultPage() {
                       </p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-[10px]">
-                    {doc.uploaded_by}
-                  </Badge>
+                  <span className="text-xs text-muted-foreground">{doc.uploaded_by}</span>
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         ))
       ) : (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-10 w-10 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-semibold">No documents yet</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Upload property documents like Tabu, insurance, and contracts.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-[10px] border border-border bg-card py-12 text-center shadow-sm">
+          <FileText className="mx-auto h-8 w-8 text-muted-foreground/50" />
+          <p className="mt-3 text-sm font-medium text-foreground">No documents yet</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Upload property documents like Tabu, insurance, and contracts.
+          </p>
+        </div>
       )}
     </div>
   )

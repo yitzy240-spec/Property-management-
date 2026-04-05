@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { Lock, ShieldOff } from 'lucide-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { verifyMagicLinkToken } from '@/lib/magic-links'
 import { ContractorTaskView } from '@/components/features/contractor-task-view'
@@ -9,10 +10,8 @@ export default async function ContractorMagicLinkPage({
   params: { token: string }
 }) {
   try {
-    // Verify JWT
     const payload = await verifyMagicLinkToken(params.token)
 
-    // Cross-check against magic_links table (supports revocation)
     const serviceClient = createServiceClient()
     const { data: magicLink } = await serviceClient
       .from('magic_links')
@@ -23,9 +22,12 @@ export default async function ContractorMagicLinkPage({
 
     if (!magicLink) {
       return (
-        <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] p-4">
           <div className="text-center">
-            <h1 className="text-xl font-bold">Link Expired</h1>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[10px] bg-muted">
+              <Lock className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <h1 className="text-lg font-semibold">Link Expired</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               This link has been used or has expired. Contact your manager for a new one.
             </p>
@@ -34,7 +36,6 @@ export default async function ContractorMagicLinkPage({
       )
     }
 
-    // Fetch property + task data
     const { data: property } = await serviceClient
       .from('properties')
       .select('id, name, address, entry_code, youtube_tutorial_url')
@@ -73,9 +74,12 @@ export default async function ContractorMagicLinkPage({
     )
   } catch {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] p-4">
         <div className="text-center">
-          <h1 className="text-xl font-bold">Invalid Link</h1>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[10px] bg-muted">
+            <ShieldOff className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <h1 className="text-lg font-semibold">Invalid Link</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             This link is invalid or has expired.
           </p>

@@ -2,12 +2,20 @@
 
 import { useState } from 'react'
 import { Check, Camera, Receipt, ExternalLink, CheckCircle2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer'
 import { createClient } from '@/lib/supabase/client'
 
 interface ContractorTaskViewProps {
@@ -59,7 +67,6 @@ export function ContractorTaskView({
       )
     )
 
-    // Persist via API
     await fetch('/api/contractor/checklist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -71,8 +78,7 @@ export function ContractorTaskView({
     const file = e.target.files?.[0]
     if (!file || !task) return
 
-    // Validate file type and size
-    const MAX_SIZE = 25 * 1024 * 1024 // 25MB
+    const MAX_SIZE = 25 * 1024 * 1024
     if (file.size > MAX_SIZE) return
     if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) return
 
@@ -80,9 +86,14 @@ export function ContractorTaskView({
     const folder = type === 'receipt' ? 'receipts' : 'tasks'
     const filePath = `${folder}/${task.id}/${Date.now()}_${file.name}`
 
-    await supabase.storage.from('task-media').upload(filePath, file)
+    const { error: uploadError } = await supabase.storage.from('task-media').upload(filePath, file)
+    if (uploadError) {
+      toast.error('Upload failed', { description: uploadError.message })
+      return
+    }
 
-    // Create task_media record via API
+    toast.success(type === 'receipt' ? 'Receipt uploaded' : 'Photo uploaded')
+
     await fetch('/api/contractor/media', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -115,11 +126,11 @@ export function ContractorTaskView({
 
   if (completed) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-status-safe/5 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] p-4">
         <div className="text-center">
-          <CheckCircle2 className="mx-auto h-16 w-16 text-status-safe" />
-          <h1 className="mt-4 text-2xl font-bold text-foreground">Task Complete</h1>
-          <p className="mt-2 text-sm text-status-safe">
+          <CheckCircle2 className="mx-auto h-14 w-14 text-status-safe" />
+          <h1 className="mt-4 text-lg font-semibold text-foreground">Task Complete</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
             Thank you! Your work has been logged.
           </p>
         </div>
@@ -128,76 +139,72 @@ export function ContractorTaskView({
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-background">
+    <div className="mx-auto min-h-screen max-w-lg bg-[#FAFAFA]">
       {/* Header */}
-      <div className="border-b bg-card p-4">
-        <p className="text-xs font-medium text-muted-foreground">ApartmentOS</p>
-        <h1 className="text-lg font-bold">Task Assignment</h1>
+      <div className="border-b border-border bg-card px-4 py-4">
+        <div className="flex items-center gap-2">
+          <img src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400" alt="Marcus Properties" className="h-6 w-auto" />
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">ApartmentOS</p>
+        </div>
+        <h1 className="mt-1 text-lg font-semibold">Task Assignment</h1>
       </div>
 
       <div className="space-y-4 p-4">
         {/* Property Info + Entry Code */}
-        <Card>
-          <CardContent className="p-4">
-            <h2 className="font-semibold">{property.name}</h2>
-            <p className="text-sm text-muted-foreground">{property.address}</p>
+        <div className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
+          <h2 className="text-sm font-semibold">{property.name}</h2>
+          <p className="text-xs text-muted-foreground">{property.address}</p>
 
-            {property.entry_code && (
-              <div className="mt-3 rounded-lg bg-primary/5 p-3 text-center">
-                <p className="text-xs font-medium text-muted-foreground">Entry Code</p>
-                <p className="text-4xl font-bold font-mono tracking-[0.2em]">
-                  {property.entry_code}
-                </p>
-              </div>
-            )}
+          {property.entry_code && (
+            <div className="mt-3 rounded-lg bg-primary/5 p-3 text-center">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Entry Code</p>
+              <p className="mt-1 font-mono text-4xl font-bold tracking-[0.2em]">
+                {property.entry_code}
+              </p>
+            </div>
+          )}
 
-            {property.youtube_tutorial_url && (
-              <a
-                href={property.youtube_tutorial_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 flex items-center gap-2"
-              >
-                <Button variant="outline" size="sm" className="w-full">
-                  <ExternalLink className="mr-2 h-3.5 w-3.5" />
-                  Watch Apartment Tutorial
-                </Button>
-              </a>
-            )}
-          </CardContent>
-        </Card>
+          {property.youtube_tutorial_url && (
+            <a
+              href={property.youtube_tutorial_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 block"
+            >
+              <Button variant="outline" size="sm" className="w-full gap-1.5">
+                <ExternalLink className="h-3.5 w-3.5" />
+                Watch Apartment Tutorial
+              </Button>
+            </a>
+          )}
+        </div>
 
         {/* Task Details */}
         {task && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{task.title}</CardTitle>
-              {task.description && (
-                <p className="text-sm text-muted-foreground">{task.description}</p>
-              )}
-            </CardHeader>
-          </Card>
+          <div className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
+            <h3 className="text-sm font-semibold">{task.title}</h3>
+            {task.description && (
+              <p className="mt-1 text-xs text-muted-foreground">{task.description}</p>
+            )}
+          </div>
         )}
 
         {/* Checklist */}
         {checklist.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
+          <div className="rounded-[10px] border border-border bg-card shadow-sm">
+            <div className="border-b border-border px-4 py-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Checklist</CardTitle>
-                <Badge variant={allChecked ? 'default' : 'secondary'}>
-                  {completedCount}/{totalCount}
-                </Badge>
+                <p className="text-sm font-semibold">Checklist</p>
+                <span className="font-mono text-xs text-muted-foreground">{completedCount}/{totalCount}</span>
               </div>
-              {/* Progress bar */}
-              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-status-safe transition-all"
                   style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
                 />
               </div>
-            </CardHeader>
-            <CardContent className="space-y-1 pt-0">
+            </div>
+            <div className="p-1">
               {checklist.map((item) => (
                 <button
                   key={item.id}
@@ -222,78 +229,95 @@ export function ContractorTaskView({
                   </span>
                 </button>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
-        <Separator />
-
         {/* Photo Upload */}
-        <Card>
-          <CardContent className="p-4">
-            <Label className="text-sm font-medium">Upload Photos</Label>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Take photos of completed work for the owner record.
-            </p>
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed p-4 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary">
-              <Camera className="h-5 w-5" />
-              Tap to take or upload photo
-              <input
-                type="file"
-                accept="image/*,video/*"
-                capture="environment"
-                className="hidden"
-                onChange={(e) => handleFileUpload(e, 'photo')}
-              />
-            </label>
-          </CardContent>
-        </Card>
+        <div className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
+          <Label className="text-xs font-semibold">Upload Photos</Label>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Take photos of completed work for the owner record.
+          </p>
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-4 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+            <Camera className="h-5 w-5" />
+            Tap to take or upload photo
+            <input
+              type="file"
+              accept="image/*,video/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => handleFileUpload(e, 'photo')}
+            />
+          </label>
+        </div>
 
         {/* Expense */}
-        <Card>
-          <CardContent className="p-4">
-            <Label className="text-sm font-medium">Expense (optional)</Label>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Log any materials purchased for this task.
-            </p>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                  ₪
-                </span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  className="pl-7 font-mono"
-                  value={expenseAmount}
-                  onChange={(e) => setExpenseAmount(e.target.value)}
-                />
-              </div>
-              <label className="flex cursor-pointer items-center gap-1 rounded-md border px-3 text-xs text-muted-foreground hover:bg-muted">
-                <Receipt className="h-3.5 w-3.5" />
-                Receipt
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => handleFileUpload(e, 'receipt')}
-                />
-              </label>
+        <div className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
+          <Label className="text-xs font-semibold">Expense (optional)</Label>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Log any materials purchased for this task.
+          </p>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                &#8362;
+              </span>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                className="h-11 pl-7 font-mono"
+                value={expenseAmount}
+                onChange={(e) => setExpenseAmount(e.target.value)}
+              />
             </div>
-          </CardContent>
-        </Card>
+            <label className="flex cursor-pointer items-center gap-1 rounded-[var(--radius-button)] border border-border px-3 text-xs text-muted-foreground hover:bg-muted">
+              <Receipt className="h-3.5 w-3.5" />
+              Receipt
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => handleFileUpload(e, 'receipt')}
+              />
+            </label>
+          </div>
+        </div>
 
-        {/* Complete Button */}
-        <Button
-          onClick={handleComplete}
-          disabled={submitting || (totalCount > 0 && !allChecked)}
-          className="w-full bg-status-safe py-6 text-lg hover:bg-status-safe/90"
-        >
-          {submitting ? 'Submitting...' : 'Complete Task'}
-        </Button>
+        {/* Complete — Drawer confirmation */}
+        <Drawer>
+          <DrawerTrigger asChild>
+            <Button
+              disabled={totalCount > 0 && !allChecked}
+              className="h-12 w-full rounded-[var(--radius-button)] bg-status-safe text-base font-semibold hover:bg-status-safe/90"
+            >
+              Complete Task
+            </Button>
+          </DrawerTrigger>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Confirm Completion</DrawerTitle>
+              <DrawerDescription>
+                This will mark the task as done and notify the property manager.
+              </DrawerDescription>
+            </DrawerHeader>
+            <DrawerFooter>
+              <Button
+                onClick={handleComplete}
+                disabled={submitting}
+                className="h-12 w-full rounded-[var(--radius-button)] bg-status-safe text-base font-semibold hover:bg-status-safe/90"
+              >
+                {submitting ? 'Submitting...' : 'Yes, Complete Task'}
+              </Button>
+              <DrawerClose asChild>
+                <Button variant="outline" className="w-full">Cancel</Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
 
         {totalCount > 0 && !allChecked && (
           <p className="text-center text-xs text-muted-foreground">
