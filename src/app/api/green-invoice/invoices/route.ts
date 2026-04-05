@@ -23,7 +23,6 @@ export async function GET(request: Request) {
       fromDate,
       toDate,
       type: [DOC_TYPES.TAX_INVOICE, DOC_TYPES.TAX_INVOICE_RECEIPT, DOC_TYPES.RECEIPT],
-      pageSize: 50,
     })
 
     return NextResponse.json(result)

@@ -1,11 +1,9 @@
 /**
  * Green Invoice (חשבונית ירוקה) API Client
  *
- * Handles: JWT auth, document creation (invoices/receipts), client sync,
- * expense recording, and document downloads.
- *
- * Prices: Green Invoice uses actual currency amounts (e.g., 500 = ₪500).
- * Our DB stores agorot — always divide by 100 before sending.
+ * IMPORTANT: Green Invoice uses 1-based pagination. page: 0 is INVALID.
+ * Prices are in actual currency (e.g., 500 = ₪500), not agorot.
+ * Empty body {} works for searches — adding page: 0 or invalid pageSize breaks them.
  */
 
 const BASE_URL = process.env.GREEN_INVOICE_SANDBOX === 'true'
@@ -15,13 +13,13 @@ const BASE_URL = process.env.GREEN_INVOICE_SANDBOX === 'true'
 // ── Document Type Codes ──
 
 export const DOC_TYPES = {
-  QUOTE: 10,              // הצעת מחיר
-  ORDER: 100,             // הזמנה
-  PROFORMA: 300,          // חשבון עסקה
-  TAX_INVOICE: 305,       // חשבונית מס
-  TAX_INVOICE_RECEIPT: 320, // חשבונית מס / קבלה (most common)
-  CREDIT_NOTE: 330,       // חשבונית זיכוי
-  RECEIPT: 400,           // קבלה
+  QUOTE: 10,                // הצעת מחיר
+  ORDER: 100,               // הזמנה
+  PROFORMA: 300,            // חשבון עסקה
+  TAX_INVOICE: 305,         // חשבונית מס
+  TAX_INVOICE_RECEIPT: 320, // חשבונית מס / קבלה
+  CREDIT_NOTE: 330,         // חשבונית זיכוי
+  RECEIPT: 400,             // קבלה — Marcus's primary type
 } as const
 
 // ── Payment Type Codes ──
@@ -33,7 +31,7 @@ export const PAYMENT_TYPES = {
   CREDIT_CARD: 3,
   BANK_TRANSFER: 4,
   PAYPAL: 5,
-  PAYMENT_APP: 10,  // Bit, Paybox
+  PAYMENT_APP: 10,
   OTHER: 11,
 } as const
 
@@ -42,7 +40,6 @@ export const PAYMENT_TYPES = {
 let cachedToken: { jwt: string; expiresAt: number } | null = null
 
 async function getJwtToken(): Promise<string> {
-  // Return cached token if still valid (with 5 min buffer)
   if (cachedToken && cachedToken.expiresAt > Date.now() + 300_000) {
     return cachedToken.jwt
   }
@@ -51,7 +48,7 @@ async function getJwtToken(): Promise<string> {
   const apiSecret = process.env.GREEN_INVOICE_API_SECRET
 
   if (!apiId || !apiSecret) {
-    throw new Error('Green Invoice credentials not configured (GREEN_INVOICE_API_ID, GREEN_INVOICE_API_SECRET)')
+    throw new Error('Green Invoice credentials not configured')
   }
 
   const res = await fetch(`${BASE_URL}/account/token`, {
@@ -66,12 +63,7 @@ async function getJwtToken(): Promise<string> {
   }
 
   const data = await res.json()
-
-  cachedToken = {
-    jwt: data.token,
-    expiresAt: Date.now() + 55 * 60 * 1000, // 55 min (token valid for 1h)
-  }
-
+  cachedToken = { jwt: data.token, expiresAt: Date.now() + 55 * 60 * 1000 }
   return data.token
 }
 
@@ -95,16 +87,23 @@ async function giFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json()
 }
 
-// ── Clients (Property Owners) ──
+// ══════════════════════════════════════
+// CLIENTS
+// ══════════════════════════════════════
 
-interface GIClient {
+export interface GIClient {
   id: string
   name: string
   emails: string[]
   phone?: string
-  address?: string
-  city?: string
-  country?: string
+}
+
+/** Search all clients. Green Invoice uses empty body for "get all". */
+export async function searchClients(): Promise<{ items: GIClient[]; total: number }> {
+  return giFetch('/clients/search', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
 }
 
 /** Create or update a client (property owner) in Green Invoice */
@@ -115,7 +114,6 @@ export async function syncOwnerAsClient(owner: {
   greenInvoiceClientId?: string | null
 }): Promise<string> {
   if (owner.greenInvoiceClientId) {
-    // Update existing
     await giFetch(`/clients/${owner.greenInvoiceClientId}`, {
       method: 'PUT',
       body: JSON.stringify({
@@ -127,17 +125,16 @@ export async function syncOwnerAsClient(owner: {
     return owner.greenInvoiceClientId
   }
 
-  // Search for existing client by email
-  const search = await giFetch<{ items: GIClient[] }>('/clients/search', {
-    method: 'POST',
-    body: JSON.stringify({ email: owner.email }),
-  })
+  // Search all clients and match by name (emails are often empty in GI)
+  const search = await searchClients()
+  const match = search.items.find(c =>
+    c.name.toLowerCase() === owner.name.toLowerCase() ||
+    c.emails?.includes(owner.email)
+  )
 
-  if (search.items.length > 0) {
-    return search.items[0].id
-  }
+  if (match) return match.id
 
-  // Create new client
+  // Create new
   const created = await giFetch<GIClient>('/clients', {
     method: 'POST',
     body: JSON.stringify({
@@ -145,14 +142,27 @@ export async function syncOwnerAsClient(owner: {
       emails: [owner.email],
       phone: owner.phone || undefined,
       country: 'IL',
-      add: true,
     }),
   })
 
   return created.id
 }
 
-// ── Documents (Invoices) ──
+// ══════════════════════════════════════
+// DOCUMENTS
+// ══════════════════════════════════════
+
+export interface GIDocument {
+  id: string
+  number: number
+  type: number
+  status: number
+  amount: number
+  currency: string
+  documentDate: string
+  client?: { id: string; name: string }
+  url?: { he: string; en: string }
+}
 
 interface CreateDocumentOptions {
   type: number
@@ -164,21 +174,12 @@ interface CreateDocumentOptions {
   items: {
     description: string
     quantity: number
-    priceAgorot: number  // We convert to ILS internally
+    priceAgorot: number
   }[]
   paymentType?: number
   remarks?: string
-  date?: string       // YYYY-MM-DD
-  dueDate?: string    // YYYY-MM-DD
-}
-
-interface GIDocument {
-  id: string
-  number: number
-  type: number
-  status: number
-  total: number
-  url: { he: string; en: string }
+  date?: string
+  dueDate?: string
 }
 
 /** Create a document (invoice, receipt, etc.) */
@@ -186,7 +187,7 @@ export async function createDocument(options: CreateDocumentOptions): Promise<GI
   const income = options.items.map(item => ({
     description: item.description,
     quantity: item.quantity,
-    price: item.priceAgorot / 100, // agorot → ILS
+    price: item.priceAgorot / 100,
     currency: options.currency || 'ILS',
     vatType: 0,
   }))
@@ -209,7 +210,6 @@ export async function createDocument(options: CreateDocumentOptions): Promise<GI
     remarks: options.remarks,
   }
 
-  // Add payment if not unpaid
   if (options.paymentType !== undefined && options.paymentType !== PAYMENT_TYPES.UNPAID) {
     body.payment = [{
       date: options.date || new Date().toISOString().split('T')[0],
@@ -225,13 +225,13 @@ export async function createDocument(options: CreateDocumentOptions): Promise<GI
   })
 }
 
-/** Create a commission invoice for an owner */
+/** Create a commission receipt (type 400) for an owner — matches Marcus's existing pattern */
 export async function createCommissionInvoice(params: {
   ownerName: string
   ownerEmail: string
   ownerGreenInvoiceId?: string | null
   propertyName: string
-  billingMonth: string  // e.g. "2026-04"
+  billingMonth: string
   commissionAgorot: number
   hourlyAgorot: number
   fixedFeeAgorot: number
@@ -267,8 +267,9 @@ export async function createCommissionInvoice(params: {
     throw new Error('No billable items for this invoice')
   }
 
+  // Use RECEIPT (400) to match Marcus's existing document pattern
   return createDocument({
-    type: DOC_TYPES.TAX_INVOICE_RECEIPT,
+    type: DOC_TYPES.RECEIPT,
     clientId: params.ownerGreenInvoiceId || undefined,
     clientName: params.ownerName,
     clientEmail: params.ownerEmail,
@@ -277,6 +278,57 @@ export async function createCommissionInvoice(params: {
     paymentType: PAYMENT_TYPES.BANK_TRANSFER,
     remarks: `Marcus Properties — ${params.propertyName} management fees for ${params.billingMonth}`,
   })
+}
+
+// ── Document Search ──
+
+interface DocumentSearchParams {
+  fromDate?: string
+  toDate?: string
+  type?: number[]
+  status?: number[]
+  sort?: string
+  page?: number
+}
+
+/** Search documents. NOTE: page is 1-based. Empty body returns all. */
+export async function searchDocuments(params: DocumentSearchParams = {}): Promise<{ items: GIDocument[]; total: number }> {
+  // Build body carefully — only include fields that have values
+  // Green Invoice rejects invalid/empty pagination params
+  const body: Record<string, unknown> = {}
+  if (params.fromDate) body.from = params.fromDate
+  if (params.toDate) body.to = params.toDate
+  if (params.type) body.type = params.type
+  if (params.status) body.status = params.status
+  if (params.sort) body.sort = params.sort
+  if (params.page && params.page > 1) body.page = params.page
+
+  return giFetch('/documents/search', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+/** Fetch ALL documents across all pages */
+export async function fetchAllDocuments(): Promise<GIDocument[]> {
+  const allDocs: GIDocument[] = []
+  let page = 1
+
+  while (true) {
+    const body: Record<string, unknown> = {}
+    if (page > 1) body.page = page
+
+    const result = await giFetch<{ items: GIDocument[]; total: number; pages: number }>('/documents/search', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+
+    allDocs.push(...(result.items || []))
+    if (page >= (result.pages || 1)) break
+    page++
+  }
+
+  return allDocs
 }
 
 // ── Document Downloads ──
@@ -291,36 +343,9 @@ export async function getDocumentDownloadLinks(documentId: string): Promise<Down
   return giFetch<DownloadLinks>(`/documents/${documentId}/download/links`)
 }
 
-// ── Document Search ──
-
-interface DocumentSearchParams {
-  fromDate?: string
-  toDate?: string
-  type?: number[]
-  status?: number[]
-  sort?: string
-  page?: number
-  pageSize?: number
-}
-
-export async function searchDocuments(params: DocumentSearchParams): Promise<{ items: GIDocument[]; total: number }> {
-  return giFetch('/documents/search', {
-    method: 'POST',
-    body: JSON.stringify({
-      from: params.fromDate,
-      to: params.toDate,
-      type: params.type,
-      status: params.status,
-      sort: params.sort || 'documentDate',
-      page: params.page || 1,
-      pageSize: params.pageSize || 25,
-    }),
-  })
-}
-
 // ── Expenses ──
 
-/** Upload a bill PDF as an expense draft (OCR auto-parsed by Green Invoice) */
+/** Upload a bill PDF as an expense draft */
 export async function uploadExpense(pdfBuffer: Buffer, filename: string): Promise<{ id: string }> {
   const token = await getJwtToken()
 
@@ -329,9 +354,7 @@ export async function uploadExpense(pdfBuffer: Buffer, filename: string): Promis
 
   const res = await fetch(`${BASE_URL}/expenses/file`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
+    headers: { 'Authorization': `Bearer ${token}` },
     body: formData,
   })
 
@@ -343,13 +366,23 @@ export async function uploadExpense(pdfBuffer: Buffer, filename: string): Promis
   return res.json()
 }
 
+/** Search expenses */
+export async function searchExpenses(): Promise<{ items: Record<string, unknown>[]; total: number }> {
+  return giFetch('/expenses/search', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
 // ── Business Info ──
 
 export async function getBusinessInfo(): Promise<{
   id: string
   name: string
-  type: number  // 1=Osek Murshe, 3=Osek Patur
+  type: number
   taxId: string
+  address: string
+  city: string
 }> {
   return giFetch('/businesses/me')
 }
