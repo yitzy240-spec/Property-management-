@@ -39,7 +39,7 @@ export async function sendOwnerMagicLink(formData: FormData) {
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/owner`,
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/owner`,
     },
   })
 

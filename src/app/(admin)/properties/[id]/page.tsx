@@ -35,7 +35,7 @@ export default async function PropertyDetailPage({
     { data: tasks },
     { data: documents },
   ] = await Promise.all([
-    serviceClient.from('bookings').select('*').eq('property_id', params.id).order('check_in', { ascending: false }).limit(10),
+    serviceClient.from('bookings').select('*').eq('property_id', params.id).order('check_in', { ascending: true }).limit(20),
     serviceClient.from('bills').select('*').eq('property_id', params.id).order('created_at', { ascending: false }).limit(10),
     serviceClient.from('tasks').select('*, contractors(name)').eq('property_id', params.id).order('created_at', { ascending: false }).limit(10),
     serviceClient.from('documents').select('*').eq('property_id', params.id).order('created_at', { ascending: false }),

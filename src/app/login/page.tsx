@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false)
   const [showReset, setShowReset] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [tab, setTab] = useState<'admin' | 'owner'>('admin')
+  const [tab, setTab] = useState<'admin' | 'owner'>('owner')
 
   async function handleAdminLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()

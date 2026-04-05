@@ -362,6 +362,13 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
   }
 
   for (const lb of lodgifyBookings) {
+    // Skip cancelled, declined, and tentative bookings
+    const status = (lb.status || '').toLowerCase()
+    if (status === 'declined' || status === 'cancelled' || status === 'canceled' || status === 'tentative' || status === 'inquiry' || status === 'open') {
+      result.skipped++
+      continue
+    }
+
     const property = propertyMap.get(String(lb.property_id))
     if (!property) {
       result.skipped++
