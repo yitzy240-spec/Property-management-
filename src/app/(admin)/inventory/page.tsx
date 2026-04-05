@@ -1,12 +1,12 @@
 export const dynamic = 'force-dynamic'
 
-import { AlertTriangle, Package, Phone } from 'lucide-react'
+import { AlertTriangle, Package } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { formatDateJerusalem } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { LinenForecast } from '@/components/features/linen-forecast'
 import { InventoryAddButton, InventoryAdjust, LaundryBatchButton, LaundryReturnButton } from '@/components/features/inventory-manage'
+import { LaundryPickupButton } from '@/components/features/laundry-pickup'
 
 export default async function InventoryPage() {
   const supabase = createServerSupabaseClient()
@@ -20,6 +20,19 @@ export default async function InventoryPage() {
   const lowStockItems = inventory?.filter(
     (item) => item.par_level && item.quantity_in_closet < item.par_level
   ) ?? []
+
+  const { data: allProperties } = await serviceClient
+    .from('properties')
+    .select('id, name, address')
+    .eq('is_active', true)
+    .order('name')
+
+  const lowStockForPickup = lowStockItems.map(item => ({
+    propertyName: (item.properties as { name: string } | null)?.name || 'Unknown',
+    itemName: item.item_name,
+    quantity: item.quantity_in_closet,
+    parLevel: item.par_level,
+  }))
 
   const { data: laundryBatches } = await serviceClient
     .from('laundry_batches')
@@ -112,12 +125,10 @@ export default async function InventoryPage() {
           </p>
           <div className="flex items-center gap-2">
             <LaundryBatchButton />
-            <a href="https://wa.me/?text=Laundry%20pickup%20request%20-%20ApartmentOS" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-                <Phone className="h-3 w-3" />
-                Notify
-              </Button>
-            </a>
+            <LaundryPickupButton
+              properties={(allProperties ?? []).map(p => ({ id: p.id, name: p.name, address: p.address }))}
+              lowStockItems={lowStockForPickup}
+            />
           </div>
         </div>
 

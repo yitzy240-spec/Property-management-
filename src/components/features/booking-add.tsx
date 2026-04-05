@@ -29,8 +29,10 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
 
   useEffect(() => {
     if (!open || propertyId) return
-    supabase.from('properties').select('id, name').eq('is_active', true).order('name')
-      .then(({ data }) => setProperties(data ?? []))
+    fetch('/api/properties/list')
+      .then(r => r.json())
+      .then(data => setProperties(data.properties ?? []))
+      .catch(() => {})
   }, [open])
 
   async function handleSubmit(formData: FormData) {
@@ -42,7 +44,6 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
     const channelStr = formData.get('channel_fees') as string
     const depositStr = formData.get('deposit') as string
 
-    // Handle multi-currency: if USD, convert to ILS agorot
     let grossAgorot: number | null = null
     let originalCents: number | null = null
     let exchangeRate: number | null = null
@@ -59,28 +60,40 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
       }
     }
 
-    const { error } = await supabase.from('bookings').insert({
-      property_id: propId,
-      guest_name: formData.get('guest_name') as string || null,
-      check_in: formData.get('check_in') as string,
-      check_out: formData.get('check_out') as string,
-      platform: formData.get('platform') as string || null,
-      gross_rental_agorot: grossAgorot,
-      channel_fees_agorot: channelStr ? Math.round(parseFloat(channelStr) * 100) : null,
-      currency,
-      original_amount_cents: originalCents,
-      exchange_rate: exchangeRate,
-      deposit_amount_agorot: depositStr ? Math.round(parseFloat(depositStr) * 100) : null,
-      payment_status: 'pending',
-      notes: formData.get('notes') as string || null,
-    })
+    try {
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          property_id: propId,
+          guest_name: formData.get('guest_name') as string || null,
+          check_in: formData.get('check_in') as string,
+          check_out: formData.get('check_out') as string,
+          platform: formData.get('platform') as string || null,
+          gross_rental_agorot: grossAgorot,
+          channel_fees_agorot: channelStr ? Math.round(parseFloat(channelStr) * 100) : null,
+          currency,
+          original_amount_cents: originalCents,
+          exchange_rate: exchangeRate,
+          deposit_amount_agorot: depositStr ? Math.round(parseFloat(depositStr) * 100) : null,
+          notes: formData.get('notes') as string || null,
+        }),
+      })
+      const data = await res.json()
 
-    if (error) {
-      toast.error('Failed to add booking', { description: error.message })
-    } else {
-      toast.success('Booking added')
+      if (!res.ok) throw new Error(data.error || 'Failed')
+
+      if (data.lodgify?.synced) {
+        toast.success('Booking added + synced to Lodgify')
+      } else if (data.lodgify?.error) {
+        toast.success('Booking added locally (Lodgify sync failed)')
+      } else {
+        toast.success('Booking added')
+      }
       setOpen(false)
       router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to add booking')
     }
     setSaving(false)
   }
