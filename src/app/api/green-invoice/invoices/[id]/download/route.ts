@@ -22,7 +22,16 @@ export async function GET(
 
   try {
     const links = await getDocumentDownloadLinks(params.id)
-    const downloadUrl = lang === 'en' ? links.en : links.he
+
+    if (!links) {
+      return NextResponse.json({ error: 'No download links available' }, { status: 404 })
+    }
+
+    const downloadUrl = lang === 'en' ? (links.en || links.he) : (links.he || links.en)
+
+    if (!downloadUrl) {
+      return NextResponse.json({ error: 'Download link not found' }, { status: 404 })
+    }
 
     return NextResponse.redirect(downloadUrl)
   } catch (err) {

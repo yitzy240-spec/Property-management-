@@ -376,8 +376,12 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
     }
 
     const platform = mapSourceToPlatform(lb.source)
+    // Lodgify total_amount is in the property's currency (USD for these Jerusalem properties)
+    // Store as cents (multiply by 100) in gross_rental_agorot field
+    // NOTE: These are USD cents, not ILS agorot — currency field tracks this
     const grossRentalAgorot = lb.total_amount ? Math.round(lb.total_amount * 100) : null
     const channelFeesAgorot = grossRentalAgorot ? estimateChannelFees(grossRentalAgorot, platform) : null
+    const currency = lb.currency || 'USD'
 
     try {
       const { data: existing } = await supabase

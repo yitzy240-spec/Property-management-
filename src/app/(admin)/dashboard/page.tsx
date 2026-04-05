@@ -24,7 +24,7 @@ export default async function DashboardPage() {
     supabase.from('properties').select('*, owners(full_name), lodgify_data').eq('is_active', true).order('name'),
     supabase.from('tasks').select('*', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
     supabase.from('bills').select('*', { count: 'exact', head: true }).eq('status', 'pending_review'),
-    supabase.from('revenue_tracking').select('total_revenue_agorot').eq('year', currentYear),
+    supabase.from('bookings').select('gross_rental_agorot').gte('check_in', `${currentYear}-01-01`).lte('check_in', `${currentYear}-12-31`).not('gross_rental_agorot', 'is', null),
     supabase.from('bookings').select('*, properties(name)').gte('check_in', today).order('check_in').limit(5),
     // Per-property: current/next booking and open tasks
     supabase.from('bookings').select('property_id, guest_name, check_in, check_out').gte('check_out', today).order('check_in'),
@@ -44,7 +44,7 @@ export default async function DashboardPage() {
     propertyTaskCount[t.property_id] = (propertyTaskCount[t.property_id] || 0) + 1
   }
 
-  const ytdRevenue = revenueData?.reduce((sum, r) => sum + (r.total_revenue_agorot || 0), 0) ?? 0
+  const ytdRevenue = revenueData?.reduce((sum, r) => sum + (r.gross_rental_agorot || 0), 0) ?? 0
   const vatPercent = Math.round((ytdRevenue / VAT_THRESHOLD_AGOROT) * 100)
   const isVatWarning = vatPercent >= VAT_WARNING_PERCENT * 100
 
