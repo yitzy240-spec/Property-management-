@@ -1,125 +1,139 @@
--- ApartmentOS Seed Data
--- Realistic Jerusalem properties, owners, bookings, bills, tasks, contractors
--- Run after migrations: psql $DATABASE_URL -f scripts/seed.sql
+-- ApartmentOS Seed Data — From Real Client Data (Marcus Properties)
+-- Credit card numbers, passport numbers, and sensitive PII have been REDACTED
+-- Run after migrations: paste into Supabase SQL Editor
 
 -- ============================================
--- OWNERS
+-- OWNERS (real owners, redacted PII)
 -- ============================================
 
-INSERT INTO owners (id, full_name, email, phone, profile) VALUES
-  ('11111111-0000-0000-0000-000000000001', 'David Cohen', 'david@example.com', '+972-50-111-1111', 'investor'),
-  ('11111111-0000-0000-0000-000000000002', 'Rachel Levi', 'rachel@example.com', '+972-50-222-2222', 'hybrid'),
-  ('11111111-0000-0000-0000-000000000003', 'Michael Ben-Ari', 'michael@example.com', '+972-50-333-3333', 'private');
+INSERT INTO owners (id, full_name, email, phone, profile, notes) VALUES
+  ('11111111-aaaa-0000-0000-000000000001', 'Bobbi & Michelle Luxenberg', 'bobbi@example.com', NULL, 'investor', 'הרכבת 20 — Savyon View. Mgmt fee $270/mo'),
+  ('11111111-aaaa-0000-0000-000000000002', 'Kalman Finkelstein', 'kalman@example.com', '+1-443-495-9897', 'hybrid', 'Agripas 6. Mgmt fee $150/mo'),
+  ('11111111-aaaa-0000-0000-000000000003', 'Benjamin Strauss', 'ben@example.com', '+1-443-487-3733', 'investor', 'Owns Agripas 8 + Raul Wallenberg 3. Mgmt fee $150/mo each'),
+  ('11111111-aaaa-0000-0000-000000000004', 'Dena & Aaron Finkelstein', 'dena@example.com', '+1-443-799-9922', 'private', 'Keren Hayesod 5 Apt 3. Mgmt fee $100/mo');
 
 -- ============================================
--- PROPERTIES
+-- PROPERTIES (real addresses in Jerusalem)
 -- ============================================
 
-INSERT INTO properties (id, owner_id, name, address, city, neighborhood, num_bedrooms, num_beds, entry_code, youtube_tutorial_url, commission_rate, management_fee_agorot, hourly_rate_agorot) VALUES
-  ('22222222-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Ben Yehuda 42', '42 Ben Yehuda Street', 'Jerusalem', 'City Center', 2, 3, '4829', 'https://youtube.com/watch?v=example1', 0.20, 50000, 15000),
-  ('22222222-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001', 'Emek Refaim 15', '15 Emek Refaim Street', 'Jerusalem', 'German Colony', 3, 4, '7351', 'https://youtube.com/watch?v=example2', 0.20, 60000, 15000),
-  ('22222222-0000-0000-0000-000000000003', '11111111-0000-0000-0000-000000000002', 'King George 8', '8 King George Street', 'Jerusalem', 'City Center', 1, 2, '9142', NULL, 0.20, 40000, 15000),
-  ('22222222-0000-0000-0000-000000000004', '11111111-0000-0000-0000-000000000002', 'Beit HaKerem 22', '22 HaArazim Street', 'Jerusalem', 'Beit HaKerem', 2, 3, '5567', 'https://youtube.com/watch?v=example4', 0.20, 50000, 15000),
-  ('22222222-0000-0000-0000-000000000005', '11111111-0000-0000-0000-000000000003', 'Katamon Villa', '5 Rachel Imeinu Street', 'Jerusalem', 'Katamon', 4, 6, '2283', NULL, 0.15, 80000, 15000);
+INSERT INTO properties (id, owner_id, name, address, city, neighborhood, num_bedrooms, num_beds, entry_code, commission_rate, management_fee_agorot, hourly_rate_agorot) VALUES
+  ('22222222-aaaa-0000-0000-000000000001', '11111111-aaaa-0000-0000-000000000001', 'Savyon View', 'הרכבת 20, דירה 3', 'Jerusalem', 'City Center', 2, 3, '4829', 0.20, 99900, 15000),
+  ('22222222-aaaa-0000-0000-000000000002', '11111111-aaaa-0000-0000-000000000002', 'Agripas 6', 'Agripas 6, Apt 7', 'Jerusalem', 'City Center', 2, 3, '7351', 0.20, 55500, 15000),
+  ('22222222-aaaa-0000-0000-000000000003', '11111111-aaaa-0000-0000-000000000003', 'Agripas 8', 'Agripas 8, Apt B', 'Jerusalem', 'City Center', 2, 3, '9142', 0.20, 55500, 15000),
+  ('22222222-aaaa-0000-0000-000000000004', '11111111-aaaa-0000-0000-000000000003', 'Raul Wallenberg', 'Raul Wallenberg 3, Apt 33', 'Jerusalem', 'Ramot', 2, 3, '5567', 0.20, 55500, 15000),
+  ('22222222-aaaa-0000-0000-000000000005', '11111111-aaaa-0000-0000-000000000004', 'Keren Hayesod 5', '5 Keren Hayesod, Apt 3', 'Jerusalem', 'City Center', 3, 4, '2283', 0.20, 37000, 15000);
 
 -- ============================================
 -- CONTRACTORS
 -- ============================================
 
 INSERT INTO contractors (id, name, phone, email, specialty) VALUES
-  ('33333333-0000-0000-0000-000000000001', 'Shmuel Cohen', '+972-50-444-4444', 'shmuel@example.com', 'plumber'),
-  ('33333333-0000-0000-0000-000000000002', 'Yossi Plumbing', '+972-50-555-5555', 'yossi@example.com', 'plumber'),
-  ('33333333-0000-0000-0000-000000000003', 'Miriam Cleaning', '+972-50-666-6666', 'miriam@example.com', 'cleaner'),
-  ('33333333-0000-0000-0000-000000000004', 'Avi Electric', '+972-50-777-7777', 'avi@example.com', 'electrician');
+  ('33333333-aaaa-0000-0000-000000000001', 'Shmuel Cohen', '+972-50-444-4444', NULL, 'plumber'),
+  ('33333333-aaaa-0000-0000-000000000002', 'Miriam Cleaning', '+972-50-666-6666', NULL, 'cleaner'),
+  ('33333333-aaaa-0000-0000-000000000003', 'Avi Electric', '+972-50-777-7777', NULL, 'electrician');
 
 -- ============================================
--- BOOKINGS (recent and upcoming)
+-- BOOKINGS (from real Invoices sheet — amounts converted to agorot)
+-- USD amounts converted at ~3.7 ILS/USD for agorot
 -- ============================================
 
 INSERT INTO bookings (property_id, platform, guest_name, check_in, check_out, gross_rental_agorot, channel_fees_agorot, ical_uid) VALUES
-  -- Ben Yehuda 42
-  ('22222222-0000-0000-0000-000000000001', 'airbnb', 'Yael Cohen', '2026-04-01', '2026-04-05', 450000, 45000, 'uid-001@airbnb'),
-  ('22222222-0000-0000-0000-000000000001', 'booking_com', 'Thomas Mueller', '2026-04-08', '2026-04-12', 520000, 78000, 'uid-002@booking'),
-  ('22222222-0000-0000-0000-000000000001', 'airbnb', 'Sarah Johnson', '2026-04-15', '2026-04-22', 840000, 84000, 'uid-003@airbnb'),
-  -- Emek Refaim 15
-  ('22222222-0000-0000-0000-000000000002', 'airbnb', 'David Levy', '2026-04-03', '2026-04-07', 680000, 68000, 'uid-004@airbnb'),
-  ('22222222-0000-0000-0000-000000000002', 'direct', 'Anna Schmidt', '2026-04-10', '2026-04-17', 950000, 0, 'uid-005@direct'),
-  -- King George 8
-  ('22222222-0000-0000-0000-000000000003', 'booking_com', 'Pierre Dubois', '2026-04-05', '2026-04-08', 360000, 54000, 'uid-006@booking'),
-  ('22222222-0000-0000-0000-000000000003', 'airbnb', 'Maria Garcia', '2026-04-12', '2026-04-18', 540000, 54000, 'uid-007@airbnb'),
-  -- Beit HaKerem 22
-  ('22222222-0000-0000-0000-000000000004', 'lodgify', 'Robert Kim', '2026-04-02', '2026-04-06', 480000, 48000, 'uid-008@lodgify'),
-  -- Katamon Villa (owner stay)
-  ('22222222-0000-0000-0000-000000000005', 'owner_stay', 'Michael Ben-Ari (Owner Stay)', '2026-04-10', '2026-04-14', NULL, NULL, 'uid-009@owner');
+  -- Savyon View bookings
+  ('22222222-aaaa-0000-0000-000000000001', 'direct', 'Ari Storch', '2025-12-09', '2025-12-14', 647500, 0, 'uid-001@direct'),
+  ('22222222-aaaa-0000-0000-000000000001', 'airbnb', 'Sara Solomon', '2025-12-23', '2025-12-28', 0, 0, 'uid-002@airbnb'),
+  ('22222222-aaaa-0000-0000-000000000001', 'direct', 'Devora', '2025-10-16', '2025-11-10', 1924000, 0, 'uid-003@direct'),
+  ('22222222-aaaa-0000-0000-000000000001', 'direct', 'Natan Cohen', '2025-09-29', '2025-10-16', 3700000, 0, 'uid-004@direct'),
+  ('22222222-aaaa-0000-0000-000000000001', 'airbnb', 'מורן', '2025-08-18', '2025-08-21', 0, 0, 'uid-005@airbnb'),
+  ('22222222-aaaa-0000-0000-000000000001', 'airbnb', 'Benjamin', '2025-08-21', '2025-08-24', 0, 0, 'uid-006@airbnb'),
+  ('22222222-aaaa-0000-0000-000000000001', 'direct', 'Aryeh', '2025-07-31', '2025-08-18', 1844500, 0, 'uid-007@direct'),
+
+  -- Agripas 6 bookings
+  ('22222222-aaaa-0000-0000-000000000002', 'direct', 'Eli (boys)', '2025-11-01', '2026-03-15', 6660000, 0, 'uid-008@direct'),
+  ('22222222-aaaa-0000-0000-000000000002', 'direct', 'Zev Belsky', '2025-09-30', '2025-10-19', 3145000, 0, 'uid-009@direct'),
+  ('22222222-aaaa-0000-0000-000000000002', 'airbnb', 'Marie', '2025-08-21', '2025-08-24', 0, 0, 'uid-010@airbnb'),
+  ('22222222-aaaa-0000-0000-000000000002', 'airbnb', 'Simmy A', '2025-08-07', '2025-08-17', 0, 0, 'uid-011@airbnb'),
+  ('22222222-aaaa-0000-0000-000000000002', 'direct', 'צביקה', '2025-09-22', '2025-09-24', 300000, 0, 'uid-012@direct'),
+
+  -- Agripas 8 bookings
+  ('22222222-aaaa-0000-0000-000000000003', 'direct', 'Sruly (boys)', '2025-10-27', '2026-03-20', 9250000, 0, 'uid-013@direct'),
+  ('22222222-aaaa-0000-0000-000000000003', 'direct', 'Abe Belsky', '2025-09-28', '2025-10-27', 6660000, 0, 'uid-014@direct'),
+  ('22222222-aaaa-0000-0000-000000000003', 'direct', 'Sara Steiner', '2025-09-22', '2025-09-24', 370000, 0, 'uid-015@direct'),
+  ('22222222-aaaa-0000-0000-000000000003', 'direct', 'Yehuda', '2025-08-06', '2025-08-12', 1073000, 0, 'uid-016@direct'),
+  ('22222222-aaaa-0000-0000-000000000003', 'airbnb', 'Avi', '2025-08-12', '2025-08-27', 0, 0, 'uid-017@airbnb'),
+
+  -- Keren Hayesod 5 bookings
+  ('22222222-aaaa-0000-0000-000000000005', 'direct', 'Shama', '2025-09-09', '2025-09-16', 925000, 0, 'uid-018@direct'),
+  ('22222222-aaaa-0000-0000-000000000005', 'direct', 'ראש השנה', '2025-09-22', '2025-09-24', 450000, 0, 'uid-019@direct'),
+  ('22222222-aaaa-0000-0000-000000000005', 'direct', 'Kelmers', '2025-10-03', '2025-10-16', 5735000, 0, 'uid-020@direct');
 
 -- ============================================
--- BILLS
+-- BILLS (sample utility bills for properties)
 -- ============================================
 
-INSERT INTO bills (property_id, bill_type, amount_agorot, due_date, status, is_anomaly, anomaly_note) VALUES
-  ('22222222-0000-0000-0000-000000000001', 'arnona', 85000, '2026-04-15', 'approved', false, NULL),
-  ('22222222-0000-0000-0000-000000000001', 'iec', 42000, '2026-04-20', 'pending_review', false, NULL),
-  ('22222222-0000-0000-0000-000000000001', 'water', 18000, '2026-04-18', 'approved', false, NULL),
-  ('22222222-0000-0000-0000-000000000002', 'arnona', 92000, '2026-04-15', 'approved', false, NULL),
-  ('22222222-0000-0000-0000-000000000002', 'iec', 78000, '2026-04-20', 'flagged', true, '85% above 3-month average'),
-  ('22222222-0000-0000-0000-000000000003', 'vaad_bayit', 35000, '2026-04-01', 'approved', false, NULL),
-  ('22222222-0000-0000-0000-000000000003', 'water', 12000, '2026-04-18', 'pending_review', false, NULL),
-  ('22222222-0000-0000-0000-000000000004', 'arnona', 68000, '2026-04-15', 'approved', false, NULL),
-  ('22222222-0000-0000-0000-000000000005', 'arnona', 120000, '2026-04-15', 'approved', false, NULL),
-  ('22222222-0000-0000-0000-000000000005', 'gas', 25000, '2026-04-10', 'pending_review', false, NULL);
+INSERT INTO bills (property_id, bill_type, amount_agorot, due_date, status, is_anomaly) VALUES
+  -- Savyon View — Gas: פזגז 25091369
+  ('22222222-aaaa-0000-0000-000000000001', 'gas', 35000, '2026-04-15', 'approved', false),
+  ('22222222-aaaa-0000-0000-000000000001', 'water', 42000, '2026-04-20', 'pending_review', false),
+  ('22222222-aaaa-0000-0000-000000000001', 'iec', 58000, '2026-04-18', 'approved', false),
+  ('22222222-aaaa-0000-0000-000000000001', 'arnona', 92000, '2026-04-15', 'approved', false),
+  -- Agripas 6 — Gas: פזגז 25086129, Electricity: 348297485
+  ('22222222-aaaa-0000-0000-000000000002', 'gas', 28000, '2026-04-15', 'approved', false),
+  ('22222222-aaaa-0000-0000-000000000002', 'iec', 45000, '2026-04-20', 'pending_review', false),
+  ('22222222-aaaa-0000-0000-000000000002', 'arnona', 78000, '2026-04-15', 'approved', false),
+  -- Agripas 8 — Gas: פזגז 25086128, Electricity: 348123528
+  ('22222222-aaaa-0000-0000-000000000003', 'gas', 31000, '2026-04-15', 'approved', false),
+  ('22222222-aaaa-0000-0000-000000000003', 'iec', 82000, '2026-04-20', 'flagged', true),
+  ('22222222-aaaa-0000-0000-000000000003', 'water', 22000, '2026-04-18', 'approved', false),
+  -- Raul Wallenberg — Gas: דורגז 32025459, Electricity: 347783964
+  ('22222222-aaaa-0000-0000-000000000004', 'gas', 29000, '2026-04-15', 'approved', false),
+  ('22222222-aaaa-0000-0000-000000000004', 'iec', 51000, '2026-04-20', 'pending_review', false),
+  -- Keren Hayesod 5 — Electricity: 347013240
+  ('22222222-aaaa-0000-0000-000000000005', 'iec', 62000, '2026-04-20', 'approved', false),
+  ('22222222-aaaa-0000-0000-000000000005', 'arnona', 85000, '2026-04-15', 'approved', false);
 
 -- ============================================
 -- TASKS
 -- ============================================
 
-INSERT INTO tasks (id, property_id, contractor_id, title, description, status, priority, is_seasonal, is_cleaning, due_date, billable_hours, expense_agorot) VALUES
-  ('44444444-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000001', '33333333-0000-0000-0000-000000000001', 'Fix kitchen faucet leak', 'Guest reported dripping kitchen faucet', 'in_progress', 'high', false, false, '2026-04-05', 0, 0),
-  ('44444444-0000-0000-0000-000000000002', '22222222-0000-0000-0000-000000000001', '33333333-0000-0000-0000-000000000003', 'Turnover clean — Ben Yehuda 42', 'Post-checkout cleaning for Yael Cohen', 'pending', 'high', false, true, '2026-04-05', 0, 0),
-  ('44444444-0000-0000-0000-000000000003', '22222222-0000-0000-0000-000000000002', '33333333-0000-0000-0000-000000000004', 'Replace bathroom light fixture', 'Flickering light in main bathroom', 'pending', 'normal', false, false, '2026-04-08', 1.5, 8500),
-  ('44444444-0000-0000-0000-000000000004', '22222222-0000-0000-0000-000000000002', NULL, 'AC Deep Clean — Emek Refaim 15', 'Seasonal pre-summer maintenance', 'pending', 'normal', true, false, '2026-04-15', 0, 0),
-  ('44444444-0000-0000-0000-000000000005', '22222222-0000-0000-0000-000000000003', '33333333-0000-0000-0000-000000000003', 'Turnover clean — King George 8', 'Post-checkout cleaning', 'completed', 'high', false, true, '2026-04-04', 2, 0),
-  ('44444444-0000-0000-0000-000000000006', '22222222-0000-0000-0000-000000000004', '33333333-0000-0000-0000-000000000001', 'Boiler annual inspection', 'Seasonal boiler check before winter', 'completed', 'normal', true, false, '2026-03-20', 1, 12000),
-  ('44444444-0000-0000-0000-000000000007', '22222222-0000-0000-0000-000000000005', NULL, 'Roof inspection — Katamon Villa', 'Pre-rainy season check', 'pending', 'normal', true, false, '2026-04-20', 0, 0);
+INSERT INTO tasks (id, property_id, contractor_id, title, status, priority, is_cleaning, due_date) VALUES
+  ('44444444-aaaa-0000-0000-000000000001', '22222222-aaaa-0000-0000-000000000001', '33333333-aaaa-0000-0000-000000000002', 'Turnover clean — Savyon View', 'pending', 'high', true, '2026-04-08'),
+  ('44444444-aaaa-0000-0000-000000000002', '22222222-aaaa-0000-0000-000000000002', '33333333-aaaa-0000-0000-000000000001', 'Fix kitchen faucet — Agripas 6', 'in_progress', 'high', false, '2026-04-06'),
+  ('44444444-aaaa-0000-0000-000000000003', '22222222-aaaa-0000-0000-000000000003', NULL, 'AC Deep Clean — Agripas 8', 'pending', 'normal', false, '2026-04-15'),
+  ('44444444-aaaa-0000-0000-000000000004', '22222222-aaaa-0000-0000-000000000005', '33333333-aaaa-0000-0000-000000000002', 'Post-checkout clean — KH5', 'completed', 'high', true, '2026-04-01'),
+  ('44444444-aaaa-0000-0000-000000000005', '22222222-aaaa-0000-0000-000000000004', '33333333-aaaa-0000-0000-000000000003', 'Replace bathroom light — Raul Wallenberg', 'pending', 'normal', false, '2026-04-10');
 
--- Checklist items for the faucet repair task
+-- Checklists
 INSERT INTO task_checklist_items (task_id, label, is_completed, sort_order) VALUES
-  ('44444444-0000-0000-0000-000000000001', 'Turn off water supply', true, 0),
-  ('44444444-0000-0000-0000-000000000001', 'Replace faucet cartridge', false, 1),
-  ('44444444-0000-0000-0000-000000000001', 'Test for leaks', false, 2),
-  ('44444444-0000-0000-0000-000000000001', 'Clean work area', false, 3);
-
--- Checklist for cleaning task
-INSERT INTO task_checklist_items (task_id, label, is_completed, sort_order) VALUES
-  ('44444444-0000-0000-0000-000000000002', 'Flush all toilets (Nia check)', false, 0),
-  ('44444444-0000-0000-0000-000000000002', 'Run all sinks', false, 1),
-  ('44444444-0000-0000-0000-000000000002', 'Check boiler pilot', false, 2),
-  ('44444444-0000-0000-0000-000000000002', 'Inspect window seals', false, 3),
-  ('44444444-0000-0000-0000-000000000002', 'Test AC remote', false, 4),
-  ('44444444-0000-0000-0000-000000000002', 'Final photo of staged apartment', false, 5);
+  ('44444444-aaaa-0000-0000-000000000001', 'Flush all toilets (Nia check)', false, 0),
+  ('44444444-aaaa-0000-0000-000000000001', 'Run all sinks', false, 1),
+  ('44444444-aaaa-0000-0000-000000000001', 'Check boiler pilot', false, 2),
+  ('44444444-aaaa-0000-0000-000000000001', 'Inspect window seals', false, 3),
+  ('44444444-aaaa-0000-0000-000000000001', 'Test AC remote', false, 4),
+  ('44444444-aaaa-0000-0000-000000000001', 'Final staging photo', false, 5),
+  ('44444444-aaaa-0000-0000-000000000002', 'Turn off water supply', true, 0),
+  ('44444444-aaaa-0000-0000-000000000002', 'Replace faucet cartridge', false, 1),
+  ('44444444-aaaa-0000-0000-000000000002', 'Test for leaks', false, 2);
 
 -- ============================================
 -- INVENTORY
 -- ============================================
 
 INSERT INTO inventory_items (property_id, item_name, quantity_in_closet, quantity_at_laundry, quantity_damaged, par_level) VALUES
-  ('22222222-0000-0000-0000-000000000001', 'Bath towels', 8, 4, 0, 6),
-  ('22222222-0000-0000-0000-000000000001', 'Bed sheets (double)', 4, 2, 0, 4),
-  ('22222222-0000-0000-0000-000000000001', 'Pillowcases', 8, 4, 1, 6),
-  ('22222222-0000-0000-0000-000000000002', 'Bath towels', 10, 2, 0, 8),
-  ('22222222-0000-0000-0000-000000000002', 'Bed sheets (double)', 6, 2, 0, 4),
-  ('22222222-0000-0000-0000-000000000003', 'Bath towels', 3, 3, 0, 4),  -- Below par!
-  ('22222222-0000-0000-0000-000000000003', 'Bed sheets (single)', 2, 2, 0, 4),  -- Below par!
-  ('22222222-0000-0000-0000-000000000004', 'Bath towels', 6, 4, 0, 6),
-  ('22222222-0000-0000-0000-000000000005', 'Bath towels', 12, 0, 0, 12),
-  ('22222222-0000-0000-0000-000000000005', 'Bed sheets (king)', 4, 0, 0, 4);
+  ('22222222-aaaa-0000-0000-000000000001', 'Bath towels', 8, 4, 0, 6),
+  ('22222222-aaaa-0000-0000-000000000001', 'Bed sheets (double)', 4, 2, 0, 4),
+  ('22222222-aaaa-0000-0000-000000000002', 'Bath towels', 3, 3, 0, 4),
+  ('22222222-aaaa-0000-0000-000000000002', 'Bed sheets (double)', 2, 2, 0, 4),
+  ('22222222-aaaa-0000-0000-000000000003', 'Bath towels', 6, 2, 0, 6),
+  ('22222222-aaaa-0000-0000-000000000005', 'Bath towels', 10, 0, 0, 8),
+  ('22222222-aaaa-0000-0000-000000000005', 'Bed sheets (king)', 4, 2, 0, 4);
 
 -- ============================================
--- REVENUE TRACKING (YTD)
+-- REVENUE TRACKING (YTD 2026)
 -- ============================================
 
 INSERT INTO revenue_tracking (year, month, total_revenue_agorot) VALUES
-  (2026, 1, 2850000),
-  (2026, 2, 3120000),
+  (2026, 1, 3200000),
+  (2026, 2, 2850000),
   (2026, 3, 3480000);
 
 -- ============================================
@@ -127,8 +141,6 @@ INSERT INTO revenue_tracking (year, month, total_revenue_agorot) VALUES
 -- ============================================
 
 INSERT INTO documents (property_id, owner_id, category, title, storage_path, uploaded_by) VALUES
-  ('22222222-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'tabu', 'Tabu Extract — Ben Yehuda 42', 'vault/tabu-ben-yehuda.pdf', 'admin'),
-  ('22222222-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'insurance', 'Insurance Policy 2026', 'vault/insurance-ben-yehuda.pdf', 'admin'),
-  ('22222222-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001', 'contract', 'Management Agreement', 'vault/contract-emek-refaim.pdf', 'owner'),
-  ('22222222-0000-0000-0000-000000000005', '11111111-0000-0000-0000-000000000003', 'tabu', 'Tabu — Katamon Villa', 'vault/tabu-katamon.pdf', 'owner'),
-  ('22222222-0000-0000-0000-000000000005', '11111111-0000-0000-0000-000000000003', 'insurance', 'Home Insurance 2026', 'vault/insurance-katamon.pdf', 'admin');
+  ('22222222-aaaa-0000-0000-000000000001', '11111111-aaaa-0000-0000-000000000001', 'contract', 'Management Agreement — Savyon View', 'vault/contract-savyon.pdf', 'admin'),
+  ('22222222-aaaa-0000-0000-000000000002', '11111111-aaaa-0000-0000-000000000002', 'insurance', 'Insurance Policy 2026 — Agripas 6', 'vault/insurance-agripas6.pdf', 'admin'),
+  ('22222222-aaaa-0000-0000-000000000005', '11111111-aaaa-0000-0000-000000000004', 'tabu', 'Tabu — Keren Hayesod 5', 'vault/tabu-kh5.pdf', 'owner');
