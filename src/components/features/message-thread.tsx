@@ -174,7 +174,7 @@ export function MessageThread({ propertyId, propertyName, currentRole }: Message
             disabled={sending}
           />
           {currentRole === 'admin' && (
-            <Button type="button" size="icon" variant="outline" onClick={handleDraftReply} disabled={drafting} title="AI draft reply">
+            <Button type="button" size="icon" variant="outline" onClick={handleDraftReply} disabled={drafting} title="AI draft reply" aria-label="Draft AI reply">
               <Sparkles className={`h-4 w-4 ${drafting ? 'animate-pulse text-accent' : ''}`} />
             </Button>
           )}

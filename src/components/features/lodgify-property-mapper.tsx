@@ -36,12 +36,11 @@ export function LodgifyPropertyMapper() {
 
   useEffect(() => {
     async function loadLocal() {
-      const { data } = await supabase
-        .from('properties')
-        .select('id, name, lodgify_property_id')
-        .eq('is_active', true)
-        .order('name')
-      setLocalProps((data as LocalProperty[]) ?? [])
+      const res = await fetch('/api/properties/list')
+      if (res.ok) {
+        const data = await res.json()
+        setLocalProps((data.properties as LocalProperty[]) ?? [])
+      }
     }
     loadLocal()
   }, [])

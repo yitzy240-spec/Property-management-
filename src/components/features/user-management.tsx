@@ -48,9 +48,12 @@ export function UserManagement() {
         const data = await res.json()
         setAdmins(data.admins || [])
         setOwners(data.owners || [])
+      } else if (res.status === 403) {
+        // User is authenticated but not admin — show empty state with hint
+        toast.error('Admin role not set. Run the SQL in Supabase to grant admin access.')
       }
     } catch {
-      // ignore
+      // Network error — ignore
     } finally {
       setLoading(false)
     }

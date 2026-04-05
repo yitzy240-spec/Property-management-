@@ -150,7 +150,7 @@ export function GuestCheckIn({ property, booking, guideText }: GuestCheckInProps
         {guideText && (
           <div className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your Guide</p>
-            <div className="mt-2 whitespace-pre-line text-sm leading-relaxed text-foreground">
+            <div dir="auto" className="mt-2 whitespace-pre-line text-sm leading-relaxed text-foreground">
               {guideText}
             </div>
           </div>

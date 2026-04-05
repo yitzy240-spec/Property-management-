@@ -45,20 +45,22 @@ export function ReportEditor({ reportId, status, narrativeEn, narrativeHe }: Rep
 
   async function handleSend() {
     setSaving(true)
-    const { error } = await supabase
-      .from('owner_reports')
-      .update({
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-        sent_via: 'email',
+    try {
+      const res = await fetch('/api/reports/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report_id: reportId }),
       })
-      .eq('id', reportId)
+      const data = await res.json()
 
-    if (error) {
-      toast.error('Failed to mark as sent', { description: error.message })
-    } else {
-      toast.success('Report marked as sent')
-      router.refresh()
+      if (!res.ok) {
+        toast.error('Failed to send', { description: data.error })
+      } else {
+        toast.success('Report emailed to owner')
+        router.refresh()
+      }
+    } catch {
+      toast.error('Failed to send report')
     }
     setSaving(false)
   }
@@ -90,7 +92,7 @@ export function ReportEditor({ reportId, status, narrativeEn, narrativeHe }: Rep
         value={tab === 'en' ? en : he}
         onChange={(e) => tab === 'en' ? setEn(e.target.value) : setHe(e.target.value)}
         dir={tab === 'he' ? 'rtl' : 'ltr'}
-        className="min-h-[400px] w-full rounded-[10px] border border-border bg-card p-4 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/20"
+        className="min-h-[200px] w-full rounded-[10px] border border-border bg-card p-4 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/20 md:min-h-[400px]"
       />
 
       {/* Actions */}
@@ -101,8 +103,8 @@ export function ReportEditor({ reportId, status, narrativeEn, narrativeHe }: Rep
             {saving ? 'Saving...' : 'Approve'}
           </Button>
         )}
-        {(status === 'draft' || status === 'approved') && (
-          <Button onClick={handleSend} disabled={saving || status === 'draft'} variant="outline" className="gap-1.5">
+        {status === 'approved' && (
+          <Button onClick={handleSend} disabled={saving} variant="outline" className="gap-1.5">
             <Send className="h-3.5 w-3.5" />
             Mark as Sent
           </Button>

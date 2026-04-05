@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload } from 'lucide-react'
 import { toast } from 'sonner'
@@ -27,13 +27,21 @@ export function DocumentUpload() {
   const [category, setCategory] = useState<DocumentCategory>('other')
   const [title, setTitle] = useState('')
   const [expiryDate, setExpiryDate] = useState('')
+  const [properties, setProperties] = useState<{ id: string; name: string }[]>([])
+  const [selectedPropertyId, setSelectedPropertyId] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+    supabase.from('properties').select('id, name').eq('is_active', true).order('name')
+      .then(({ data }) => setProperties(data ?? []))
+  }, [open])
 
   async function handleUpload(formData: FormData) {
     setLoading(true)
 
     const file = formData.get('file') as File
     const titleVal = formData.get('title') as string
-    const propertyId = formData.get('property_id') as string || null
+    const propertyId = selectedPropertyId || null
 
     if (!file || !titleVal) {
       setLoading(false)
@@ -136,8 +144,13 @@ export function DocumentUpload() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="property_id" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Property</Label>
-              <Input id="property_id" name="property_id" placeholder="Property UUID (optional)" className="h-11" />
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Property</Label>
+              <Select value={selectedPropertyId} onValueChange={(v) => setSelectedPropertyId(v || '')}>
+                <SelectTrigger className="h-11"><SelectValue placeholder="General (optional)" /></SelectTrigger>
+                <SelectContent>
+                  {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
 
             <Button type="submit" className="h-11 w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={loading}>

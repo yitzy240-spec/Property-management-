@@ -4,6 +4,7 @@ import { Suspense } from 'react'
 import { GmailConnect } from '@/components/features/gmail-connect'
 import { LodgifyPropertyMapper } from '@/components/features/lodgify-property-mapper'
 import { UserManagement } from '@/components/features/user-management'
+import { IntegrationHealth } from '@/components/features/integration-health'
 import { SeasonalTemplateSettings } from '@/components/features/seasonal-template-settings'
 import { isGmailConnected } from '@/lib/gmail'
 
@@ -23,6 +24,14 @@ export default async function SettingsPage() {
           Manage integrations and system configuration.
         </p>
       </div>
+
+      {/* Integration Health Dashboard */}
+      <section>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Integration Status
+        </p>
+        <IntegrationHealth />
+      </section>
 
       <section>
         <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">

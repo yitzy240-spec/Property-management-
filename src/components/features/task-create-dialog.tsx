@@ -132,12 +132,12 @@ export function TaskCreateDialog() {
   const formContent = (
     <form action={handleCreate} className="space-y-4 p-4">
       {/* Snap-to-Task: AI photo analysis */}
-      <div className="rounded-[10px] border border-dashed border-border bg-muted/30 p-3">
-        <label className="flex cursor-pointer items-center justify-center gap-2 text-sm text-muted-foreground">
+      <div className="rounded-[10px] border border-dashed border-accent/40 bg-accent/5 p-3">
+        <label className="flex cursor-pointer items-center justify-center gap-2 text-sm font-medium text-foreground">
           {analyzing ? (
             <><Sparkles className="h-4 w-4 animate-pulse text-accent" /> AI analyzing photo...</>
           ) : (
-            <><Camera className="h-4 w-4" /> Snap a photo — AI fills the form</>
+            <><Camera className="h-4 w-4 text-accent" /> Snap a photo — AI fills the form</>
           )}
           <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoAnalyze} disabled={analyzing} />
         </label>

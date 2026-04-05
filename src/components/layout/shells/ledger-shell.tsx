@@ -54,8 +54,8 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Top header — compact, financial feel */}
-      <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b bg-card px-4">
-        <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-40 grid h-12 grid-cols-3 items-center border-b bg-card px-4">
+        <div className="flex items-center">
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger className="flex h-11 w-11 items-center justify-center rounded-md hover:bg-muted -ml-2" aria-label="Open navigation menu">
               <Menu className="h-5 w-5" />
@@ -99,12 +99,13 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
               </nav>
             </SheetContent>
           </Sheet>
-          <img src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400" alt="Marcus Properties" className="h-6 w-auto" />
-          <span className="text-sm font-bold tracking-tight text-primary">
-            ApartmentOS
-          </span>
         </div>
-        <span className="text-xs text-muted-foreground">Marcus Properties</span>
+        <div className="flex justify-center">
+          <img src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400" alt="Marcus Properties" className="h-7 w-auto" />
+        </div>
+        <div className="flex justify-end">
+          <span className="text-sm font-bold tracking-tight text-primary">ApartmentOS</span>
+        </div>
       </header>
 
       {/* Main content — scrollable */}

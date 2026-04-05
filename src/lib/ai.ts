@@ -29,10 +29,19 @@ export async function callGeminiJSON<T = unknown>(
   if (!text) return null
 
   try {
-    const jsonMatch = text.match(/[\[{][\s\S]*[\]}]/)
-    if (!jsonMatch) return null
-    return JSON.parse(jsonMatch[0]) as T
+    // Try direct parse first
+    return JSON.parse(text) as T
   } catch {
-    return null
+    // Extract JSON from markdown code blocks or raw text
+    try {
+      const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+      if (codeBlock) return JSON.parse(codeBlock[1]) as T
+
+      const jsonMatch = text.match(/[\[{][\s\S]*?[\]}]/)
+      if (!jsonMatch) return null
+      return JSON.parse(jsonMatch[0]) as T
+    } catch {
+      return null
+    }
   }
 }

@@ -34,22 +34,37 @@ export async function geminiGenerate(
   contents: Array<{ parts: Array<Record<string, unknown>> }>,
 ): Promise<string | null> {
   const model = GEMINI_MODELS[tier]
-  const response = await fetch(
-    `${GEMINI_API_BASE}/${model}:generateContent`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30_000)
+
+  try {
+    const response = await fetch(
+      `${GEMINI_API_BASE}/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({ contents }),
+        signal: controller.signal,
       },
-      body: JSON.stringify({ contents }),
-    },
-  )
+    )
 
-  if (!response.ok) return null
+    clearTimeout(timeout)
 
-  const data = await response.json()
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null
+    if (!response.ok) {
+      console.error(`Gemini ${tier} (${model}) error: ${response.status}`)
+      return null
+    }
+
+    const data = await response.json()
+    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null
+  } catch (err) {
+    clearTimeout(timeout)
+    console.error(`Gemini ${tier} (${model}) call failed:`, err instanceof Error ? err.message : err)
+    return null
+  }
 }
 
 /**

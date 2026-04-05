@@ -14,7 +14,7 @@ export async function GET() {
   const serviceClient = createServiceClient()
   const { data } = await serviceClient
     .from('properties')
-    .select('id, name')
+    .select('id, name, lodgify_property_id')
     .eq('is_active', true)
     .order('name')
 

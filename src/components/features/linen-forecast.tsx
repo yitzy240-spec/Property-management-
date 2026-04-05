@@ -15,6 +15,7 @@ interface Forecast {
 export function LinenForecast() {
   const [forecasts, setForecasts] = useState<Forecast[] | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
 
   async function loadForecast() {
     setLoading(true)
@@ -24,8 +25,21 @@ export function LinenForecast() {
         const data = await res.json()
         setForecasts(data.forecasts)
       }
-    } catch { /* silently fail */ }
+    } catch {
+      setError(true)
+    }
     setLoading(false)
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-[10px] border border-status-danger/30 bg-[hsl(0_72%_51%/0.04)] p-4 text-center">
+        <p className="text-sm font-medium text-status-danger">Forecast unavailable</p>
+        <Button variant="ghost" size="sm" onClick={() => { setError(false); loadForecast() }} className="mt-2 text-xs">
+          Retry
+        </Button>
+      </div>
+    )
   }
 
   if (forecasts === null) {
@@ -58,14 +72,14 @@ export function LinenForecast() {
         <p className="text-xs font-semibold text-foreground">AI Linen Forecast</p>
       </div>
       <div className="space-y-2">
-        {forecasts.map((f, i) => (
-          <div key={i} className="flex items-start justify-between gap-2">
+        {forecasts.map((f) => (
+          <div key={f.property_name} className="flex items-start justify-between gap-2">
             <div>
               <div className="flex items-center gap-1.5">
                 {f.urgency === 'urgent' && <AlertTriangle className="h-3 w-3 text-status-danger" />}
                 <span className="text-sm font-medium">{f.property_name}</span>
                 <StatusBadge
-                  status={f.urgency === 'urgent' ? 'danger' : 'warning'}
+                  status={f.urgency === 'urgent' ? 'danger' : f.urgency === 'soon' ? 'warning' : 'safe'}
                   label={f.urgency}
                   size="sm"
                 />

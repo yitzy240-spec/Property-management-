@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     .map(t => `${t.title} (${t.status})`)
     .join(', ')
 
-  const draft = await callGemini('pro', [{
+  const draft = await callGemini('fast', [{
     parts: [{
       text: `You are a property manager replying to a property owner. Be professional, warm, and concise.
 

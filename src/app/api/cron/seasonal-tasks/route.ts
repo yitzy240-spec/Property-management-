@@ -47,6 +47,18 @@ export async function GET(request: Request) {
     const checklistItems = template.checklist_items as string[]
 
     for (const property of properties) {
+      // Skip if a seasonal task for this template+property already exists this month
+      const monthStart = new Date(new Date().getFullYear(), currentMonth - 1, 1).toISOString()
+      const { count: existing } = await serviceClient
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('property_id', property.id)
+        .eq('season_type', template.season_type)
+        .eq('is_seasonal', true)
+        .gte('created_at', monthStart)
+
+      if (existing && existing > 0) continue
+
       // Create the task
       const { data: task, error: taskError } = await serviceClient
         .from('tasks')
