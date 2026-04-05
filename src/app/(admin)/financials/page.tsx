@@ -57,7 +57,7 @@ export default async function FinancialsPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-xs font-medium text-muted-foreground">Commission (20%)</p>
-            <p className="text-xl font-bold font-mono text-green-700">
+            <p className="text-xl font-bold font-mono text-financial-income">
               {formatILS(totals.commission)}
             </p>
           </CardContent>
@@ -118,7 +118,7 @@ export default async function FinancialsPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     {entry.pushed_to_invoice ? (
-                      <Badge variant="outline" className="text-[10px] text-green-700">
+                      <Badge variant="outline" className="text-[10px] text-financial-income">
                         Invoiced
                       </Badge>
                     ) : (

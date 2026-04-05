@@ -88,16 +88,16 @@ export function GuestCheckIn({ property, booking }: GuestCheckInProps) {
         )}
 
         {/* Entry Code — Time-Gated */}
-        <Card className={codeVisible ? 'border-green-200 bg-green-50' : ''}>
+        <Card className={codeVisible ? 'border-status-safe/30 bg-status-safe/5' : ''}>
           <CardContent className="p-6 text-center">
             {codeVisible && property.entry_code ? (
               <>
-                <KeyRound className="mx-auto h-8 w-8 text-green-600" />
-                <p className="mt-2 text-xs font-medium text-green-700">Your Entry Code</p>
-                <p className="mt-2 text-5xl font-bold font-mono tracking-[0.25em] text-green-900">
+                <KeyRound className="mx-auto h-8 w-8 text-status-safe" />
+                <p className="mt-2 text-xs font-medium text-status-safe">Your Entry Code</p>
+                <p className="mt-2 text-5xl font-bold font-mono tracking-[0.25em] text-foreground">
                   {property.entry_code}
                 </p>
-                <p className="mt-3 text-xs text-green-700">
+                <p className="mt-3 text-xs text-status-safe">
                   Use this code on the Simplex lock at the front door.
                 </p>
               </>

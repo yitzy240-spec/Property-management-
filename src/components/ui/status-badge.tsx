@@ -60,7 +60,7 @@ export function StatusBadge({
     <span
       className={cn(
         'inline-flex items-center rounded-[var(--radius-badge)] border font-medium capitalize',
-        size === 'sm' ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs',
+        size === 'sm' ? 'px-1.5 py-0.5 text-[11px]' : 'px-2 py-1 text-xs',
         statusStyles[semanticStatus],
         className
       )}

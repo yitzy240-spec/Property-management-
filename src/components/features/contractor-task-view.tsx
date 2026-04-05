@@ -115,11 +115,11 @@ export function ContractorTaskView({
 
   if (completed) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-green-50 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-status-safe/5 p-4">
         <div className="text-center">
-          <CheckCircle2 className="mx-auto h-16 w-16 text-green-600" />
-          <h1 className="mt-4 text-2xl font-bold text-green-900">Task Complete</h1>
-          <p className="mt-2 text-sm text-green-700">
+          <CheckCircle2 className="mx-auto h-16 w-16 text-status-safe" />
+          <h1 className="mt-4 text-2xl font-bold text-foreground">Task Complete</h1>
+          <p className="mt-2 text-sm text-status-safe">
             Thank you! Your work has been logged.
           </p>
         </div>
@@ -192,7 +192,7 @@ export function ContractorTaskView({
               {/* Progress bar */}
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-green-500 transition-all"
+                  className="h-full rounded-full bg-status-safe transition-all"
                   style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
                 />
               </div>
@@ -207,7 +207,7 @@ export function ContractorTaskView({
                   <div
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
                       item.is_completed
-                        ? 'border-green-500 bg-green-500 text-white'
+                        ? 'border-status-safe bg-status-safe text-white'
                         : 'border-muted-foreground/30'
                     }`}
                   >
@@ -290,7 +290,7 @@ export function ContractorTaskView({
         <Button
           onClick={handleComplete}
           disabled={submitting || (totalCount > 0 && !allChecked)}
-          className="w-full bg-green-600 py-6 text-lg hover:bg-green-700"
+          className="w-full bg-status-safe py-6 text-lg hover:bg-status-safe/90"
         >
           {submitting ? 'Submitting...' : 'Complete Task'}
         </Button>

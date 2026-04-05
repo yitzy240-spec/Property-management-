@@ -37,12 +37,13 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">ApartmentOS</CardTitle>
-          <CardDescription>Property Management Platform</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="w-full max-w-sm">
+        <div className="rounded-t-xl bg-primary p-6 text-primary-foreground text-center">
+          <p className="text-xs font-medium uppercase tracking-widest opacity-70">Marcus Properties</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">ApartmentOS</h1>
+        </div>
+        <Card className="rounded-t-none border-t-0">
+        <CardContent className="pt-6">
           <Tabs defaultValue="admin" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="admin">Admin</TabsTrigger>
@@ -122,7 +123,8 @@ export default function LoginPage() {
             </TabsContent>
           </Tabs>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   )
 }

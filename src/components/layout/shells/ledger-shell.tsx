@@ -58,8 +58,8 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b bg-card px-4">
         <div className="flex items-center gap-3">
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-            <SheetTrigger className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted">
-              <Menu className="h-4.5 w-4.5" />
+            <SheetTrigger className="flex h-11 w-11 items-center justify-center rounded-md hover:bg-muted -ml-2">
+              <Menu className="h-5 w-5" />
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0">
               <div className="flex h-12 items-center justify-between border-b px-4">
@@ -123,12 +123,15 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
                 key={tab.href}
                 href={tab.href}
                 className={cn(
-                  'flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors',
+                  'relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition-colors',
                   isActive
                     ? 'text-primary'
                     : 'text-muted-foreground'
                 )}
               >
+                {isActive && (
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full bg-primary" />
+                )}
                 <tab.icon className={cn('h-5 w-5', isActive && 'text-primary')} />
                 {tab.label}
               </Link>

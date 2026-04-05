@@ -21,7 +21,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#0074c7',
+  themeColor: '#1E3A5F',
 }
 
 export default function RootLayout({
@@ -30,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={cn('font-sans', inter.variable, ibmPlexMono.variable)}>
+    <html lang="en" data-direction="ledger" className={cn('font-sans', inter.variable, ibmPlexMono.variable)}>
       <body className="min-h-screen bg-background font-sans antialiased">
         <Providers>
           {children}
