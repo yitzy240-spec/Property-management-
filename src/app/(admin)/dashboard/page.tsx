@@ -1,25 +1,33 @@
-'use client'
+export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, Calendar as CalendarIcon, ArrowRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { createServiceClient } from '@/lib/supabase/server'
 import { formatILS, VAT_THRESHOLD_AGOROT, VAT_WARNING_PERCENT } from '@/lib/utils'
 
-export default function DashboardPage() {
-  const { data: properties } = useQuery<any[]>({ queryKey: ['properties'] })
-  const { data: tasks } = useQuery<any[]>({ queryKey: ['tasks'] })
-  const { data: bills } = useQuery<any[]>({ queryKey: ['bills'] })
-  const { data: bookings } = useQuery<any[]>({ queryKey: ['bookings'] })
-  const { data: revenueData } = useQuery<any[]>({ queryKey: ['revenue_tracking'] })
-
-  const openTaskCount = tasks?.filter(t => t.status === 'pending' || t.status === 'in_progress').length ?? 0
-  const pendingBillCount = bills?.filter(b => b.status === 'pending_review').length ?? 0
+export default async function DashboardPage() {
+  const supabase = createServiceClient()
+  const currentYear = new Date().getFullYear()
   const today = new Date().toISOString().split('T')[0]
-  const upcomingBookings = bookings?.filter(b => b.check_in >= today).slice(0, 5) ?? []
+
+  const [
+    { data: properties },
+    { count: openTaskCount },
+    { count: pendingBillCount },
+    { data: revenueData },
+    { data: upcomingBookings },
+  ] = await Promise.all([
+    supabase.from('properties').select('*, owners(full_name)').eq('is_active', true).order('name'),
+    supabase.from('tasks').select('*', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
+    supabase.from('bills').select('*', { count: 'exact', head: true }).eq('status', 'pending_review'),
+    supabase.from('revenue_tracking').select('total_revenue_agorot').eq('year', currentYear),
+    supabase.from('bookings').select('*, properties(name)').gte('check_in', today).order('check_in').limit(5),
+  ])
+
   const ytdRevenue = revenueData?.reduce((sum, r) => sum + (r.total_revenue_agorot || 0), 0) ?? 0
   const vatPercent = Math.round((ytdRevenue / VAT_THRESHOLD_AGOROT) * 100)
   const isVatWarning = vatPercent >= VAT_WARNING_PERCENT * 100
@@ -40,11 +48,11 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Open Tasks</p>
-              <p className="font-mono text-xl font-bold text-status-warning">{openTaskCount}</p>
+              <p className="font-mono text-xl font-bold text-status-warning">{openTaskCount ?? 0}</p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Pending Bills</p>
-              <p className="font-mono text-xl font-bold text-status-danger">{pendingBillCount}</p>
+              <p className="font-mono text-xl font-bold text-status-danger">{pendingBillCount ?? 0}</p>
             </div>
           </div>
         </CardContent>
@@ -74,7 +82,7 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {pendingBillCount > 0 && (
+      {(pendingBillCount ?? 0) > 0 && (
         <Link href="/bills">
           <Card className="border-status-warning/30 transition-shadow hover:shadow-md">
             <CardContent className="flex items-center justify-between p-3">
@@ -94,7 +102,7 @@ export default function DashboardPage() {
           <Link href="/properties" className="text-xs text-primary hover:underline">View all</Link>
         </div>
         <div className="space-y-2">
-          {properties && properties.length > 0 ? properties.map((property: any) => (
+          {properties && properties.length > 0 ? properties.map((property) => (
             <Link key={property.id} href={`/properties/${property.id}`}>
               <Card className="transition-shadow hover:shadow-md">
                 <CardContent className="p-4">
@@ -110,7 +118,7 @@ export default function DashboardPage() {
                   <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
                     <span>{property.num_bedrooms} bed</span>
                     <span>·</span>
-                    <span>{property.owners?.full_name}</span>
+                    <span>{(property.owners as unknown as { full_name: string } | null)?.full_name}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -121,16 +129,16 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {upcomingBookings.length > 0 && (
+      {upcomingBookings && upcomingBookings.length > 0 && (
         <div>
           <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Upcoming Check-ins</p>
           <div className="space-y-2">
-            {upcomingBookings.map((booking: any) => (
+            {upcomingBookings.map((booking) => (
               <Card key={booking.id}>
                 <CardContent className="flex items-center justify-between p-3">
                   <div>
                     <p className="text-sm font-medium">{booking.guest_name || 'Guest'}</p>
-                    <p className="text-xs text-muted-foreground">{booking.properties?.name}</p>
+                    <p className="text-xs text-muted-foreground">{(booking.properties as unknown as { name: string })?.name}</p>
                   </div>
                   <div className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
                     <CalendarIcon className="h-3 w-3" />{booking.check_in}

@@ -1,14 +1,20 @@
-'use client'
+export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { useQuery } from '@tanstack/react-query'
 import { Plus, Building2 } from 'lucide-react'
+import { createServiceClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 
-export default function PropertiesPage() {
-  const { data: properties } = useQuery<any[]>({ queryKey: ['properties'] })
+export default async function PropertiesPage() {
+  const supabase = createServiceClient()
+
+  const { data: properties } = await supabase
+    .from('properties')
+    .select('*, owners(full_name, profile)')
+    .eq('is_active', true)
+    .order('name')
 
   return (
     <div className="space-y-6">
@@ -29,7 +35,7 @@ export default function PropertiesPage() {
 
       {properties && properties.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {properties.map((property: any) => (
+          {properties.map((property) => (
             <Link key={property.id} href={`/properties/${property.id}`}>
               <Card className="transition-shadow hover:shadow-md">
                 <CardContent className="p-4">
@@ -47,8 +53,12 @@ export default function PropertiesPage() {
                   </div>
                   {property.owners && (
                     <div className="mt-3 flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{property.owners.full_name}</span>
-                      <Badge variant="secondary" className="text-[10px]">{property.owners.profile}</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {(property.owners as unknown as { full_name: string }).full_name}
+                      </span>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {(property.owners as unknown as { profile: string }).profile}
+                      </Badge>
                     </div>
                   )}
                   {property.entry_code && (
