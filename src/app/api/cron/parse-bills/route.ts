@@ -37,10 +37,12 @@ export async function GET(request: Request) {
     { data: properties },
     { data: owners },
     { data: senderMappings },
+    { data: utilityAccounts },
   ] = await Promise.all([
     serviceClient.from('properties').select('id, name, address, owner_id').eq('is_active', true),
     serviceClient.from('owners').select('id, full_name'),
     serviceClient.from('bill_sender_mappings').select('*').eq('confirmed', true),
+    serviceClient.from('property_utility_accounts').select('property_id, utility_type, account_number'),
   ])
 
   try {
@@ -112,7 +114,18 @@ export async function GET(request: Request) {
         matchMethod = 'learned_mapping'
       }
 
-      // 2. Match by owner name in subject or AI-extracted account holder
+      // 2. Match by utility account number (highest confidence after sender mapping)
+      if (!propertyId && aiParsedData?.account_number) {
+        const accountMatch = (utilityAccounts ?? []).find(
+          ua => ua.utility_type === billType && ua.account_number === aiParsedData.account_number
+        )
+        if (accountMatch) {
+          propertyId = accountMatch.property_id
+          matchMethod = 'account_number'
+        }
+      }
+
+      // 3. Match by owner name in subject or AI-extracted account holder
       if (!propertyId) {
         const searchText = `${msg.subject} ${aiParsedData?.account_holder || ''}`.toLowerCase()
 
@@ -226,6 +239,7 @@ async function parseWithAI(
   period_end: string | null
   address: string | null
   account_holder: string | null
+  account_number: string | null
 } | null> {
   const text = await geminiGenerate('lite', apiKey, [
     {
@@ -239,6 +253,7 @@ async function parseWithAI(
 - period_end: billing period end in YYYY-MM-DD
 - address: the property address on the bill
 - account_holder: the name of the person/entity the bill is addressed to (שם בעל החשבון)
+- account_number: the utility account/contract/meter number (מספר חשבון/מספר חוזה/מספר מונה)
 
 Return ONLY valid JSON with these fields. If you can't determine a field, use null.`,
         },
@@ -268,6 +283,7 @@ Return ONLY valid JSON with these fields. If you can't determine a field, use nu
       period_end: parsed.period_end || null,
       address: parsed.address || null,
       account_holder: parsed.account_holder || null,
+      account_number: parsed.account_number || null,
     }
   } catch {
     return null

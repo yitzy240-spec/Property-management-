@@ -8,6 +8,7 @@ import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { signOut } from '@/app/login/actions'
 import { MessageThread } from '@/components/features/message-thread'
 import { RequestStay } from '@/components/features/request-stay'
+import { InvoiceHistory } from '@/components/features/invoice-history'
 
 export default async function OwnerPortalPage() {
   const supabase = createServerSupabaseClient()
@@ -246,6 +247,14 @@ export default async function OwnerPortalPage() {
                 </a>
               ))}
             </div>
+          </section>
+        )}
+
+        {/* Invoices & Receipts from Green Invoice */}
+        {showFinancials && (
+          <section>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Invoices & Receipts</p>
+            <InvoiceHistory clientFilter={owner.full_name} limit={10} showHeader={false} />
           </section>
         )}
 

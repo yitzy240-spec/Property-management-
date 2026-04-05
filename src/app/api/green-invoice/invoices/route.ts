@@ -1,31 +1,23 @@
 import { NextResponse } from 'next/server'
-import { searchDocuments, getDocumentDownloadLinks, DOC_TYPES } from '@/lib/green-invoice'
-import { requireAdmin, AuthError } from '@/lib/auth'
+import { fetchAllDocuments } from '@/lib/green-invoice'
+import { requireAuth, AuthError } from '@/lib/auth'
 
 /**
- * GET /api/green-invoice/invoices?from=2026-01-01&to=2026-04-30
- * Pull invoice history from Green Invoice.
+ * GET /api/green-invoice/invoices
+ * Pull full invoice history from Green Invoice (all pages).
+ * Accessible to both admins and owners.
  */
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    await requireAdmin()
+    await requireAuth()
   } catch (err) {
     if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const url = new URL(request.url)
-  const fromDate = url.searchParams.get('from') || undefined
-  const toDate = url.searchParams.get('to') || undefined
-
   try {
-    const result = await searchDocuments({
-      fromDate,
-      toDate,
-      type: [DOC_TYPES.TAX_INVOICE, DOC_TYPES.TAX_INVOICE_RECEIPT, DOC_TYPES.RECEIPT],
-    })
-
-    return NextResponse.json(result)
+    const items = await fetchAllDocuments()
+    return NextResponse.json({ items, total: items.length })
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to fetch invoices' },

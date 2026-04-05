@@ -139,6 +139,9 @@ export default async function PropertyDetailPage({
         </div>
       )}
 
+      {/* Utility Accounts */}
+      <UtilityAccountsSection propertyId={params.id} />
+
       {/* Bookings */}
       <section>
         <div className="mb-3 flex items-center justify-between">
@@ -148,26 +151,24 @@ export default async function PropertyDetailPage({
           <BookingAddButton propertyId={params.id} propertyName={property.name} />
         </div>
         {bookings && bookings.length > 0 ? (
-          <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
-            {bookings.map((booking, i) => (
-              <div key={booking.id} className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}>
-                <div>
-                  <p className="text-sm font-medium">{booking.guest_name || 'Guest'}</p>
-                  <p className="font-mono text-xs text-muted-foreground">
-                    {booking.check_in} → {booking.check_out}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-right">
-                  {booking.platform && (
-                    <StatusBadge status="neutral" label={booking.platform} size="sm" />
-                  )}
-                  {booking.gross_rental_agorot && (
-                    <CurrencyDisplay agorot={booking.gross_rental_agorot} className="text-sm font-semibold" />
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <BookingList
+            bookings={(bookings as Array<Record<string, unknown>>).map(b => ({
+              id: b.id as string,
+              guest_name: b.guest_name as string | null,
+              check_in: b.check_in as string,
+              check_out: b.check_out as string,
+              platform: b.platform as string | null,
+              gross_rental_agorot: b.gross_rental_agorot as number | null,
+              currency: (b.currency as string) || 'ILS',
+              original_amount_cents: b.original_amount_cents as number | null,
+              commission_amount_agorot: b.commission_amount_agorot as number | null,
+              commission_collected: (b.commission_collected as boolean) || false,
+              deposit_amount_agorot: b.deposit_amount_agorot as number | null,
+              payment_status: (b.payment_status as string) || 'pending',
+              notes: b.notes as string | null,
+            }))}
+            commissionRate={property.commission_rate}
+          />
         ) : (
           <div className="rounded-[10px] border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">No bookings yet</div>
         )}

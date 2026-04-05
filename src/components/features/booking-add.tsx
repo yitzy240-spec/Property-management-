@@ -24,6 +24,8 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
   const [saving, setSaving] = useState(false)
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([])
   const [selectedProperty, setSelectedProperty] = useState(propertyId || '')
+  const [currency, setCurrency] = useState<'ILS' | 'USD'>('ILS')
+  const [fxRate, setFxRate] = useState('3.70')
 
   useEffect(() => {
     if (!open || propertyId) return
@@ -38,6 +40,24 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
 
     const grossStr = formData.get('gross_rental') as string
     const channelStr = formData.get('channel_fees') as string
+    const depositStr = formData.get('deposit') as string
+
+    // Handle multi-currency: if USD, convert to ILS agorot
+    let grossAgorot: number | null = null
+    let originalCents: number | null = null
+    let exchangeRate: number | null = null
+
+    if (grossStr) {
+      const amount = parseFloat(grossStr)
+      if (currency === 'USD') {
+        const rate = parseFloat(fxRate) || 3.70
+        originalCents = Math.round(amount * 100)
+        grossAgorot = Math.round(amount * rate * 100)
+        exchangeRate = rate
+      } else {
+        grossAgorot = Math.round(amount * 100)
+      }
+    }
 
     const { error } = await supabase.from('bookings').insert({
       property_id: propId,
@@ -45,8 +65,14 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
       check_in: formData.get('check_in') as string,
       check_out: formData.get('check_out') as string,
       platform: formData.get('platform') as string || null,
-      gross_rental_agorot: grossStr ? Math.round(parseFloat(grossStr) * 100) : null,
+      gross_rental_agorot: grossAgorot,
       channel_fees_agorot: channelStr ? Math.round(parseFloat(channelStr) * 100) : null,
+      currency,
+      original_amount_cents: originalCents,
+      exchange_rate: exchangeRate,
+      deposit_amount_agorot: depositStr ? Math.round(parseFloat(depositStr) * 100) : null,
+      payment_status: 'pending',
+      notes: formData.get('notes') as string || null,
     })
 
     if (error) {
@@ -110,16 +136,66 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Gross Rental (ILS)</Label>
-                <Input name="gross_rental" type="number" step="0.01" placeholder="1,500.00" className="h-11" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Channel Fees (ILS)</Label>
-                <Input name="channel_fees" type="number" step="0.01" placeholder="225.00" className="h-11" />
+            {/* Currency toggle */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Currency</Label>
+              <div className="flex gap-1">
+                {(['ILS', 'USD'] as const).map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCurrency(c)}
+                    className={`flex-1 rounded-[var(--radius-button)] py-2 text-sm font-medium transition-colors ${
+                      currency === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {c === 'ILS' ? '₪ ILS' : '$ USD'}
+                  </button>
+                ))}
               </div>
             </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Gross Rental ({currency === 'USD' ? '$' : '₪'})
+              </Label>
+              <Input name="gross_rental" type="number" step="0.01" placeholder={currency === 'USD' ? '1,200.00' : '4,440.00'} className="h-11" />
+            </div>
+
+            {currency === 'USD' && (
+              <div className="flex items-center gap-2 rounded-[10px] bg-muted/50 px-3 py-2">
+                <span className="text-xs text-muted-foreground">× rate</span>
+                <Input
+                  value={fxRate}
+                  onChange={e => setFxRate(e.target.value)}
+                  type="number"
+                  step="0.01"
+                  className="h-8 w-20 text-center font-mono text-sm"
+                />
+                <span className="text-xs text-muted-foreground">= ₪{fxRate && parseFloat(fxRate) ? '...' : '0'}</span>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Channel Fees (₪)</Label>
+              <Input name="channel_fees" type="number" step="0.01" placeholder="225.00" className="h-11" />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Deposit (₪)</Label>
+              <Input name="deposit" type="number" step="0.01" placeholder="Optional" className="h-11" />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notes</Label>
+              <textarea
+                name="notes"
+                className="min-h-[60px] w-full rounded-[10px] border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="e.g. cash payment, monthly arrangement..."
+                maxLength={500}
+              />
+            </div>
+
             <Button type="submit" disabled={saving} className="h-11 w-full bg-accent text-accent-foreground hover:bg-accent/90">
               {saving ? 'Adding...' : 'Add Booking'}
             </Button>

@@ -7,6 +7,7 @@ import { InvoicePushButton } from '@/components/features/invoice-push-button'
 import { FeeEntryAddButton } from '@/components/features/fee-entry-add'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { formatILS } from '@/lib/utils'
+import { InvoiceHistory } from '@/components/features/invoice-history'
 
 export default async function FinancialsPage() {
   const supabase = createServerSupabaseClient()
@@ -119,6 +120,11 @@ export default async function FinancialsPage() {
             <p className="mt-1 text-xs text-muted-foreground">Fees are calculated from completed bookings and tasks</p>
           </div>
         )}
+      </section>
+
+      {/* Green Invoice History */}
+      <section>
+        <InvoiceHistory limit={15} />
       </section>
     </div>
   )
