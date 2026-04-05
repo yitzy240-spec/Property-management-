@@ -6,11 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { formatILS, VAT_THRESHOLD_AGOROT, VAT_WARNING_PERCENT } from '@/lib/utils'
 
 export default async function DashboardPage() {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
   const currentYear = new Date().getFullYear()
   const today = new Date().toISOString().split('T')[0]
 
@@ -23,12 +24,12 @@ export default async function DashboardPage() {
     { data: upcomingBookings },
     { count: unreadMessages },
   ] = await Promise.all([
-    supabase.from('properties').select('id, name, address, neighborhood, num_bedrooms, commission_rate, owners(full_name)').eq('is_active', true).order('name'),
-    supabase.from('tasks').select('*', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
-    supabase.from('bills').select('*', { count: 'exact', head: true }).eq('status', 'pending_review'),
-    supabase.from('revenue_tracking').select('total_revenue_agorot').eq('year', currentYear),
-    supabase.from('bookings').select('*, properties(name)').gte('check_in', today).order('check_in').limit(5),
-    supabase.from('messages').select('*', { count: 'exact', head: true }).eq('is_read', false).eq('sender_role', 'owner'),
+    serviceClient.from('properties').select('id, name, address, neighborhood, num_bedrooms, commission_rate, owners(full_name)').eq('is_active', true).order('name'),
+    serviceClient.from('tasks').select('*', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
+    serviceClient.from('bills').select('*', { count: 'exact', head: true }).eq('status', 'pending_review'),
+    serviceClient.from('revenue_tracking').select('total_revenue_agorot').eq('year', currentYear),
+    serviceClient.from('bookings').select('*, properties(name)').gte('check_in', today).order('check_in').limit(5),
+    serviceClient.from('messages').select('*', { count: 'exact', head: true }).eq('is_read', false).eq('sender_role', 'owner'),
   ])
 
   // Calculate YTD revenue

@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { ClipboardList } from 'lucide-react'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -23,6 +23,7 @@ const priorityColors: Record<string, string> = {
 
 export default async function TasksPage() {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
 
   const { data: tasks } = await supabase
     .from('tasks')

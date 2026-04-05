@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { AlertTriangle, Check, X, FileDown } from 'lucide-react'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -27,6 +27,7 @@ const statusColors: Record<string, string> = {
 
 export default async function BillsPage() {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
 
   const { data: bills } = await supabase
     .from('bills')

@@ -1,11 +1,12 @@
 export const dynamic = 'force-dynamic'
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
 export default async function CalendarPage() {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
 
   const today = new Date()
   const twoWeeksOut = new Date(today)

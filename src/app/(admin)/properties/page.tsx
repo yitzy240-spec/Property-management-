@@ -2,13 +2,14 @@ export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import { Plus, Building2 } from 'lucide-react'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 
 export default async function PropertiesPage() {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
 
   const { data: properties } = await supabase
     .from('properties')

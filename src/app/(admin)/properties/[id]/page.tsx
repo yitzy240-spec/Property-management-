@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Copy, ExternalLink, Pencil } from 'lucide-react'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,6 +17,7 @@ export default async function PropertyDetailPage({
   params: { id: string }
 }) {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
 
   const { data: property } = await supabase
     .from('properties')
@@ -33,10 +34,10 @@ export default async function PropertyDetailPage({
     { data: tasks },
     { data: documents },
   ] = await Promise.all([
-    supabase.from('bookings').select('*').eq('property_id', params.id).order('check_in', { ascending: false }).limit(10),
-    supabase.from('bills').select('*').eq('property_id', params.id).order('created_at', { ascending: false }).limit(10),
-    supabase.from('tasks').select('*, contractors(name)').eq('property_id', params.id).order('created_at', { ascending: false }).limit(10),
-    supabase.from('documents').select('*').eq('property_id', params.id).order('created_at', { ascending: false }),
+    serviceClient.from('bookings').select('*').eq('property_id', params.id).order('check_in', { ascending: false }).limit(10),
+    serviceClient.from('bills').select('*').eq('property_id', params.id).order('created_at', { ascending: false }).limit(10),
+    serviceClient.from('tasks').select('*, contractors(name)').eq('property_id', params.id).order('created_at', { ascending: false }).limit(10),
+    serviceClient.from('documents').select('*').eq('property_id', params.id).order('created_at', { ascending: false }),
   ])
 
   const owner = property.owners as { full_name: string; email: string; profile: string } | null

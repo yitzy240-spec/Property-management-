@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator'
 
 export default async function ContractorsPage() {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
 
   // Get all active contractors with their open tasks
   const { data: contractors } = await supabase

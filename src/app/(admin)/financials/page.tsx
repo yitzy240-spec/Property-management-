@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { DollarSign, FileText, TrendingUp } from 'lucide-react'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { formatILS } from '@/lib/utils'
 
 export default async function FinancialsPage() {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
 
   const now = new Date()
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`

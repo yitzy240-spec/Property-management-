@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import { Plus, Users } from 'lucide-react'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -15,6 +15,7 @@ const profileColors: Record<string, string> = {
 
 export default async function OwnersPage() {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
 
   const { data: owners } = await supabase
     .from('owners')

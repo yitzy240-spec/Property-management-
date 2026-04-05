@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { FileText, Upload } from 'lucide-react'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DocumentUpload } from '@/components/features/document-upload'
@@ -17,6 +17,7 @@ const categoryLabels: Record<string, string> = {
 
 export default async function VaultPage() {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
 
   const { data: documents } = await supabase
     .from('documents')

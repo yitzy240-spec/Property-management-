@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { AlertTriangle, Package, Phone } from 'lucide-react'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { formatDateJerusalem } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ import {
 
 export default async function InventoryPage() {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
 
   const { data: inventory } = await supabase
     .from('inventory_items')
