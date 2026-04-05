@@ -18,13 +18,31 @@ export default async function DashboardPage() {
     { count: pendingBillCount },
     { data: revenueData },
     { data: upcomingBookings },
+    { data: currentBookings },
+    { data: openTasks },
   ] = await Promise.all([
     supabase.from('properties').select('*, owners(full_name), lodgify_data').eq('is_active', true).order('name'),
     supabase.from('tasks').select('*', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
     supabase.from('bills').select('*', { count: 'exact', head: true }).eq('status', 'pending_review'),
     supabase.from('revenue_tracking').select('total_revenue_agorot').eq('year', currentYear),
     supabase.from('bookings').select('*, properties(name)').gte('check_in', today).order('check_in').limit(5),
+    // Per-property: current/next booking and open tasks
+    supabase.from('bookings').select('property_id, guest_name, check_in, check_out').gte('check_out', today).order('check_in'),
+    supabase.from('tasks').select('property_id').in('status', ['pending', 'in_progress']),
   ])
+
+  // Build per-property status maps
+  const propertyBookingMap = {} as { [key: string]: { guest: string; checkIn: string; checkOut: string } }
+  for (const b of currentBookings ?? []) {
+    if (!propertyBookingMap[b.property_id]) {
+      propertyBookingMap[b.property_id] = { guest: b.guest_name || 'Guest', checkIn: b.check_in, checkOut: b.check_out }
+    }
+  }
+
+  const propertyTaskCount = {} as { [key: string]: number }
+  for (const t of openTasks ?? []) {
+    propertyTaskCount[t.property_id] = (propertyTaskCount[t.property_id] || 0) + 1
+  }
 
   const ytdRevenue = revenueData?.reduce((sum, r) => sum + (r.total_revenue_agorot || 0), 0) ?? 0
   const vatPercent = Math.round((ytdRevenue / VAT_THRESHOLD_AGOROT) * 100)
@@ -106,47 +124,63 @@ export default async function DashboardPage() {
         </Link>
       )}
 
-      {/* ── Properties list ── */}
+      {/* ── Properties tiles ── */}
       <section>
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Properties</p>
-          <Link href="/properties" className="flex items-center gap-0.5 text-xs font-medium text-primary hover:underline">
-            View all <ChevronRight className="h-3 w-3" />
-          </Link>
-        </div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Properties</p>
 
-        <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
-          {properties && properties.length > 0 ? properties.map((property, i) => (
-            <Link key={property.id} href={`/properties/${property.id}`} className="block">
-              <div className={`flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/40 ${i > 0 ? 'border-t border-border' : ''}`}>
-                {(() => {
-                  const ld = property.lodgify_data as { image_url?: string } | null
-                  return ld?.image_url ? (
-                    <img src={`https:${ld.image_url}`} alt="" className="h-12 w-16 shrink-0 rounded-md object-cover" />
-                  ) : (
-                    <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md bg-muted text-[10px] text-muted-foreground">No img</div>
-                  )
-                })()}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="truncate text-sm font-semibold">{property.name}</h3>
-                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                      {Math.round(property.commission_rate * 100)}%
-                    </span>
+        {properties && properties.length > 0 ? (
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
+            {properties.map((property) => {
+              const ld = property.lodgify_data as { image_url?: string } | null
+              const booking = propertyBookingMap[property.id]
+              const tasks = propertyTaskCount[property.id] || 0
+              const isOccupied = !!booking && booking.checkIn <= today && booking.checkOut >= today
+
+              return (
+                <Link key={property.id} href={`/properties/${property.id}`} className="group block">
+                  <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
+                    <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
+                      {ld?.image_url ? (
+                        <img src={`https:${ld.image_url}`} alt={property.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">No image</div>
+                      )}
+                      {/* Status overlay */}
+                      <div className="absolute left-1.5 top-1.5 flex gap-1">
+                        <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium backdrop-blur-sm ${
+                          isOccupied
+                            ? 'bg-status-safe/90 text-white'
+                            : 'bg-black/50 text-white'
+                        }`}>
+                          {isOccupied ? 'Occupied' : 'Vacant'}
+                        </span>
+                        {tasks > 0 && (
+                          <span className="rounded-md bg-status-warning/90 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+                            {tasks} task{tasks > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-2.5">
+                      <h3 className="truncate text-xs font-semibold">{property.name}</h3>
+                      {booking ? (
+                        <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                          {isOccupied ? booking.guest : `Next: ${booking.guest}`} · {isOccupied ? `out ${booking.checkOut}` : booking.checkIn}
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                          {(property.owners as unknown as { full_name: string } | null)?.full_name}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                    <span>{property.num_bedrooms} bed</span>
-                    <span className="text-border">·</span>
-                    <span className="truncate">{(property.owners as unknown as { full_name: string } | null)?.full_name}</span>
-                  </div>
-                </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
-              </div>
-            </Link>
-          )) : (
-            <div className="py-10 text-center text-sm text-muted-foreground">No properties yet.</div>
-          )}
-        </div>
+                </Link>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="py-10 text-center text-sm text-muted-foreground">No properties yet.</div>
+        )}
       </section>
 
       {/* ── Upcoming check-ins ── */}

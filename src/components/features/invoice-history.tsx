@@ -1,9 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { FileText, Download } from 'lucide-react'
-import { StatusBadge } from '@/components/ui/status-badge'
-import { Button } from '@/components/ui/button'
+import { Download } from 'lucide-react'
 
 interface GIDocument {
   id: string
@@ -16,30 +14,18 @@ interface GIDocument {
   client?: { id: string; name: string }
 }
 
-const TYPE_LABELS: Record<number, string> = {
+const TYPE_SHORT: Record<number, string> = {
   10: 'Quote',
-  100: 'Order',
   300: 'Proforma',
-  305: 'Tax Invoice',
-  320: 'Invoice/Receipt',
-  330: 'Credit Note',
+  305: 'Invoice',
+  320: 'Inv/Rcpt',
+  330: 'Credit',
   400: 'Receipt',
 }
 
-const STATUS_MAP: Record<number, string> = {
-  0: 'safe',    // open/active
-  1: 'neutral', // closed
-  2: 'neutral', // manually closed
-  3: 'info',    // credit note
-  4: 'danger',  // cancelled
-}
-
 interface InvoiceHistoryProps {
-  /** If provided, only show documents for this client name */
   clientFilter?: string
-  /** Max items to show */
   limit?: number
-  /** Show title header */
   showHeader?: boolean
 }
 
@@ -63,11 +49,7 @@ export function InvoiceHistory({ clientFilter, limit, showHeader = true }: Invoi
           }
 
           setTotal(items.length)
-
-          if (limit) {
-            items = items.slice(0, limit)
-          }
-
+          if (limit) items = items.slice(0, limit)
           setDocuments(items)
         }
       } catch {
@@ -100,7 +82,7 @@ export function InvoiceHistory({ clientFilter, limit, showHeader = true }: Invoi
       {showHeader && (
         <div className="mb-3 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Green Invoice History
+            Invoice History
           </p>
           <span className="font-mono text-xs text-muted-foreground">{total} total</span>
         </div>
@@ -109,31 +91,22 @@ export function InvoiceHistory({ clientFilter, limit, showHeader = true }: Invoi
         {documents.map((doc, i) => (
           <div
             key={doc.id}
-            className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}
+            className={`flex items-center justify-between px-3 py-2.5 ${i > 0 ? 'border-t border-border' : ''}`}
           >
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <FileText className="h-4 w-4 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="rounded-[var(--radius-badge)] bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                  {TYPE_SHORT[doc.type] || 'Doc'}
+                </span>
+                <span className="font-mono text-xs text-muted-foreground">#{doc.number}</span>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">
-                    {TYPE_LABELS[doc.type] || 'Document'} #{doc.number}
-                  </p>
-                  <StatusBadge
-                    status={(STATUS_MAP[doc.status] || 'neutral') as 'safe' | 'danger' | 'info' | 'neutral' | 'warning'}
-                    label={doc.status === 0 ? 'Active' : doc.status === 4 ? 'Cancelled' : 'Closed'}
-                    size="sm"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {doc.client?.name || 'No client'} · {doc.documentDate}
-                </p>
-              </div>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {doc.client?.name || 'No client'} · {doc.documentDate}
+              </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-2">
               <p className="font-mono text-sm font-semibold">
-                {doc.currency === 'ILS' ? '₪' : '$'}{doc.amount.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {doc.currency === 'ILS' ? '₪' : '$'}{doc.amount.toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
               <a
                 href={`/api/green-invoice/invoices/${doc.id}/download?lang=he`}
