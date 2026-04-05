@@ -282,7 +282,7 @@ export function ContractorTaskView({
                 onChange={(e) => setExpenseAmount(e.target.value)}
               />
             </div>
-            <label className="flex cursor-pointer items-center gap-1 rounded-[var(--radius-button)] border border-border px-3 text-xs text-muted-foreground hover:bg-muted">
+            <label className="flex h-11 cursor-pointer items-center gap-1 rounded-[var(--radius-button)] border border-border px-3 text-xs text-muted-foreground hover:bg-muted">
               <Receipt className="h-3.5 w-3.5" />
               Receipt
               <input

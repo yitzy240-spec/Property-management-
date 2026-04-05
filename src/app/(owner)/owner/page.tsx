@@ -134,7 +134,7 @@ export default async function OwnerPortalPage() {
                   <p className="font-mono text-lg font-bold">{properties?.length ?? 0}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Bills (YTD)</p>
+                  <p className="text-xs text-muted-foreground">Recent Bills</p>
                   <CurrencyDisplay agorot={totalBills} variant="expense" className="text-lg font-bold" />
                 </div>
                 <div>

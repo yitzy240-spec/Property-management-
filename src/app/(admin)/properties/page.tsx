@@ -70,8 +70,7 @@ export default async function PropertiesPage() {
                       </div>
                       {ld?.min_price != null && (
                         <p className="shrink-0 font-mono text-sm font-bold">
-                          {'$'}{Math.round(ld.min_price)}
-                          <span className="text-[10px] font-normal text-muted-foreground">/nt</span>
+                          {Math.round(ld.min_price)} <span className="text-[10px] font-normal text-muted-foreground">{ld.currency_code || 'USD'}/nt</span>
                         </p>
                       )}
                     </div>

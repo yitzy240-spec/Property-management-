@@ -65,7 +65,7 @@ export default async function GuestCheckInPage({
     try {
       const lang = (booking as Record<string, unknown>)?.guest_language as string || 'en'
       const guideRes = await fetch(
-        `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/ai/guest-guide?property_id=${payload.property_id}&lang=${lang}`,
+        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/ai/guest-guide?property_id=${payload.property_id}&lang=${lang}`,
         { headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` } },
       )
       if (guideRes.ok) {

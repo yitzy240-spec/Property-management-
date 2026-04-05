@@ -165,7 +165,7 @@ export default async function DashboardPage() {
                       <h3 className="truncate text-xs font-semibold">{property.name}</h3>
                       {booking ? (
                         <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                          {isOccupied ? booking.guest : `Next: ${booking.guest}`} · {isOccupied ? `out ${booking.checkOut}` : booking.checkIn}
+                          {isOccupied ? booking.guest : `Next: ${booking.guest}`} · {isOccupied ? `out ${new Date(booking.checkOut).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </p>
                       ) : (
                         <p className="mt-0.5 truncate text-[10px] text-muted-foreground">

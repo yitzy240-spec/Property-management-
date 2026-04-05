@@ -27,7 +27,7 @@ export default async function SettingsPage() {
 
       {/* Integration Health Dashboard */}
       <section>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           Integration Status
         </p>
         <IntegrationHealth />

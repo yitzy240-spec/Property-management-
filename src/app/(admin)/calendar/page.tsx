@@ -114,10 +114,10 @@ export default async function CalendarPage() {
                       key={i}
                       className={`flex items-center justify-between border-l-4 px-4 py-3 ${config.borderColor} ${i > 0 ? 'border-t border-border' : ''}`}
                     >
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <StatusBadge status={config.status} label={config.label} size="sm" />
-                          <span className="text-sm font-medium">{event.title}</span>
+                          <span className="truncate text-sm font-medium">{event.title}</span>
                         </div>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {event.property} · {event.detail}

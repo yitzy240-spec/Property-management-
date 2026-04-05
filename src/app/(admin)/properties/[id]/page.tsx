@@ -69,7 +69,10 @@ export default async function PropertyDetailPage({
         <span className="rounded-[var(--radius-badge)] bg-muted px-2 py-1 text-xs font-medium">{property.num_bedrooms} bed · {property.num_beds} beds</span>
         <span className="rounded-[var(--radius-badge)] bg-muted px-2 py-1 text-xs font-medium">{property.neighborhood || property.city}</span>
         {owner && (
-          <span className="rounded-[var(--radius-badge)] border border-border px-2 py-1 text-xs font-medium">{owner.full_name} ({owner.profile})</span>
+          <>
+            <span className="max-w-[160px] truncate rounded-[var(--radius-badge)] border border-border px-2 py-1 text-xs font-medium">{owner.full_name}</span>
+            <StatusBadge status={owner.profile === 'investor' ? 'info' : owner.profile === 'hybrid' ? 'warning' : 'safe'} label={owner.profile} size="sm" />
+          </>
         )}
         <span className="rounded-[var(--radius-badge)] border border-border px-2 py-1 text-xs font-medium font-mono">{Math.round(property.commission_rate * 100)}% commission</span>
       </div>
@@ -96,9 +99,9 @@ export default async function PropertyDetailPage({
                     <>
                       <p className="text-[10px] text-muted-foreground">Nightly rate</p>
                       <p className="font-mono text-lg font-bold">
-                        {'$'}{Math.round(ld.min_price)}
-                        {ld.max_price && ld.max_price !== ld.min_price ? ` – $${Math.round(ld.max_price)}` : ''}
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">{ld.currency_code || 'USD'}</span>
+                        {Math.round(ld.min_price)}
+                        {ld.max_price && ld.max_price !== ld.min_price ? ` – ${Math.round(ld.max_price)}` : ''}
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">{ld.currency_code || 'USD'}/nt</span>
                       </p>
                     </>
                   )}
