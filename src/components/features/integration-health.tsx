@@ -98,7 +98,7 @@ export function IntegrationHealth() {
             key: 'gmail',
             name: 'Gmail',
             status: gmailData.connected ? 'connected' : 'not_configured',
-            detail: gmailData.connected ? 'Bill parsing active' : 'Click Connect below',
+            detail: gmailData.connected ? (gmailData.email || 'Bill parsing active') : 'Click Connect below',
           })
         } else {
           results.push({ key: 'gmail', name: 'Gmail', status: 'not_configured', detail: 'Click Connect below' })

@@ -1,14 +1,27 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AlertCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
 
-export function GmailConnect({ isConnected }: { isConnected: boolean }) {
+export function GmailConnect({ isConnected: initialConnected }: { isConnected: boolean }) {
   const searchParams = useSearchParams()
   const gmailConnected = searchParams.get('gmail_connected') === 'true'
   const gmailError = searchParams.get('gmail_error')
-  const connected = isConnected || gmailConnected
+  const [connected, setConnected] = useState(initialConnected || gmailConnected)
+  const [email, setEmail] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/auth/gmail/status')
+      .then(r => r.json())
+      .then(data => {
+        setConnected(data.connected)
+        if (data.email) setEmail(data.email)
+      })
+      .catch(() => {})
+  }, [])
 
   return (
     <div className="rounded-[10px] border border-border bg-card p-5 shadow-sm">
@@ -41,7 +54,11 @@ export function GmailConnect({ isConnected }: { isConnected: boolean }) {
         {connected ? (
           <>
             <p className="text-xs text-muted-foreground">
-              Gmail connected. Bills with PDF attachments are auto-parsed.
+              {email ? (
+                <>Connected as <span className="font-medium text-foreground">{email}</span>. Bills with PDF attachments are auto-parsed.</>
+              ) : (
+                'Gmail connected. Bills with PDF attachments are auto-parsed.'
+              )}
             </p>
             <a href="/api/auth/gmail" className="block">
               <button className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border bg-card px-4 text-sm font-medium shadow-sm transition-colors hover:bg-muted sm:w-auto">

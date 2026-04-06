@@ -177,7 +177,7 @@ export async function fetchBillEmails(maxResults: number = 10): Promise<{
   // Search for emails with PDF attachments (Israeli utility bill patterns)
   // Senders: IEC (noreplys@iec.co.il), Hagihon (hagihon@printernet.co.il), Bezeq (bezeq_mail@bezeq.co.il)
   // Keywords cover: electricity, water, internet, arnona, va'ad bayit
-  const query = 'has:attachment filename:pdf (from:iec.co.il OR from:hagihon OR from:bezeq OR from:iriya OR arnona OR electricity OR IEC OR water OR "va\'ad bayit" OR חשבון OR ארנונה OR חשמל OR מים OR הגיחון OR בזק OR "חברת החשמל" OR "חשבונית מים" OR "החשבונית החודשית")'
+  const query = 'has:attachment filename:pdf (from:iec.co.il OR from:hagihon OR from:bezeq OR from:iriya OR arnona OR electricity OR IEC OR water OR "va\'ad bayit" OR חשבון OR ארנונה OR חשמל OR מים OR הגיחון OR בזק OR "חברת החשמל" OR "חשבונית מים" OR "החשבונית החודשית" OR "אישור תשלום" OR "ועד בית" OR "חשבון תקופתי")'
 
   const listResponse = await fetch(
     `${GMAIL_API_BASE}/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
