@@ -318,28 +318,37 @@ export async function verifyOtp(otpCode: string, factorId: string, propertyId: s
     contractIds: [],
   }
 
-  // Get customer info
-  try {
-    const customerRes = await authenticatedFetch(`${IEC_BASE}/customer`, tokens.idToken)
-    if (customerRes.ok) {
-      const customer = await customerRes.json()
-      tokens.bpNumber = customer.bp_number || customer.bpNumber || ''
+  // Get account info via /outages/accounts (works for both TZ and passport accounts)
+  const accountsRes = await authenticatedFetch(`${IEC_BASE}/outages/accounts`, tokens.idToken)
+  if (accountsRes.ok) {
+    const accountsData = await accountsRes.json()
+    console.log('[IEC] Accounts response:', JSON.stringify(accountsData).slice(0, 500))
+    const accounts = accountsData.data || []
+    if (accounts.length > 0) {
+      tokens.bpNumber = accounts[0].accountNumber || ''
     }
+  } else {
+    console.error('[IEC] Accounts fetch failed:', accountsRes.status)
+  }
 
-    if (tokens.bpNumber) {
-      const contractsRes = await authenticatedFetch(
-        `${IEC_BASE}/customer/contract/${tokens.bpNumber}`,
-        tokens.idToken
-      )
-      if (contractsRes.ok) {
-        const contracts = await contractsRes.json()
-        tokens.contractIds = (contracts || []).map((c: { contract_id?: string; contractId?: string }) =>
-          c.contract_id || c.contractId || ''
-        ).filter(Boolean)
-      }
+  // Get contracts using account number
+  if (tokens.bpNumber) {
+    const contractsRes = await authenticatedFetch(
+      `${IEC_BASE}/customer/contract/${tokens.bpNumber}`,
+      tokens.idToken
+    )
+    if (contractsRes.ok) {
+      const contractsData = await contractsRes.json()
+      console.log('[IEC] Contracts response:', JSON.stringify(contractsData).slice(0, 500))
+      const contracts = contractsData.data?.contracts || []
+      tokens.contractIds = contracts.map((c: Record<string, unknown>) =>
+        String(c.contractId || c.contract_id || '')
+      ).filter(Boolean)
+    } else {
+      console.error('[IEC] Contracts fetch failed:', contractsRes.status)
     }
-  } catch {
-    // Customer fetch failed — tokens still valid
+  } else {
+    console.warn('[IEC] No account number found')
   }
 
   // Clean up temp state
