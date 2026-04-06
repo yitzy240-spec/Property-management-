@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Play, CheckCircle2, XCircle, Pencil } from 'lucide-react'
+import { Play, CheckCircle2, XCircle, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -101,6 +101,30 @@ export function TaskActions({
           Cancel
         </Button>
       )}
+
+      {/* Delete */}
+      <Button
+        size="sm"
+        variant="outline"
+        className="gap-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+        disabled={loading !== null}
+        onClick={async () => {
+          if (!confirm('Delete this task? This cannot be undone.')) return
+          setLoading('delete')
+          const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+          if (error) {
+            toast.error('Failed to delete', { description: error.message })
+          } else {
+            toast.success('Task deleted')
+            router.push('/tasks')
+            router.refresh()
+          }
+          setLoading(null)
+        }}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        {loading === 'delete' ? 'Deleting...' : 'Delete'}
+      </Button>
 
       {/* Edit drawer */}
       <TaskEditDrawer
