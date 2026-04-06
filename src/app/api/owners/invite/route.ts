@@ -89,6 +89,16 @@ export async function POST(request: Request) {
     magicLink = linkData.properties.action_link
   }
 
+  // Also trigger Supabase's built-in OTP email as fallback (works even without Resend)
+  const { createServerSupabaseClient: createPublicClient } = await import('@/lib/supabase/server')
+  const publicSupabase = createPublicClient()
+  await publicSupabase.auth.signInWithOtp({
+    email: owner.email,
+    options: {
+      emailRedirectTo: `${appUrl}/auth/callback?next=/owner`,
+    },
+  }).catch(() => {}) // silent fallback
+
   const { data: properties } = await serviceClient
     .from('properties')
     .select('name')
