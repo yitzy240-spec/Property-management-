@@ -78,11 +78,12 @@ export async function POST(request: Request) {
     .gte('date', monthStart)
     .lt('date', monthEnd)
 
-  // ── 3. Bookings for commission ──
+  // ── 3. Bookings for commission (exclude Airbnb — they pay commission directly) ──
   const { data: bookings } = await serviceClient
     .from('bookings')
-    .select('gross_rental_agorot, property_id')
+    .select('gross_rental_agorot, property_id, platform')
     .in('property_id', propertyIds)
+    .neq('platform', 'airbnb')
     .gte('check_in', monthStart)
     .lt('check_in', monthEnd)
     .not('gross_rental_agorot', 'is', null)
@@ -142,7 +143,7 @@ export async function POST(request: Request) {
 
     if (commission > 0) {
       lineItems.push({
-        description: `Commission ${Math.round(Number(property.commission_rate) * 100)}% — ${property.name} (${monthLabel})`,
+        description: `Commission ${Math.round(Number(property.commission_rate) * 100)}% — ${property.name} (${monthLabel}, excl. Airbnb)`,
         priceAgorot: commission,
         quantity: 1,
       })
