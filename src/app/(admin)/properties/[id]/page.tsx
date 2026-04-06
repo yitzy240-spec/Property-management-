@@ -82,42 +82,43 @@ export default async function PropertyDetailPage({
         <span className="rounded-[var(--radius-badge)] border border-border px-2 py-1 text-xs font-medium font-mono">{Math.round(property.commission_rate * 100)}% commission</span>
       </div>
 
-      {/* Lodgify Hero Image + Pricing */}
+      {/* Hero Image + Pricing */}
       {(() => {
         const ld = property.lodgify_data as { image_url?: string; min_price?: number; max_price?: number; currency_code?: string; rooms?: { id: number; name: string }[] } | null
-        if (!ld) return null
+        const heroImage = (property as Record<string, unknown>).image_url as string | null
+          || (ld?.image_url ? `https:${ld.image_url}` : null)
+        const hasPricing = ld?.min_price != null
+        if (!heroImage && !hasPricing) return null
         return (
           <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
-            {ld.image_url && (
+            {heroImage && (
               <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
                 <img
-                  src={`https:${ld.image_url}`}
+                  src={heroImage}
                   alt={property.name}
                   className="h-full w-full object-cover"
                 />
               </div>
             )}
-            <div className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  {ld.min_price != null && (
-                    <>
-                      <p className="text-[10px] text-muted-foreground">Nightly rate</p>
-                      <p className="font-mono text-lg font-bold">
-                        {Math.round(ld.min_price)}
-                        {ld.max_price && ld.max_price !== ld.min_price ? ` – ${Math.round(ld.max_price)}` : ''}
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">{ld.currency_code || 'USD'}/nt</span>
-                      </p>
-                    </>
+            {hasPricing && (
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Nightly rate</p>
+                    <p className="font-mono text-lg font-bold">
+                      {Math.round(ld.min_price!)}
+                      {ld.max_price && ld.max_price !== ld.min_price ? ` – ${Math.round(ld.max_price)}` : ''}
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">{ld.currency_code || 'USD'}/nt</span>
+                    </p>
+                  </div>
+                  {ld.rooms && (
+                    <span className="text-xs text-muted-foreground">
+                      {ld.rooms.length} room type{ld.rooms.length === 1 ? '' : 's'}
+                    </span>
                   )}
                 </div>
-                {ld.rooms && (
-                  <span className="text-xs text-muted-foreground">
-                    {ld.rooms.length} room type{ld.rooms.length === 1 ? '' : 's'}
-                  </span>
-                )}
               </div>
-            </div>
+            )}
           </div>
         )
       })()}

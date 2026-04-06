@@ -55,6 +55,8 @@ export interface Property {
   management_fee_agorot: number
   hourly_rate_agorot: number
   commission_rate: number
+  image_url: string | null
+  lodgify_data: Record<string, unknown> | null
   is_active: boolean
   created_at: string
   updated_at: string

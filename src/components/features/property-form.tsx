@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { Upload, X, ImageIcon, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -68,9 +69,23 @@ export function PropertyForm({ property }: PropertyFormProps) {
     router.refresh()
   }
 
+  // Resolve current image: custom > lodgify
+  const lodgifyImage = (property?.lodgify_data as { image_url?: string } | null)?.image_url
+  const currentImage = property?.image_url || (lodgifyImage ? `https:${lodgifyImage}` : null)
+  const isLodgifyImage = !property?.image_url && !!lodgifyImage
+
   return (
     <form action={handleSubmit}>
       <div className="space-y-6">
+        {/* Property Image */}
+        {isEditing && (
+          <PropertyImageUpload
+            propertyId={property.id}
+            currentImage={currentImage}
+            isLodgifyImage={isLodgifyImage}
+          />
+        )}
+
         {/* Basic Info */}
         <div className="rounded-[10px] border border-border bg-card shadow-sm">
           <div className="border-b border-border px-4 py-3">
@@ -188,5 +203,147 @@ export function PropertyForm({ property }: PropertyFormProps) {
         </div>
       </div>
     </form>
+  )
+}
+
+function PropertyImageUpload({
+  propertyId,
+  currentImage,
+  isLodgifyImage,
+}: {
+  propertyId: string
+  currentImage: string | null
+  isLodgifyImage: boolean
+}) {
+  const [image, setImage] = useState(currentImage)
+  const [uploading, setUploading] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const [isFromLodgify, setIsFromLodgify] = useState(isLodgifyImage)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function handleUpload(file: File) {
+    setUploading(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('propertyId', propertyId)
+
+      const res = await fetch('/api/properties/image', { method: 'POST', body: form })
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+
+      setImage(data.imageUrl)
+      setIsFromLodgify(false)
+      toast.success('Image uploaded')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleRemove() {
+    setRemoving(true)
+    try {
+      const res = await fetch('/api/properties/image', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propertyId }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Remove failed')
+      }
+      setImage(null)
+      setIsFromLodgify(false)
+      toast.success('Image removed')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Remove failed')
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) handleUpload(file)
+    e.target.value = ''
+  }
+
+  return (
+    <div className="rounded-[10px] border border-border bg-card shadow-sm">
+      <div className="border-b border-border px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Property Image</p>
+      </div>
+      <div className="p-4">
+        {image ? (
+          <div className="relative overflow-hidden rounded-lg">
+            <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
+              <img src={image} alt="Property" className="h-full w-full object-cover" />
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {isFromLodgify && (
+                  <span className="rounded-[var(--radius-badge)] bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    From Lodgify
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 text-xs"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                  {isFromLodgify ? 'Replace' : 'Change'}
+                </Button>
+                {!isFromLodgify && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 text-xs text-destructive hover:text-destructive"
+                    onClick={handleRemove}
+                    disabled={removing}
+                  >
+                    {removing ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="flex w-full flex-col items-center gap-2 rounded-lg border-2 border-dashed border-border py-10 text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+          >
+            {uploading ? (
+              <Loader2 className="h-8 w-8 animate-spin" />
+            ) : (
+              <ImageIcon className="h-8 w-8" />
+            )}
+            <span className="text-sm font-medium">
+              {uploading ? 'Uploading...' : 'Click to upload property image'}
+            </span>
+            <span className="text-xs">JPG, PNG, WebP — max 5MB</span>
+          </button>
+        )}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </div>
+    </div>
   )
 }
