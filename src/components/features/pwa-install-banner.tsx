@@ -82,7 +82,7 @@ export function PwaInstallBanner() {
   if (isInstalled || dismissed) return null
 
   return (
-    <div className="fixed bottom-16 left-0 right-0 z-50 mx-auto max-w-lg px-4 pb-2">
+    <div className="fixed bottom-4 left-0 right-0 z-50 mx-auto max-w-lg px-4">
       <div className="flex items-center gap-3 rounded-[10px] border border-border bg-card p-3 shadow-lg">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary">
           <Download className="h-5 w-5 text-primary-foreground" />

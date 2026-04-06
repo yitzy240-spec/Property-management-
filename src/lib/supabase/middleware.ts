@@ -30,24 +30,33 @@ export async function updateSession(request: NextRequest) {
   // All admin routes under (admin) group + owner portal require auth
   // Public routes (contractor/[token], guest/[token], login, api/webhooks)
   // are excluded by the middleware matcher in src/middleware.ts
-  const isProtectedRoute =
-    request.nextUrl.pathname.startsWith('/dashboard') ||
-    request.nextUrl.pathname.startsWith('/properties') ||
-    request.nextUrl.pathname.startsWith('/bills') ||
-    request.nextUrl.pathname.startsWith('/tasks') ||
-    request.nextUrl.pathname.startsWith('/financials') ||
-    request.nextUrl.pathname.startsWith('/calendar') ||
-    request.nextUrl.pathname.startsWith('/settings') ||
-    request.nextUrl.pathname.startsWith('/inventory') ||
-    request.nextUrl.pathname.startsWith('/vault') ||
-    request.nextUrl.pathname.startsWith('/contractors') ||
-    request.nextUrl.pathname.startsWith('/messages') ||
-    request.nextUrl.pathname.startsWith('/owners') ||
-    request.nextUrl.pathname.startsWith('/owner')
+  const pathname = request.nextUrl.pathname
 
-  if (isProtectedRoute && !user) {
+  // Admin login page is public
+  if (pathname === '/admin/login') {
+    return supabaseResponse
+  }
+
+  const isProtectedRoute =
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/properties') ||
+    pathname.startsWith('/bills') ||
+    pathname.startsWith('/tasks') ||
+    pathname.startsWith('/financials') ||
+    pathname.startsWith('/calendar') ||
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/inventory') ||
+    pathname.startsWith('/vault') ||
+    pathname.startsWith('/contractors') ||
+    pathname.startsWith('/messages') ||
+    pathname.startsWith('/owners') ||
+    pathname.startsWith('/owner')
+
+  const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/')
+
+  if ((isProtectedRoute || isAdminRoute) && !user) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    url.pathname = isAdminRoute ? '/admin/login' : '/login'
     return NextResponse.redirect(url)
   }
 
