@@ -82,33 +82,42 @@ export async function GET(request: Request) {
 
       if (existing && existing.length > 0) continue
 
-      const attachment = msg.attachments[0]
       const accessToken = await getGmailAccessToken()
+      let pdfBase64: string | null = null
+      let storagePath: string | null = null
 
-      const attachResponse = await fetch(
-        `${GMAIL_API_BASE}/users/me/messages/${msg.id}/attachments/${attachment.attachmentId}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      )
+      // Download PDF if available
+      if (msg.attachmentId && msg.pdfFilename) {
+        try {
+          const attachResponse = await fetch(
+            `${GMAIL_API_BASE}/users/me/messages/${msg.id}/attachments/${msg.attachmentId}`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          )
+          if (attachResponse.ok) {
+            const attachData = await attachResponse.json()
+            pdfBase64 = attachData.data
+            const pdfBuffer = Buffer.from(pdfBase64 as string, 'base64url')
+            storagePath = `bills/${msg.id}_${msg.pdfFilename}`
+            await serviceClient.storage
+              .from('documents')
+              .upload(storagePath, pdfBuffer, { contentType: 'application/pdf' })
+          }
+        } catch {
+          // PDF download failed — will use HTML body instead
+        }
+      }
 
-      if (!attachResponse.ok) continue
-
-      const attachData = await attachResponse.json()
-      const pdfBase64 = attachData.data
-
-      const pdfBuffer = Buffer.from(pdfBase64, 'base64url')
-      const storagePath = `bills/${msg.id}_${attachment.filename}`
-
-      await serviceClient.storage
-        .from('documents')
-        .upload(storagePath, pdfBuffer, { contentType: 'application/pdf' })
-
-      // AI extraction
+      // AI extraction — use PDF if available, otherwise HTML body
       let aiParsedData = null
       if (process.env.GEMINI_API_KEY) {
         try {
-          aiParsedData = await parseWithAI(pdfBase64, process.env.GEMINI_API_KEY)
+          if (pdfBase64) {
+            aiParsedData = await parseWithAI(pdfBase64, process.env.GEMINI_API_KEY)
+          } else if (msg.htmlBody) {
+            aiParsedData = await parseHtmlWithAI(msg.htmlBody, msg.subject, msg.from, process.env.GEMINI_API_KEY)
+          }
         } catch {
-          // AI parsing failed — continue with null data
+          // AI parsing failed — bill created with null data for manual entry
         }
       }
 
@@ -285,6 +294,95 @@ Return ONLY valid JSON with these fields. If you can't determine a field, use nu
       ],
     },
   ])
+
+  if (!text) return null
+
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return null
+
+    const parsed = JSON.parse(jsonMatch[0])
+
+    return {
+      bill_type: parsed.bill_type || 'other',
+      amount_agorot: parsed.amount ? Math.round(parsed.amount * 100) : 0,
+      due_date: parsed.due_date || null,
+      period_start: parsed.period_start || null,
+      period_end: parsed.period_end || null,
+      address: parsed.address || null,
+      account_holder: parsed.account_holder || null,
+      account_number: parsed.account_number || null,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Parse bill data from HTML email body using Gemini
+ */
+async function parseHtmlWithAI(
+  htmlBody: string,
+  subject: string,
+  from: string,
+  apiKey: string
+): Promise<{
+  bill_type: string
+  amount_agorot: number
+  due_date: string | null
+  period_start: string | null
+  period_end: string | null
+  address: string | null
+  account_holder: string | null
+  account_number: string | null
+} | null> {
+  // Truncate HTML to avoid token limits
+  const truncatedHtml = htmlBody.substring(0, 10000)
+
+  const response = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: `Extract billing information from this Israeli utility bill email.
+
+Email subject: ${subject}
+Email from: ${from}
+
+Email HTML body:
+${truncatedHtml}
+
+Extract:
+- bill_type: one of "arnona", "iec", "water", "vaad_bayit", "internet", "gas", "other"
+- amount: total amount due in ILS (number, e.g. 842.50)
+- due_date: payment due date in YYYY-MM-DD format
+- period_start: billing period start in YYYY-MM-DD
+- period_end: billing period end in YYYY-MM-DD
+- address: property address on the bill
+- account_holder: name of person/entity (שם בעל החשבון)
+- account_number: account/contract number
+
+Return ONLY valid JSON. If you can't determine a field, use null.`,
+              },
+            ],
+          },
+        ],
+      }),
+    }
+  )
+
+  if (!response.ok) return null
+
+  const data = await response.json()
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
 
   if (!text) return null
 

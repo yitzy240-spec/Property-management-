@@ -168,16 +168,28 @@ export async function isGmailConnected(): Promise<boolean> {
   return !!data
 }
 
-/** Fetch recent messages with PDF attachments (utility bills) */
-export async function fetchBillEmails(maxResults: number = 10): Promise<{
-  messages: { id: string; subject: string; from: string; date: string; attachments: { filename: string; attachmentId: string }[] }[]
-}> {
+// ══════════════════════════════════════
+// BILL EMAIL FETCHING
+// ══════════════════════════════════════
+
+export interface BillEmail {
+  id: string
+  subject: string
+  from: string
+  date: string
+  // Content for AI parsing — either PDF or HTML body
+  pdfBase64: string | null
+  pdfFilename: string | null
+  htmlBody: string | null
+  attachmentId: string | null
+}
+
+/** Fetch bill emails — returns emails with either PDF attachments or HTML bodies for AI parsing */
+export async function fetchBillEmails(maxResults: number = 20): Promise<{ messages: BillEmail[] }> {
   const accessToken = await getGmailAccessToken()
 
-  // Search for emails with PDF attachments (Israeli utility bill patterns)
-  // Use sender-based queries for known utilities (most reliable)
-  // Plus filename:pdf for non-Hebrew filenames, plus Hebrew keywords for others
-  const query = '(from:iec.co.il OR from:hagihon OR from:printernet.co.il OR from:bezeq.co.il OR from:hyp.co.il OR (has:attachment filename:pdf (ארנונה OR חשמל OR מים OR "ועד בית" OR "חשבון תקופתי")) OR (has:attachment (חשבון OR "אישור תשלום")))'
+  // Search by known utility senders + bill keywords
+  const query = '(from:iec.co.il OR from:hagihon OR from:printernet.co.il OR from:bezeq.co.il OR from:hyp.co.il OR from:iriya OR (חשבון OR "אישור תשלום" OR ארנונה OR חשמל OR מים OR "ועד בית" OR "חשבון תקופתי"))'
 
   const listResponse = await fetch(
     `${GMAIL_API_BASE}/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
@@ -194,49 +206,82 @@ export async function fetchBillEmails(maxResults: number = 10): Promise<{
     return { messages: [] }
   }
 
-  const messages = []
-  console.log('[Gmail] Found', listData.messages?.length || 0, 'matching emails')
+  const messages: BillEmail[] = []
 
   for (const msg of listData.messages) {
-    const msgResponse = await fetch(
-      `${GMAIL_API_BASE}/users/me/messages/${msg.id}?format=full`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    )
+    try {
+      const msgResponse = await fetch(
+        `${GMAIL_API_BASE}/users/me/messages/${msg.id}?format=full`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      )
 
-    if (!msgResponse.ok) continue
+      if (!msgResponse.ok) continue
 
-    const msgData = await msgResponse.json()
-    const headers = msgData.payload?.headers || []
+      const msgData = await msgResponse.json()
+      const headers = msgData.payload?.headers || []
 
-    const subject = headers.find((h: { name: string }) => h.name === 'Subject')?.value || 'No subject'
-    const from = headers.find((h: { name: string }) => h.name === 'From')?.value || ''
-    const date = headers.find((h: { name: string }) => h.name === 'Date')?.value || ''
+      const subject = headers.find((h: { name: string }) => h.name === 'Subject')?.value || 'No subject'
+      const from = headers.find((h: { name: string }) => h.name === 'From')?.value || ''
+      const date = headers.find((h: { name: string }) => h.name === 'Date')?.value || ''
 
-    // Find PDF attachments
-    const attachments: { filename: string; attachmentId: string }[] = []
+      // Look for PDF attachments
+      let pdfFilename: string | null = null
+      let attachmentId: string | null = null
 
-    function findAttachments(parts: { filename?: string; mimeType?: string; body?: { attachmentId?: string }; parts?: unknown[] }[]) {
-      for (const part of parts) {
-        if (part.filename && (part.mimeType === 'application/pdf' || part.filename.toLowerCase().endsWith('.pdf')) && part.body?.attachmentId) {
-          attachments.push({
-            filename: part.filename,
-            attachmentId: part.body.attachmentId,
-          })
-        }
-        if (part.parts) {
-          findAttachments(part.parts as typeof parts)
+      function findPdf(parts: { filename?: string; mimeType?: string; body?: { attachmentId?: string; data?: string }; parts?: unknown[] }[]) {
+        for (const part of parts) {
+          if (part.filename && (part.mimeType === 'application/pdf' || part.filename.toLowerCase().endsWith('.pdf')) && part.body?.attachmentId) {
+            pdfFilename = part.filename
+            attachmentId = part.body.attachmentId
+            return
+          }
+          if (part.parts) {
+            findPdf(part.parts as typeof parts)
+          }
         }
       }
-    }
 
-    if (msgData.payload?.parts) {
-      findAttachments(msgData.payload.parts)
-    }
+      if (msgData.payload?.parts) {
+        findPdf(msgData.payload.parts)
+      }
 
-    console.log('[Gmail]', msg.id, '| from:', from.substring(0, 40), '| attachments:', attachments.length, '| parts:', msgData.payload?.parts?.length || 0)
+      // Extract HTML body for AI parsing (if no PDF, or in addition to PDF)
+      let htmlBody: string | null = null
 
-    if (attachments.length > 0) {
-      messages.push({ id: msg.id, subject, from, date, attachments })
+      function findHtml(parts: { mimeType?: string; body?: { data?: string }; parts?: unknown[] }[]) {
+        for (const part of parts) {
+          if (part.mimeType === 'text/html' && part.body?.data) {
+            htmlBody = Buffer.from(part.body.data, 'base64url').toString('utf-8')
+            return
+          }
+          if (part.parts) {
+            findHtml(part.parts as typeof parts)
+          }
+        }
+      }
+
+      if (msgData.payload?.parts) {
+        findHtml(msgData.payload.parts)
+      } else if (msgData.payload?.body?.data && msgData.payload?.mimeType === 'text/html') {
+        htmlBody = Buffer.from(msgData.payload.body.data, 'base64url').toString('utf-8')
+      }
+
+      // Include email if it has either a PDF or HTML body
+      if (pdfFilename || htmlBody) {
+        messages.push({
+          id: msg.id,
+          subject,
+          from,
+          date,
+          pdfBase64: null, // Downloaded later in the cron route
+          pdfFilename,
+          htmlBody,
+          attachmentId,
+        })
+      }
+    } catch {
+      // Skip individual email errors
+      continue
     }
   }
 
