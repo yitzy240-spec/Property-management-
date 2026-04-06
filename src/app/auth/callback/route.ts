@@ -9,7 +9,8 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
-  const next = url.searchParams.get('next') || '/owner'
+  const raw = url.searchParams.get('next') || '/owner'
+  const next = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/owner'
 
   if (code) {
     const supabase = createServerSupabaseClient()
