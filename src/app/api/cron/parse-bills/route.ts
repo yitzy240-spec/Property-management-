@@ -46,7 +46,7 @@ export async function GET(request: Request) {
   ])
 
   try {
-    const { messages } = await fetchBillEmails(200)
+    const { messages } = await fetchBillEmails(20)
 
     if (messages.length === 0) {
       return NextResponse.json({ message: 'No new bill emails found', parsed: 0 })

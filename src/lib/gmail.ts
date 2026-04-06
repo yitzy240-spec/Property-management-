@@ -216,7 +216,7 @@ export async function fetchBillEmails(maxResults: number = 10): Promise<{
 
     function findAttachments(parts: { filename?: string; mimeType?: string; body?: { attachmentId?: string }; parts?: unknown[] }[]) {
       for (const part of parts) {
-        if (part.filename && part.mimeType === 'application/pdf' && part.body?.attachmentId) {
+        if (part.filename && (part.mimeType === 'application/pdf' || part.filename.toLowerCase().endsWith('.pdf')) && part.body?.attachmentId) {
           attachments.push({
             filename: part.filename,
             attachmentId: part.body.attachmentId,
