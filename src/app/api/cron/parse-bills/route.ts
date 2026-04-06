@@ -46,7 +46,7 @@ export async function GET(request: Request) {
   ])
 
   try {
-    const { messages } = await fetchBillEmails(20)
+    const { messages } = await fetchBillEmails(50)
 
     if (messages.length === 0) {
       // Debug: try raw Gmail search to see what we're getting

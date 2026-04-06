@@ -20,8 +20,13 @@ export default function LoginPage() {
     const formData = new FormData(e.currentTarget)
     const result = await sendOwnerMagicLink(formData)
     if (result?.error) {
-      setError(result.error)
-    } else if (result?.success) {
+      // Show error but still show "check email" for rate limit errors
+      if (result.error.includes('rate') || result.error.includes('limit')) {
+        setMagicLinkSent(true)
+      } else {
+        setError(result.error)
+      }
+    } else {
       setMagicLinkSent(true)
     }
     setLoading(false)
