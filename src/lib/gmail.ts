@@ -188,3 +188,55 @@ export async function fetchBillEmails(maxResults: number = 50): Promise<{ messag
 
   return { messages: allMessages }
 }
+
+// ══════════════════════════════════════
+// GMAIL WATCH (Pub/Sub push notifications)
+// ══════════════════════════════════════
+
+/**
+ * Start watching Marcus's Gmail inbox via Pub/Sub.
+ * Must be called once initially, then renewed daily (watch expires after 7 days).
+ */
+export async function watchGmail(): Promise<{ historyId: string; expiration: string }> {
+  const accessToken = await getGmailAccessToken()
+  const topicName = process.env.GMAIL_PUBSUB_TOPIC
+
+  if (!topicName) {
+    throw new Error('GMAIL_PUBSUB_TOPIC not configured')
+  }
+
+  const res = await fetch(`${GMAIL_API_BASE}/users/me/watch`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      topicName,
+      labelIds: ['INBOX'],
+    }),
+  })
+
+  if (!res.ok) {
+    const error = await res.text()
+    throw new Error(`Gmail watch failed: ${error}`)
+  }
+
+  const data = await res.json()
+
+  // Store the initial historyId
+  const serviceClient = createServiceClient()
+  await serviceClient
+    .from('app_settings')
+    .upsert({
+      key: 'gmail_history_id',
+      value: String(data.historyId),
+      description: 'Gmail Pub/Sub watch historyId',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'key' })
+
+  return {
+    historyId: data.historyId,
+    expiration: new Date(parseInt(data.expiration)).toISOString(),
+  }
+}

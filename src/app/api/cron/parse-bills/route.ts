@@ -32,6 +32,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'Gmail not connected — skipping', parsed: 0 })
   }
 
+  // Renew Gmail Pub/Sub watch (expires every 7 days, renewing daily is safe)
+  try {
+    const { watchGmail } = await import('@/lib/gmail')
+    if (process.env.GMAIL_PUBSUB_TOPIC) {
+      await watchGmail()
+    }
+  } catch {
+    // Watch renewal failed — not critical, Pub/Sub still works until expiry
+  }
+
   // Preload data for matching
   const [
     { data: properties },
