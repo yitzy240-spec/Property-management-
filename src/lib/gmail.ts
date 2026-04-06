@@ -175,9 +175,9 @@ export async function fetchBillEmails(maxResults: number = 10): Promise<{
   const accessToken = await getGmailAccessToken()
 
   // Search for emails with PDF attachments (Israeli utility bill patterns)
-  // Removed filename:pdf — Hebrew filenames (אישור_תשלום.PDF) don't match Gmail's filename: operator
-  // PDF check happens in code when scanning attachments
-  const query = 'has:attachment (from:iec.co.il OR from:hagihon OR from:bezeq OR from:iriya OR from:hyp.co.il OR arnona OR IEC OR water OR "va\'ad bayit" OR חשבון OR ארנונה OR חשמל OR מים OR הגיחון OR בזק OR "חברת החשמל" OR "חשבונית מים" OR "החשבונית החודשית" OR "אישור תשלום" OR "ועד בית" OR "חשבון תקופתי")'
+  // Use sender-based queries for known utilities (most reliable)
+  // Plus filename:pdf for non-Hebrew filenames, plus Hebrew keywords for others
+  const query = '(from:iec.co.il OR from:hagihon OR from:printernet.co.il OR from:bezeq.co.il OR from:hyp.co.il OR (has:attachment filename:pdf (ארנונה OR חשמל OR מים OR "ועד בית" OR "חשבון תקופתי")) OR (has:attachment (חשבון OR "אישור תשלום")))'
 
   const listResponse = await fetch(
     `${GMAIL_API_BASE}/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
