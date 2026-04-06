@@ -29,8 +29,10 @@ export function FeeEntryAddButton() {
 
   useEffect(() => {
     if (!open) return
-    supabase.from('properties').select('id, name').eq('is_active', true).order('name')
-      .then(({ data }) => setProperties(data ?? []))
+    fetch('/api/properties/list')
+      .then(r => r.json())
+      .then(data => setProperties(data.properties ?? []))
+      .catch(() => {})
   }, [open])
 
   async function handleSubmit(formData: FormData) {

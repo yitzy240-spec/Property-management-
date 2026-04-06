@@ -73,10 +73,14 @@ export function TaskCreateDialog({ preselectedPropertyId, preselectedPropertyNam
 
   useEffect(() => {
     if (!open) return
-    supabase.from('properties').select('id, name').eq('is_active', true).order('name')
-      .then(({ data }) => setProperties(data ?? []))
-    supabase.from('contractors').select('id, name').order('name')
-      .then(({ data }) => setContractors(data ?? []))
+    fetch('/api/properties/list')
+      .then(r => r.json())
+      .then(data => setProperties(data.properties ?? []))
+      .catch(() => {})
+    fetch('/api/contractors/list')
+      .then(r => r.json())
+      .then(data => setContractors(data.contractors ?? []))
+      .catch(() => {})
   }, [open])
 
   async function handleCreate(formData: FormData) {

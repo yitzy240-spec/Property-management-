@@ -73,22 +73,28 @@ export async function POST(request: Request) {
       .eq('id', owner.id)
   }
 
-  // Generate a password reset link (acts as "set your password" for new users)
-  const { data: linkData, error: linkError } = await serviceClient.auth.admin.generateLink({
+  // Send magic link via Supabase's built-in email (no Resend needed)
+  const { error: otpError } = await serviceClient.auth.admin.generateLink({
     type: 'magiclink',
     email: owner.email,
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/owner`,
+      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/owner`,
     },
   })
 
-  if (linkError) {
-    return NextResponse.json({ error: linkError.message }, { status: 500 })
-  }
+  // Also trigger Supabase's OTP email delivery
+  const { createServerSupabaseClient: createPublicClient } = await import('@/lib/supabase/server')
+  const publicSupabase = createPublicClient()
+  await publicSupabase.auth.signInWithOtp({
+    email: owner.email,
+    options: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/owner`,
+    },
+  })
 
-  const magicLink = linkData?.properties?.action_link
+  // Also try sending via Resend if configured (premium branded email)
+  const magicLink: string | null = null // Supabase sends its own email with the link
 
-  // Get owner's properties for the email
   const { data: properties } = await serviceClient
     .from('properties')
     .select('name')
@@ -97,7 +103,6 @@ export async function POST(request: Request) {
 
   const propertyList = (properties || []).map(p => p.name).join(', ')
 
-  // Send premium welcome email
   await sendEmail({
     to: owner.email,
     subject: `${owner.full_name.split(' ')[0]}, your property portal is ready`,

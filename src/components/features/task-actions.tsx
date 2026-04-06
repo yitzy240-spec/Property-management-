@@ -140,8 +140,10 @@ function TaskEditDrawer({
 
   useEffect(() => {
     if (!open) return
-    supabase.from('contractors').select('id, name').eq('is_active', true).order('name')
-      .then(({ data }) => setContractors(data ?? []))
+    fetch('/api/contractors/list')
+      .then(r => r.json())
+      .then(data => setContractors(data.contractors ?? []))
+      .catch(() => {})
   }, [open])
 
   async function handleSave(formData: FormData) {

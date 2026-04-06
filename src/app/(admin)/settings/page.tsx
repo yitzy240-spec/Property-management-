@@ -62,6 +62,25 @@ export default async function SettingsPage() {
         </p>
         <SeasonalTemplateSettings />
       </section>
+
+      <section>
+        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Account
+        </p>
+        <div className="rounded-[10px] border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold">Password</h3>
+              <p className="text-xs text-muted-foreground">Change your admin login password.</p>
+            </div>
+            <a href="/login/reset">
+              <button className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+                Change Password
+              </button>
+            </a>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
