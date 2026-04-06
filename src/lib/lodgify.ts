@@ -386,6 +386,7 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
     const currency = lb.currency || 'USD'
 
     try {
+      // Check if this exact Lodgify booking already exists
       const { data: existing } = await supabase
         .from('bookings')
         .select('id')
@@ -393,15 +394,18 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
         .eq('external_id', `lodgify_${lb.id}`)
         .single()
 
+      const guestName = lb.guest?.name || null
+
       const bookingData = {
         property_id: property.id,
         platform,
         external_id: `lodgify_${lb.id}`,
-        guest_name: lb.guest?.name || null,
+        guest_name: guestName,
         check_in: lb.arrival,
         check_out: lb.departure,
         gross_rental_agorot: grossRentalAgorot,
         channel_fees_agorot: channelFeesAgorot,
+        currency,
         synced_at: new Date().toISOString(),
       }
 
@@ -409,8 +413,37 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
         await supabase.from('bookings').update(bookingData).eq('id', existing.id)
         result.updated++
       } else {
-        await supabase.from('bookings').insert(bookingData)
-        result.created++
+        // Before inserting, check for an existing booking on the same dates
+        // (may have been created from iCal sync or manual entry with a real guest name)
+        const { data: dateMatch } = await supabase
+          .from('bookings')
+          .select('id, guest_name')
+          .eq('property_id', property.id)
+          .eq('check_in', lb.arrival)
+          .eq('check_out', lb.departure)
+          .limit(1)
+          .single()
+
+        if (dateMatch) {
+          // Update existing booking with Lodgify financial data but keep real guest name
+          const updateData: Record<string, unknown> = {
+            external_id: `lodgify_${lb.id}`,
+            gross_rental_agorot: grossRentalAgorot,
+            channel_fees_agorot: channelFeesAgorot,
+            currency,
+            platform: platform || dateMatch.guest_name ? undefined : platform,
+            synced_at: new Date().toISOString(),
+          }
+          // Only overwrite guest_name if the existing one is null/empty
+          if (!dateMatch.guest_name && guestName) {
+            updateData.guest_name = guestName
+          }
+          await supabase.from('bookings').update(updateData).eq('id', dateMatch.id)
+          result.updated++
+        } else {
+          await supabase.from('bookings').insert(bookingData)
+          result.created++
+        }
       }
       result.synced++
     } catch (err) {

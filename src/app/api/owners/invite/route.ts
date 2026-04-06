@@ -73,27 +73,21 @@ export async function POST(request: Request) {
       .eq('id', owner.id)
   }
 
-  // Send magic link via Supabase's built-in email (no Resend needed)
-  const { error: otpError } = await serviceClient.auth.admin.generateLink({
+  // Generate a magic link for the owner
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://apartmentos.app'
+  let magicLink: string | null = null
+
+  const { data: linkData } = await serviceClient.auth.admin.generateLink({
     type: 'magiclink',
     email: owner.email,
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/owner`,
+      redirectTo: `${appUrl}/auth/callback?next=/owner`,
     },
   })
 
-  // Also trigger Supabase's OTP email delivery
-  const { createServerSupabaseClient: createPublicClient } = await import('@/lib/supabase/server')
-  const publicSupabase = createPublicClient()
-  await publicSupabase.auth.signInWithOtp({
-    email: owner.email,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/owner`,
-    },
-  })
-
-  // Also try sending via Resend if configured (premium branded email)
-  const magicLink: string | null = null // Supabase sends its own email with the link
+  if (linkData?.properties?.action_link) {
+    magicLink = linkData.properties.action_link
+  }
 
   const { data: properties } = await serviceClient
     .from('properties')
@@ -169,8 +163,13 @@ export async function POST(request: Request) {
             After your first visit, sign in anytime at the <strong>Owner</strong> tab on the login page.
           </p>
           ` : `
-          <p style="color: #6B7280; font-size: 14px; text-align: center;">
-            Sign in at the Owner tab on the login page using this email address.
+          <div style="text-align: center; margin-bottom: 24px;">
+            <a href="${appUrl}/login" style="display: inline-block; background: #1E3A5F; color: #F8F7F4; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 600; letter-spacing: 0.3px;">
+              Sign In to Your Portal
+            </a>
+          </div>
+          <p style="color: #9CA3AF; font-size: 12px; text-align: center; margin: 0;">
+            Use this email address to sign in.
           </p>
           `}
         </div>
