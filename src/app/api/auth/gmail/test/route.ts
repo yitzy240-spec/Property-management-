@@ -70,12 +70,42 @@ export async function GET() {
       }
     }
 
+    // Test 3: Debug attachment structure of first bill match
+    let attachmentDebug = null
+    if (billData.messages?.length > 0) {
+      const fullRes = await fetch(
+        `${BASE}/users/me/messages/${billData.messages[0].id}?format=full`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      )
+      if (fullRes.ok) {
+        const fullMsg = await fullRes.json()
+        function mapParts(parts: unknown[]): unknown[] {
+          return (parts || []).map((part: unknown) => {
+            const p = part as Record<string, unknown>
+            return {
+              mimeType: p.mimeType,
+              filename: p.filename || null,
+              hasAttachmentId: !!(p.body as Record<string, unknown>)?.attachmentId,
+              bodySize: (p.body as Record<string, unknown>)?.size || 0,
+              children: p.parts ? mapParts(p.parts as unknown[]) : undefined,
+            }
+          })
+        }
+        attachmentDebug = {
+          id: billData.messages[0].id,
+          topMimeType: fullMsg.payload?.mimeType,
+          parts: mapParts(fullMsg.payload?.parts || []),
+        }
+      }
+    }
+
     return NextResponse.json({
       connection: 'OK',
       recent_emails: recentEmails,
       recent_count: allData.resultSizeEstimate || allData.messages?.length || 0,
       bill_matches: billEmails,
       bill_count: billData.resultSizeEstimate || billData.messages?.length || 0,
+      attachment_debug: attachmentDebug,
     })
   } catch (err) {
     return NextResponse.json({
