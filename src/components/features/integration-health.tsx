@@ -89,12 +89,23 @@ export function IntegrationHealth() {
         detail: 'Osek Patur',
       })
 
-      results.push({
-        key: 'gmail',
-        name: 'Gmail',
-        status: 'not_configured',
-        detail: 'Click Connect below',
-      })
+      // Gmail — check if tokens exist
+      try {
+        const gmailRes = await fetch('/api/auth/gmail/status')
+        if (gmailRes.ok) {
+          const gmailData = await gmailRes.json()
+          results.push({
+            key: 'gmail',
+            name: 'Gmail',
+            status: gmailData.connected ? 'connected' : 'not_configured',
+            detail: gmailData.connected ? 'Bill parsing active' : 'Click Connect below',
+          })
+        } else {
+          results.push({ key: 'gmail', name: 'Gmail', status: 'not_configured', detail: 'Click Connect below' })
+        }
+      } catch {
+        results.push({ key: 'gmail', name: 'Gmail', status: 'not_configured', detail: 'Click Connect below' })
+      }
 
       results.push({
         key: 'gemini',
