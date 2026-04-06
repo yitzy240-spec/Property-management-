@@ -20,7 +20,6 @@ import {
 
 /**
  * Per-property IEC integration.
- * Each property has its own TZ / IEC account.
  */
 export function IecConnect({ propertyId }: { propertyId: string }) {
   const [connected, setConnected] = useState(false)
@@ -91,25 +90,79 @@ export function IecConnect({ propertyId }: { propertyId: string }) {
   )
 }
 
-function IecAuthDrawer({ propertyId, onConnect, reconnect }: { propertyId: string; onConnect: (contracts: string[]) => void; reconnect?: boolean }) {
+interface Factor {
+  id: string
+  type: string
+  email?: string
+}
+
+function IecAuthDrawer({ propertyId, onConnect, reconnect }: {
+  propertyId: string
+  onConnect: (contracts: string[]) => void
+  reconnect?: boolean
+}) {
   const [open, setOpen] = useState(false)
-  const [step, setStep] = useState<'id' | 'otp' | 'done'>('id')
+  const [step, setStep] = useState<'id' | 'factor' | 'otp' | 'done'>('id')
   const [loading, setLoading] = useState(false)
-  const [israeliId, setIsraeliId] = useState('')
+  const [idNumber, setIdNumber] = useState('')
+  const [factors, setFactors] = useState<Factor[]>([])
+  const [selectedFactor, setSelectedFactor] = useState<string>('')
   const [otpCode, setOtpCode] = useState('')
 
-  async function handleSendOtp() {
-    if (!israeliId) return
+  function reset() {
+    setStep('id')
+    setOtpCode('')
+    setFactors([])
+    setSelectedFactor('')
+  }
+
+  async function handleLogin() {
+    if (!idNumber) return
     setLoading(true)
     try {
       const res = await fetch('/api/iec', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login', israeliId }),
+        body: JSON.stringify({ action: 'login', israeliId: idNumber }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
-      toast.success('OTP sent to your phone')
+
+      if (data.factors?.length === 1) {
+        // Only one factor — auto-select and send OTP
+        setSelectedFactor(data.factors[0].id)
+        setFactors(data.factors)
+        await doSendOtp(data.factors[0].id)
+        setStep('otp')
+      } else if (data.factors?.length > 1) {
+        setFactors(data.factors)
+        setStep('factor')
+      } else {
+        throw new Error('No OTP methods available')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function doSendOtp(factorId: string) {
+    const res = await fetch('/api/iec', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'send_otp', factorId }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to send OTP')
+    toast.success('OTP code sent')
+  }
+
+  async function handleSelectFactor(factorId: string) {
+    setSelectedFactor(factorId)
+    setLoading(true)
+    try {
+      await doSendOtp(factorId)
       setStep('otp')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed')
@@ -125,7 +178,7 @@ function IecAuthDrawer({ propertyId, onConnect, reconnect }: { propertyId: strin
       const res = await fetch('/api/iec', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify_otp', israeliId, otpCode, propertyId }),
+        body: JSON.stringify({ action: 'verify_otp', otpCode, factorId: selectedFactor, propertyId }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
@@ -140,7 +193,7 @@ function IecAuthDrawer({ propertyId, onConnect, reconnect }: { propertyId: strin
   }
 
   return (
-    <Drawer open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setStep('id'); setOtpCode('') } }}>
+    <Drawer open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset() }}>
       <DrawerTrigger asChild>
         <Button size="sm" className={reconnect ? 'h-7 gap-1 text-xs' : 'h-8 gap-1.5 text-xs'} variant={reconnect ? 'ghost' : 'outline'}>
           <Zap className="h-3 w-3" />
@@ -150,29 +203,52 @@ function IecAuthDrawer({ propertyId, onConnect, reconnect }: { propertyId: strin
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle>Connect to Israel Electric</DrawerTitle>
-          <DrawerDescription>Enter the ID registered with this property&apos;s IEC account.</DrawerDescription>
+          <DrawerDescription>Sign in with your IEC account (ת.ז. or passport).</DrawerDescription>
         </DrawerHeader>
         <div className="space-y-4 p-4">
           {step === 'id' && (
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Israeli ID (ת.ז.)</Label>
+              <Label className="text-xs font-medium">ID Number (ת.ז. or Passport)</Label>
               <Input
-                type="text" inputMode="numeric" placeholder="123456789"
-                value={israeliId} onChange={e => setIsraeliId(e.target.value)}
-                className="h-11 font-mono text-center text-lg tracking-widest" maxLength={9}
+                type="text" placeholder="ID or passport number"
+                value={idNumber} onChange={e => setIdNumber(e.target.value)}
+                className="h-11 font-mono text-center text-lg tracking-widest"
+                maxLength={20}
               />
               <p className="text-[10px] text-muted-foreground">
-                IEC only supports ת.ז. (not passport). OTP will be sent to the phone on this account.
+                Enter the ID you use to log in on the IEC website.
               </p>
             </div>
           )}
+
+          {step === 'factor' && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Choose where to receive your verification code:</p>
+              {factors.map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => handleSelectFactor(f.id)}
+                  disabled={loading}
+                  className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition-colors hover:bg-muted"
+                >
+                  <div className="flex-1">
+                    <p className="text-sm font-medium capitalize">{f.type === 'email' ? 'Email' : f.type}</p>
+                    {f.email && <p className="text-xs text-muted-foreground">{f.email}</p>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
           {step === 'otp' && (
             <>
               <div className="rounded-[10px] bg-muted/50 p-3 text-center">
-                <p className="text-xs text-muted-foreground">Check your phone for the code</p>
+                <p className="text-xs text-muted-foreground">
+                  Code sent to {factors.find(f => f.id === selectedFactor)?.email || 'your account'}
+                </p>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium">OTP Code</Label>
+                <Label className="text-xs font-medium">Verification Code</Label>
                 <Input
                   type="text" inputMode="numeric" placeholder="123456"
                   value={otpCode} onChange={e => setOtpCode(e.target.value)}
@@ -181,6 +257,7 @@ function IecAuthDrawer({ propertyId, onConnect, reconnect }: { propertyId: strin
               </div>
             </>
           )}
+
           {step === 'done' && (
             <div className="py-6 text-center">
               <Check className="mx-auto h-10 w-10 text-status-safe" />
@@ -191,8 +268,13 @@ function IecAuthDrawer({ propertyId, onConnect, reconnect }: { propertyId: strin
         </div>
         <DrawerFooter>
           {step === 'id' && (
-            <Button onClick={handleSendOtp} disabled={loading || israeliId.length < 7} className="h-11 w-full">
-              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : 'Send OTP'}
+            <Button onClick={handleLogin} disabled={loading || idNumber.length < 5} className="h-11 w-full">
+              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Connecting...</> : 'Continue'}
+            </Button>
+          )}
+          {step === 'factor' && loading && (
+            <Button disabled className="h-11 w-full">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending code...
             </Button>
           )}
           {step === 'otp' && (

@@ -100,55 +100,153 @@ async function authenticatedFetch(url: string, token: string, options: RequestIn
   })
 }
 
-// ── Auth Flow ──
+// ── Auth Flow (Okta-based) ──
+
+const IEC_OKTA_BASE = 'https://iec-ext.okta.com'
 
 /**
- * Step 1: Initiate login with Israeli ID number.
- * IEC sends OTP to the phone number registered with the account.
+ * Step 1: Initiate login — sends ID to Okta, returns available OTP factors.
+ * IEC uses Okta with username format: {id}@iec.co.il
  */
-export async function initLogin(israeliId: string): Promise<{ factorId: string }> {
-  // IEC only supports Israeli ID (ת.ז.) — passport auth is not available
-  const res = await fetch(`${IEC_BASE}/Authentication/${israeliId}/1/-1?customErrorPage=true`, {
-    method: 'GET',
-    headers: HEADERS,
+export async function initLogin(idNumber: string): Promise<{
+  stateToken: string
+  factors: { id: string; type: string; email?: string }[]
+}> {
+  const res = await fetch(`${IEC_OKTA_BASE}/api/v1/authn`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ username: `${idNumber}@iec.co.il` }),
   })
 
   if (!res.ok) {
-    throw new Error(`IEC login initiation failed: ${res.status}`)
+    const errText = await res.text().catch(() => '')
+    throw new Error(`IEC login failed: ${res.status} ${errText.slice(0, 200)}`)
   }
 
   const data = await res.json()
-  return { factorId: data.factorId || data.FactorId || israeliId }
+
+  if (data.status !== 'UNAUTHENTICATED' || !data._embedded?.factors?.length) {
+    throw new Error('Unexpected IEC auth response — no OTP factors available')
+  }
+
+  const factors = (data._embedded.factors as Array<{
+    id: string
+    factorType: string
+    profile?: { email?: string }
+    _links?: { verify?: { href?: string } }
+  }>).map(f => ({
+    id: f.id,
+    type: f.factorType,
+    email: f.profile?.email,
+    verifyUrl: f._links?.verify?.href,
+  }))
+
+  // Store stateToken in app_settings temporarily for the verify step
+  const serviceClient = createServiceClient()
+  await serviceClient.from('app_settings').upsert({
+    key: 'iec_okta_state',
+    value: JSON.stringify({ stateToken: data.stateToken, factors }),
+    description: 'Temporary IEC Okta state token',
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'key' })
+
+  return { stateToken: data.stateToken, factors }
 }
 
 /**
- * Step 2: Verify OTP code sent to phone.
- * Returns JWT tokens for API access. Stores per-property.
+ * Step 1b: Send OTP to chosen factor (email).
  */
-export async function verifyOtp(israeliId: string, otpCode: string, propertyId: string): Promise<IecTokens> {
-  const res = await fetch(`${IEC_BASE}/Authentication/VerifyOtp`, {
+export async function sendOtp(factorId: string): Promise<void> {
+  const serviceClient = createServiceClient()
+  const { data: stateData } = await serviceClient
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'iec_okta_state')
+    .single()
+
+  if (!stateData?.value) throw new Error('No active IEC login session')
+
+  const { stateToken, factors } = JSON.parse(stateData.value)
+  const factor = factors.find((f: { id: string }) => f.id === factorId)
+  const verifyUrl = factor?.verifyUrl || `${IEC_OKTA_BASE}/api/v1/authn/factors/${factorId}/verify`
+
+  const res = await fetch(verifyUrl, {
     method: 'POST',
-    headers: HEADERS,
-    body: JSON.stringify({
-      id: israeliId,
-      otpCode,
-    }),
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ stateToken }),
   })
 
   if (!res.ok) {
-    throw new Error(`IEC OTP verification failed: ${res.status}`)
+    throw new Error(`Failed to send OTP: ${res.status}`)
+  }
+}
+
+/**
+ * Step 2: Verify OTP code.
+ * Returns JWT tokens for API access. Stores per-property.
+ */
+export async function verifyOtp(otpCode: string, factorId: string, propertyId: string): Promise<IecTokens> {
+  const serviceClient = createServiceClient()
+  const { data: stateData } = await serviceClient
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'iec_okta_state')
+    .single()
+
+  if (!stateData?.value) throw new Error('No active IEC login session')
+
+  const { stateToken } = JSON.parse(stateData.value)
+
+  // Verify OTP with Okta
+  const res = await fetch(`${IEC_OKTA_BASE}/api/v1/authn/factors/${factorId}/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ stateToken, passCode: otpCode }),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    throw new Error(`OTP verification failed: ${res.status} ${errText.slice(0, 200)}`)
   }
 
   const data = await res.json()
+
+  if (data.status !== 'SUCCESS' || !data.sessionToken) {
+    throw new Error('OTP verification did not return a session token')
+  }
+
+  // Exchange Okta session token for IEC API token
+  const tokenRes = await fetch(`${IEC_BASE}/Authentication/OktaAuthorize?sessionToken=${data.sessionToken}&is498=false`, {
+    method: 'GET',
+    headers: HEADERS,
+    redirect: 'manual',
+  })
+
+  // The response might be a redirect with token in URL, or direct JSON
+  let idToken = ''
+  if (tokenRes.status === 200) {
+    const tokenData = await tokenRes.json()
+    idToken = tokenData.id_token || tokenData.token || tokenData.access_token || ''
+  } else if (tokenRes.status === 302) {
+    const location = tokenRes.headers.get('location') || ''
+    const tokenMatch = location.match(/[?&]id_token=([^&]+)/) || location.match(/[?&]token=([^&]+)/)
+    if (tokenMatch) idToken = tokenMatch[1]
+  }
+
+  if (!idToken) {
+    // Try alternative: use session token directly with IEC
+    idToken = data.sessionToken
+  }
+
   const tokens: IecTokens = {
-    idToken: data.id_token || data.idToken || data.token,
-    refreshToken: data.refresh_token || data.refreshToken || '',
-    expiresAt: Date.now() + 3600 * 1000, // 1 hour
+    idToken,
+    refreshToken: '',
+    expiresAt: Date.now() + 3600 * 1000,
     bpNumber: '',
     contractIds: [],
   }
 
-  // Get customer info to populate bpNumber and contracts
+  // Get customer info
   try {
     const customerRes = await authenticatedFetch(`${IEC_BASE}/customer`, tokens.idToken)
     if (customerRes.ok) {
@@ -171,6 +269,9 @@ export async function verifyOtp(israeliId: string, otpCode: string, propertyId: 
   } catch {
     // Customer fetch failed — tokens still valid
   }
+
+  // Clean up temp state
+  await serviceClient.from('app_settings').delete().eq('key', 'iec_okta_state')
 
   await storeTokens(propertyId, tokens)
   return tokens

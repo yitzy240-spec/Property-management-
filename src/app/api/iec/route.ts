@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
-import { initLogin, verifyOtp, syncIecBills, getBillingInvoices, getIecStatus } from '@/lib/iec-api'
+import { initLogin, sendOtp, verifyOtp, syncIecBills, getBillingInvoices, getIecStatus } from '@/lib/iec-api'
 
 /**
  * POST /api/iec — IEC operations (per-property)
- * Body: { action: 'status' | 'login' | 'verify_otp' | 'sync' | 'invoices', propertyId, ... }
+ * Auth flow: login → select factor → send_otp → verify_otp
  */
 export async function POST(request: Request) {
   try {
@@ -26,16 +26,31 @@ export async function POST(request: Request) {
       }
 
       case 'login': {
+        // Step 1: Send ID to Okta, get available OTP factors
         const { israeliId } = body
-        if (!israeliId) return NextResponse.json({ error: 'israeliId required' }, { status: 400 })
+        if (!israeliId) return NextResponse.json({ error: 'ID number required' }, { status: 400 })
         const result = await initLogin(israeliId)
-        return NextResponse.json({ success: true, message: 'OTP sent to your phone', ...result })
+        return NextResponse.json({
+          success: true,
+          factors: result.factors,
+        })
+      }
+
+      case 'send_otp': {
+        // Step 2: Send OTP to chosen factor
+        const { factorId } = body
+        if (!factorId) return NextResponse.json({ error: 'factorId required' }, { status: 400 })
+        await sendOtp(factorId)
+        return NextResponse.json({ success: true, message: 'OTP sent' })
       }
 
       case 'verify_otp': {
-        const { israeliId: id, otpCode } = body
-        if (!id || !otpCode || !propertyId) return NextResponse.json({ error: 'israeliId, otpCode, and propertyId required' }, { status: 400 })
-        const tokens = await verifyOtp(id, otpCode, propertyId)
+        // Step 3: Verify OTP and get tokens
+        const { otpCode, factorId } = body
+        if (!otpCode || !factorId || !propertyId) {
+          return NextResponse.json({ error: 'otpCode, factorId, and propertyId required' }, { status: 400 })
+        }
+        const tokens = await verifyOtp(otpCode, factorId, propertyId)
         return NextResponse.json({
           success: true,
           bpNumber: tokens.bpNumber,
