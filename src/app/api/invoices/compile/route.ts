@@ -78,15 +78,7 @@ export async function POST(request: Request) {
     .gte('date', monthStart)
     .lt('date', monthEnd)
 
-  // ── 3. Bookings for commission (exclude Airbnb — they pay commission directly) ──
-  const { data: bookings } = await serviceClient
-    .from('bookings')
-    .select('gross_rental_agorot, property_id, platform')
-    .in('property_id', propertyIds)
-    .neq('platform', 'airbnb')
-    .gte('check_in', monthStart)
-    .lt('check_in', monthEnd)
-    .not('gross_rental_agorot', 'is', null)
+  // Commission excluded — Marcus handles externally with criteria not in the app
 
   // ── Build line items ──
   const lineItems: { description: string; priceAgorot: number; quantity: number }[] = []
@@ -133,22 +125,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // Commission
-  for (const property of properties) {
-    const propBookings = (bookings ?? []).filter(b => b.property_id === property.id)
-    if (propBookings.length === 0) continue
-
-    const totalRevenue = propBookings.reduce((s, b) => s + (b.gross_rental_agorot || 0), 0)
-    const commission = Math.round(totalRevenue * Number(property.commission_rate))
-
-    if (commission > 0) {
-      lineItems.push({
-        description: `Commission ${Math.round(Number(property.commission_rate) * 100)}% — ${property.name} (${monthLabel}, excl. Airbnb)`,
-        priceAgorot: commission,
-        quantity: 1,
-      })
-    }
-  }
+  // Commission excluded — Marcus handles externally
 
   if (lineItems.length === 0) {
     return NextResponse.json({ error: 'No billable items for this period', lineItems: [] }, { status: 400 })
@@ -205,6 +182,5 @@ export async function POST(request: Request) {
     total: totalAgorot / 100,
     bills_count: (bills ?? []).length,
     hours_count: (workLogs ?? []).length,
-    bookings_count: (bookings ?? []).length,
   })
 }
