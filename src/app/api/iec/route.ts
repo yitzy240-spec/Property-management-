@@ -55,6 +55,12 @@ export async function POST(request: Request) {
           success: true,
           bpNumber: tokens.bpNumber,
           contracts: tokens.contractIds,
+          debug: {
+            hasIdToken: !!tokens.idToken,
+            idTokenLength: tokens.idToken?.length || 0,
+            bpNumber: tokens.bpNumber,
+            contractCount: tokens.contractIds.length,
+          },
         })
       }
 

@@ -182,7 +182,12 @@ function IecAuthDrawer({ propertyId, onConnect, reconnect }: {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
-      toast.success(`IEC connected — ${data.contracts?.length || 0} contracts found`)
+      const contractCount = data.contracts?.length || 0
+      if (contractCount > 0) {
+        toast.success(`IEC connected — ${contractCount} contract${contractCount > 1 ? 's' : ''} found`)
+      } else {
+        toast.warning(`IEC connected but no contracts found. Account: ${data.bpNumber || 'unknown'}`)
+      }
       setStep('done')
       onConnect(data.contracts || [])
     } catch (err) {
