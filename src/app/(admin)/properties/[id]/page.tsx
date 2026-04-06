@@ -13,6 +13,7 @@ import { BookingAddButton } from '@/components/features/booking-add'
 import { TaskCreateDialog } from '@/components/features/task-create-dialog'
 import { BillAddButton } from '@/components/features/bill-add'
 import { LaundryPickupButton } from '@/components/features/laundry-pickup'
+import { WorkLogButton, WorkLogList } from '@/components/features/work-log'
 import { UtilityAccountsSection } from '@/components/features/utility-accounts'
 import { BookingList } from '@/components/features/booking-list'
 
@@ -258,6 +259,17 @@ export default async function PropertyDetailPage({
         ) : (
           <div className="rounded-[10px] border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">No documents yet</div>
         )}
+      </section>
+
+      {/* Work Log */}
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Work Log
+          </p>
+          <WorkLogButton preselectedPropertyId={params.id} />
+        </div>
+        <WorkLogList propertyId={params.id} />
       </section>
 
       {/* Quick Actions */}
