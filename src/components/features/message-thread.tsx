@@ -80,15 +80,15 @@ export function MessageThread({ propertyId, propertyName, currentRole }: Message
         }),
       })
 
-      if (res.ok) {
-        const data = await res.json()
-        if (data.message) {
-          setMessages(prev => [...prev, data.message as Message])
-          setNewMessage('')
-        }
+      const data = await res.json()
+      if (res.ok && data.message) {
+        setMessages(prev => [...prev, data.message as Message])
+        setNewMessage('')
+      } else {
+        console.error('[Messages] Send failed:', data.error || res.status)
       }
-    } catch {
-      // silent fail
+    } catch (err) {
+      console.error('[Messages] Send error:', err)
     }
 
     setSending(false)

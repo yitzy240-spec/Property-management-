@@ -49,6 +49,7 @@ export async function POST(request: Request) {
     .from('messages')
     .insert({
       property_id,
+      sender_id: user.id,
       sender_role: sender_role || (user.app_metadata?.role === 'admin' ? 'admin' : 'owner'),
       body: body.trim(),
     })
