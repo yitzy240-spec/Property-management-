@@ -96,8 +96,9 @@ async function authenticatedFetch(url: string, token: string, options: RequestIn
  * Step 1: Initiate login with Israeli ID number.
  * IEC sends OTP to the phone number registered with the account.
  */
-export async function initLogin(israeliId: string): Promise<{ factorId: string }> {
-  const res = await fetch(`${IEC_BASE}/Authentication/${israeliId}/1/-1?customErrorPage=true`, {
+export async function initLogin(israeliId: string, idType: number = 1): Promise<{ factorId: string }> {
+  // idType: 1 = Israeli ID (ת.ז.), 2 = Passport
+  const res = await fetch(`${IEC_BASE}/Authentication/${israeliId}/${idType}/-1?customErrorPage=true`, {
     method: 'GET',
     headers: HEADERS,
   })
