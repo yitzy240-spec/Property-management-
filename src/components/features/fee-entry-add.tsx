@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import {
   Drawer,
   DrawerContent,
@@ -81,23 +81,24 @@ export function FeeEntryAddButton() {
         <form action={handleSubmit} className="space-y-4 p-4">
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Property</Label>
-            <Select value={propertyId} onValueChange={(v) => setPropertyId(v || '')}>
-              <SelectTrigger className="h-11"><SelectValue placeholder="Select property" /></SelectTrigger>
-              <SelectContent>
-                {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <NativeSelect
+              value={propertyId}
+              onChange={(e) => setPropertyId(e.target.value)}
+              placeholder="Select property"
+              options={properties.map(p => ({ value: p.id, label: p.name }))}
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Fee Type</Label>
-            <Select value={feeType} onValueChange={(v) => setFeeType(v as FeeType)}>
-              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="commission">Commission</SelectItem>
-                <SelectItem value="hourly">Hourly</SelectItem>
-                <SelectItem value="fixed">Fixed</SelectItem>
-              </SelectContent>
-            </Select>
+            <NativeSelect
+              value={feeType}
+              onChange={(e) => setFeeType(e.target.value as FeeType)}
+              options={[
+                { value: 'commission', label: 'Commission' },
+                { value: 'hourly', label: 'Hourly' },
+                { value: 'fixed', label: 'Fixed' },
+              ]}
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Amount (ILS)</Label>

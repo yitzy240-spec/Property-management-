@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import {
   Drawer,
   DrawerContent,
@@ -115,12 +115,12 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
             {!propertyId && (
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Property</Label>
-                <Select value={selectedProperty} onValueChange={(v) => setSelectedProperty(v || '')}>
-                  <SelectTrigger className="h-11"><SelectValue placeholder="Select property" /></SelectTrigger>
-                  <SelectContent>
-                    {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <NativeSelect
+                  value={selectedProperty}
+                  onChange={(e) => setSelectedProperty(e.target.value)}
+                  placeholder="Select property"
+                  options={properties.map(p => ({ value: p.id, label: p.name }))}
+                />
               </div>
             )}
             <div className="space-y-1.5">
@@ -139,15 +139,17 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Platform</Label>
-              <Select name="platform" defaultValue="">
-                <SelectTrigger className="h-11"><SelectValue placeholder="Direct / Manual" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="airbnb">Airbnb</SelectItem>
-                  <SelectItem value="booking">Booking.com</SelectItem>
-                  <SelectItem value="lodgify">Lodgify</SelectItem>
-                  <SelectItem value="direct">Direct</SelectItem>
-                </SelectContent>
-              </Select>
+              <NativeSelect
+                name="platform"
+                defaultValue=""
+                placeholder="Direct / Manual"
+                options={[
+                  { value: 'airbnb', label: 'Airbnb' },
+                  { value: 'booking', label: 'Booking.com' },
+                  { value: 'lodgify', label: 'Lodgify' },
+                  { value: 'direct', label: 'Direct' },
+                ]}
+              />
             </div>
             {/* Currency toggle */}
             <div className="space-y-1.5">

@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import {
   Drawer,
   DrawerContent,
@@ -79,27 +79,28 @@ export function BillAddButton({ preselectedPropertyId }: { preselectedPropertyId
           <form action={handleSubmit} className="space-y-4 p-4">
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Property</Label>
-              <Select value={propertyId} onValueChange={(v) => setPropertyId(v || '')}>
-                <SelectTrigger className="h-11"><SelectValue placeholder="Select property" /></SelectTrigger>
-                <SelectContent>
-                  {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <NativeSelect
+                value={propertyId}
+                onChange={(e) => setPropertyId(e.target.value)}
+                placeholder="Select property"
+                options={properties.map(p => ({ value: p.id, label: p.name }))}
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bill Type</Label>
-              <Select value={billType} onValueChange={(v) => setBillType(v as BillType)}>
-                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="arnona">Arnona</SelectItem>
-                  <SelectItem value="iec">Electricity (IEC)</SelectItem>
-                  <SelectItem value="water">Water</SelectItem>
-                  <SelectItem value="vaad_bayit">Va&apos;ad Bayit</SelectItem>
-                  <SelectItem value="internet">Internet</SelectItem>
-                  <SelectItem value="gas">Gas</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+              <NativeSelect
+                value={billType}
+                onChange={(e) => setBillType(e.target.value as BillType)}
+                options={[
+                  { value: 'arnona', label: 'Arnona' },
+                  { value: 'iec', label: 'Electricity (IEC)' },
+                  { value: 'water', label: 'Water' },
+                  { value: 'vaad_bayit', label: "Va'ad Bayit" },
+                  { value: 'internet', label: 'Internet' },
+                  { value: 'gas', label: 'Gas' },
+                  { value: 'other', label: 'Other' },
+                ]}
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Amount (ILS)</Label>

@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import {
   Drawer,
   DrawerContent,
@@ -120,19 +120,18 @@ export function DocumentUpload() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Category</Label>
-              <Select value={category} onValueChange={(v) => setCategory(v as DocumentCategory)}>
-                <SelectTrigger className="h-11">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="tabu">Tabu</SelectItem>
-                  <SelectItem value="insurance">Insurance</SelectItem>
-                  <SelectItem value="contract">Contract</SelectItem>
-                  <SelectItem value="warranty">Warranty</SelectItem>
-                  <SelectItem value="receipt">Receipt</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+              <NativeSelect
+                value={category}
+                onChange={(e) => setCategory(e.target.value as DocumentCategory)}
+                options={[
+                  { value: 'tabu', label: 'Tabu' },
+                  { value: 'insurance', label: 'Insurance' },
+                  { value: 'contract', label: 'Contract' },
+                  { value: 'warranty', label: 'Warranty' },
+                  { value: 'receipt', label: 'Receipt' },
+                  { value: 'other', label: 'Other' },
+                ]}
+              />
             </div>
 
             <div className="space-y-1.5">
@@ -147,12 +146,12 @@ export function DocumentUpload() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Property</Label>
-              <Select value={selectedPropertyId} onValueChange={(v) => setSelectedPropertyId(v || '')}>
-                <SelectTrigger className="h-11"><SelectValue placeholder="General (optional)" /></SelectTrigger>
-                <SelectContent>
-                  {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <NativeSelect
+                value={selectedPropertyId}
+                onChange={(e) => setSelectedPropertyId(e.target.value)}
+                placeholder="General (optional)"
+                options={properties.map(p => ({ value: p.id, label: p.name }))}
+              />
             </div>
 
             <Button type="submit" className="h-11 w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={loading}>

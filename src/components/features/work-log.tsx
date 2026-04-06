@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import {
   Drawer,
   DrawerClose,
@@ -88,12 +88,12 @@ export function WorkLogButton({ preselectedPropertyId }: { preselectedPropertyId
           {!preselectedPropertyId && (
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Property</Label>
-              <Select value={propertyId} onValueChange={(v) => setPropertyId(v || '')}>
-                <SelectTrigger className="h-11"><SelectValue placeholder="Select property" /></SelectTrigger>
-                <SelectContent>
-                  {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <NativeSelect
+                value={propertyId}
+                onChange={(e) => setPropertyId(e.target.value)}
+                placeholder="Select property"
+                options={properties.map(p => ({ value: p.id, label: p.name }))}
+              />
             </div>
           )}
           <div className="grid grid-cols-2 gap-4">
