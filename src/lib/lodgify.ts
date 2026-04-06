@@ -378,6 +378,14 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
     }
 
     const platform = mapSourceToPlatform(lb.source)
+
+    // Airbnb bookings with no guest name are likely cancelled —
+    // Airbnb hides the name after cancellation but Lodgify may still return the booking
+    const guestNameRaw = lb.guest?.name || ''
+    if (platform === 'airbnb' && (!guestNameRaw || guestNameRaw === 'N/A' || guestNameRaw.toLowerCase().includes('n/a'))) {
+      result.skipped++
+      continue
+    }
     // Lodgify total_amount is in the property's currency (USD for these Jerusalem properties)
     // Store as cents (multiply by 100) in gross_rental_agorot field
     // NOTE: These are USD cents, not ILS agorot — currency field tracks this

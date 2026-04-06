@@ -26,9 +26,9 @@ export async function POST(request: Request) {
       }
 
       case 'login': {
-        const { israeliId, idType } = body
+        const { israeliId } = body
         if (!israeliId) return NextResponse.json({ error: 'israeliId required' }, { status: 400 })
-        const result = await initLogin(israeliId, idType || 1)
+        const result = await initLogin(israeliId)
         return NextResponse.json({ success: true, message: 'OTP sent to your phone', ...result })
       }
 

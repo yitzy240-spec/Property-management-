@@ -15,12 +15,22 @@ import { encrypt, decrypt } from '@/lib/encryption'
 
 const IEC_BASE = 'https://iecapi.iec.co.il/api'
 
-const HEADERS = {
+const HEADERS: Record<string, string> = {
   'accept': 'application/json, text/plain, */*',
+  'accept-language': 'en,he;q=0.9',
   'content-type': 'application/json',
+  'dnt': '1',
   'origin': 'https://www.iec.co.il',
   'referer': 'https://www.iec.co.il/',
-  'user-agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+  'sec-ch-ua': '"Chromium";v="121", "Not A(Brand";v="99"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"macOS"',
+  'sec-fetch-dest': 'empty',
+  'sec-fetch-mode': 'cors',
+  'sec-fetch-site': 'same-site',
+  'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+  'x-iec-idt': '1',
+  'x-iec-webview': '1',
 }
 
 // ── Types ──
@@ -96,9 +106,9 @@ async function authenticatedFetch(url: string, token: string, options: RequestIn
  * Step 1: Initiate login with Israeli ID number.
  * IEC sends OTP to the phone number registered with the account.
  */
-export async function initLogin(israeliId: string, idType: number = 1): Promise<{ factorId: string }> {
-  // idType: 1 = Israeli ID (ת.ז.), 2 = Passport
-  const res = await fetch(`${IEC_BASE}/Authentication/${israeliId}/${idType}/-1?customErrorPage=true`, {
+export async function initLogin(israeliId: string): Promise<{ factorId: string }> {
+  // IEC only supports Israeli ID (ת.ז.) — passport auth is not available
+  const res = await fetch(`${IEC_BASE}/Authentication/${israeliId}/1/-1?customErrorPage=true`, {
     method: 'GET',
     headers: HEADERS,
   })

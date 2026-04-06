@@ -95,7 +95,6 @@ function IecAuthDrawer({ propertyId, onConnect, reconnect }: { propertyId: strin
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<'id' | 'otp' | 'done'>('id')
   const [loading, setLoading] = useState(false)
-  const [idType, setIdType] = useState<1 | 2>(1) // 1 = TZ, 2 = Passport
   const [israeliId, setIsraeliId] = useState('')
   const [otpCode, setOtpCode] = useState('')
 
@@ -106,7 +105,7 @@ function IecAuthDrawer({ propertyId, onConnect, reconnect }: { propertyId: strin
       const res = await fetch('/api/iec', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login', israeliId, idType }),
+        body: JSON.stringify({ action: 'login', israeliId }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
@@ -155,34 +154,16 @@ function IecAuthDrawer({ propertyId, onConnect, reconnect }: { propertyId: strin
         </DrawerHeader>
         <div className="space-y-4 p-4">
           {step === 'id' && (
-            <div className="space-y-3">
-              <div className="flex rounded-lg border border-border overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setIdType(1)}
-                  className={`flex-1 py-2 text-xs font-medium transition-colors ${idType === 1 ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}
-                >
-                  ת.ז. (Israeli ID)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIdType(2)}
-                  className={`flex-1 py-2 text-xs font-medium transition-colors ${idType === 2 ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}
-                >
-                  Passport
-                </button>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium">{idType === 1 ? 'Israeli ID (ת.ז.)' : 'Passport Number'}</Label>
-                <Input
-                  type="text" inputMode={idType === 1 ? 'numeric' : 'text'}
-                  placeholder={idType === 1 ? '123456789' : 'Passport number'}
-                  value={israeliId} onChange={e => setIsraeliId(e.target.value)}
-                  className="h-11 font-mono text-center text-lg tracking-widest"
-                  maxLength={idType === 1 ? 9 : 20}
-                />
-                <p className="text-[10px] text-muted-foreground">IEC sends OTP to the phone registered on this account.</p>
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Israeli ID (ת.ז.)</Label>
+              <Input
+                type="text" inputMode="numeric" placeholder="123456789"
+                value={israeliId} onChange={e => setIsraeliId(e.target.value)}
+                className="h-11 font-mono text-center text-lg tracking-widest" maxLength={9}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                IEC only supports ת.ז. (not passport). OTP will be sent to the phone on this account.
+              </p>
             </div>
           )}
           {step === 'otp' && (
