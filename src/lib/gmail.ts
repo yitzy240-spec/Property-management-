@@ -188,8 +188,8 @@ export interface BillEmail {
 export async function fetchBillEmails(maxResults: number = 20): Promise<{ messages: BillEmail[] }> {
   const accessToken = await getGmailAccessToken()
 
-  // Search by known utility senders + bill keywords
-  const query = '(from:iec.co.il OR from:hagihon OR from:printernet.co.il OR from:bezeq.co.il OR from:hyp.co.il OR from:iriya OR (חשבון OR "אישור תשלום" OR ארנונה OR חשמל OR מים OR "ועד בית" OR "חשבון תקופתי"))'
+  // Search by known utility senders + bill keywords, from Jan 2026 onwards
+  const query = 'after:2026/01/01 (from:iec.co.il OR from:hagihon OR from:printernet.co.il OR from:bezeq.co.il OR from:hyp.co.il OR from:iriya OR (חשבון OR "אישור תשלום" OR ארנונה OR חשמל OR מים OR "ועד בית" OR "חשבון תקופתי"))'
 
   const listResponse = await fetch(
     `${GMAIL_API_BASE}/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,

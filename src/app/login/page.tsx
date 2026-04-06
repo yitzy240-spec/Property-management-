@@ -6,21 +6,33 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FullScreenLoader } from '@/components/ui/logo-spinner'
-import { sendOwnerMagicLink } from './actions'
+import { loginWithEmail, sendOwnerMagicLink } from './actions'
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [magicLinkSent, setMagicLinkSent] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [mode, setMode] = useState<'password' | 'magic'>('password')
 
-  async function handleOwnerLogin(e: React.FormEvent<HTMLFormElement>) {
+  async function handlePasswordLogin(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+    const formData = new FormData(e.currentTarget)
+    const result = await loginWithEmail(formData)
+    if (result?.error) {
+      setError(result.error)
+      setLoading(false)
+    }
+  }
+
+  async function handleMagicLink(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setError(null)
     const formData = new FormData(e.currentTarget)
     const result = await sendOwnerMagicLink(formData)
     if (result?.error) {
-      // Show error but still show "check email" for rate limit errors
       if (result.error.includes('rate') || result.error.includes('limit')) {
         setMagicLinkSent(true)
       } else {
@@ -33,12 +45,11 @@ export default function LoginPage() {
   }
 
   if (loading) {
-    return <FullScreenLoader text="Sending login link..." />
+    return <FullScreenLoader text={mode === 'password' ? 'Signing in...' : 'Sending login link...'} />
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4">
-      {/* Subtle grid-paper texture */}
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.05]"
         style={{
@@ -49,7 +60,6 @@ export default function LoginPage() {
       />
 
       <div className="relative z-10 w-full max-w-[380px]">
-        {/* Brand header */}
         <div className="mb-8 text-center">
           <img
             src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400"
@@ -61,7 +71,6 @@ export default function LoginPage() {
           </h1>
         </div>
 
-        {/* Login card */}
         <div className="rounded-[10px] border border-border bg-card shadow-md">
           <div className="p-6">
             {magicLinkSent ? (
@@ -77,6 +86,9 @@ export default function LoginPage() {
                 <p className="mt-1 text-sm text-muted-foreground">
                   We sent a login link to your inbox.
                 </p>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  After your first login, you can set a password to sign in directly from the app.
+                </p>
                 <button
                   type="button"
                   onClick={() => { setMagicLinkSent(false); setError(null) }}
@@ -85,14 +97,64 @@ export default function LoginPage() {
                   Try again
                 </button>
               </div>
-            ) : (
-              <form onSubmit={handleOwnerLogin} className="space-y-4">
+            ) : mode === 'password' ? (
+              <form onSubmit={handlePasswordLogin} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="owner-email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <Label htmlFor="email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Email
                   </Label>
                   <Input
-                    id="owner-email"
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    required
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="password" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Password
+                  </Label>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    required
+                    className="h-11"
+                  />
+                </div>
+
+                {error && (
+                  <div className="rounded-md bg-destructive/10 px-3 py-2">
+                    <p className="text-sm text-destructive">{error}</p>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
+                >
+                  {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</> : 'Sign In'}
+                </Button>
+
+                <button
+                  type="button"
+                  onClick={() => { setMode('magic'); setError(null) }}
+                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
+                >
+                  First time? Sign in with email link instead
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleMagicLink} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="magic-email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Email
+                  </Label>
+                  <Input
+                    id="magic-email"
                     name="email"
                     type="email"
                     placeholder="your@email.com"
@@ -117,12 +179,19 @@ export default function LoginPage() {
                 >
                   {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : 'Send Login Link'}
                 </Button>
+
+                <button
+                  type="button"
+                  onClick={() => { setMode('password'); setError(null) }}
+                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Already have a password? Sign in with password
+                </button>
               </form>
             )}
           </div>
         </div>
 
-        {/* Footer */}
         <p className="mt-6 text-center text-xs text-muted-foreground">
           Jerusalem Property Management
         </p>
