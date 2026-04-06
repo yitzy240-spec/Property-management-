@@ -195,6 +195,7 @@ export async function fetchBillEmails(maxResults: number = 10): Promise<{
   }
 
   const messages = []
+  console.log('[Gmail] Found', listData.messages?.length || 0, 'matching emails')
 
   for (const msg of listData.messages) {
     const msgResponse = await fetch(
@@ -231,6 +232,8 @@ export async function fetchBillEmails(maxResults: number = 10): Promise<{
     if (msgData.payload?.parts) {
       findAttachments(msgData.payload.parts)
     }
+
+    console.log('[Gmail]', msg.id, '| from:', from.substring(0, 40), '| attachments:', attachments.length, '| parts:', msgData.payload?.parts?.length || 0)
 
     if (attachments.length > 0) {
       messages.push({ id: msg.id, subject, from, date, attachments })
