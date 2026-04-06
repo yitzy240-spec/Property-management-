@@ -100,9 +100,101 @@ async function authenticatedFetch(url: string, token: string, options: RequestIn
   })
 }
 
-// ── Auth Flow (Okta-based) ──
+// ── Auth Flow (Okta PKCE) ──
 
 const IEC_OKTA_BASE = 'https://iec-ext.okta.com'
+const IEC_CLIENT_ID = '0oaqf6zr7yEcQZqqt2p7'
+const IEC_REDIRECT_URI = 'com.iecrn:/'
+
+/** Generate PKCE code_verifier and code_challenge */
+function generatePKCE(): { codeVerifier: string; codeChallenge: string } {
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  const codeVerifier = Buffer.from(array).toString('base64url')
+
+  const hash = crypto.subtle
+    ? null // will use sync below
+    : null
+  // Use Node crypto for SHA-256
+  const { createHash } = require('crypto') as typeof import('crypto')
+  const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url')
+
+  return { codeVerifier, codeChallenge }
+}
+
+/**
+ * Exchange Okta session token for IEC API id_token via PKCE OIDC flow.
+ * 1. GET /authorize with sessionToken → HTML with auth code
+ * 2. POST /token with code + code_verifier → id_token
+ */
+async function exchangeSessionForToken(sessionToken: string): Promise<{ idToken: string; refreshToken: string }> {
+  const { codeVerifier, codeChallenge } = generatePKCE()
+  const state = Math.random().toString(36).slice(2, 14)
+
+  // Step 1: Authorize — get auth code from HTML response
+  const authorizeParams = new URLSearchParams({
+    client_id: IEC_CLIENT_ID,
+    response_type: 'id_token code',
+    response_mode: 'form_post',
+    scope: 'openid email profile offline_access',
+    redirect_uri: IEC_REDIRECT_URI,
+    state,
+    nonce: 'abc123',
+    code_challenge_method: 'S256',
+    sessionToken,
+    code_challenge: codeChallenge,
+  })
+
+  const authorizeRes = await fetch(
+    `${IEC_OKTA_BASE}/oauth2/default/v1/authorize?${authorizeParams}`,
+    { method: 'GET', redirect: 'manual' }
+  )
+
+  let authCode = ''
+  // Check for redirect with code in URL/body
+  if (authorizeRes.status === 200) {
+    const html = await authorizeRes.text()
+    const codeMatch = html.match(/name="code"\s+value="([^"]+)"/)
+    if (codeMatch) authCode = codeMatch[1]
+  } else if (authorizeRes.status === 302 || authorizeRes.status === 303) {
+    const location = authorizeRes.headers.get('location') || ''
+    const codeMatch = location.match(/[?&]code=([^&]+)/)
+    if (codeMatch) authCode = codeMatch[1]
+  }
+
+  if (!authCode) {
+    throw new Error('Failed to get authorization code from IEC/Okta')
+  }
+
+  // Step 2: Exchange code for tokens
+  const tokenRes = await fetch(`${IEC_OKTA_BASE}/oauth2/default/v1/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+    body: new URLSearchParams({
+      client_id: IEC_CLIENT_ID,
+      code_verifier: codeVerifier,
+      grant_type: 'authorization_code',
+      redirect_uri: IEC_REDIRECT_URI,
+      code: authCode,
+    }).toString(),
+  })
+
+  if (!tokenRes.ok) {
+    const errText = await tokenRes.text().catch(() => '')
+    throw new Error(`Token exchange failed: ${tokenRes.status} ${errText.slice(0, 200)}`)
+  }
+
+  const tokenData = await tokenRes.json()
+
+  if (!tokenData.id_token) {
+    throw new Error('Token exchange did not return id_token')
+  }
+
+  return {
+    idToken: tokenData.id_token,
+    refreshToken: tokenData.refresh_token || '',
+  }
+}
 
 /**
  * Step 1: Initiate login — sends ID to Okta, returns available OTP factors.
@@ -215,32 +307,12 @@ export async function verifyOtp(otpCode: string, factorId: string, propertyId: s
     throw new Error('OTP verification did not return a session token')
   }
 
-  // Exchange Okta session token for IEC API token
-  const tokenRes = await fetch(`${IEC_BASE}/Authentication/OktaAuthorize?sessionToken=${data.sessionToken}&is498=false`, {
-    method: 'GET',
-    headers: HEADERS,
-    redirect: 'manual',
-  })
-
-  // The response might be a redirect with token in URL, or direct JSON
-  let idToken = ''
-  if (tokenRes.status === 200) {
-    const tokenData = await tokenRes.json()
-    idToken = tokenData.id_token || tokenData.token || tokenData.access_token || ''
-  } else if (tokenRes.status === 302) {
-    const location = tokenRes.headers.get('location') || ''
-    const tokenMatch = location.match(/[?&]id_token=([^&]+)/) || location.match(/[?&]token=([^&]+)/)
-    if (tokenMatch) idToken = tokenMatch[1]
-  }
-
-  if (!idToken) {
-    // Try alternative: use session token directly with IEC
-    idToken = data.sessionToken
-  }
+  // Exchange Okta session token for IEC API id_token via PKCE flow
+  const { idToken, refreshToken } = await exchangeSessionForToken(data.sessionToken)
 
   const tokens: IecTokens = {
     idToken,
-    refreshToken: '',
+    refreshToken,
     expiresAt: Date.now() + 3600 * 1000,
     bpNumber: '',
     contractIds: [],
