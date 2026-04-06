@@ -6,7 +6,6 @@ import { LodgifyPropertyMapper } from '@/components/features/lodgify-property-ma
 import { UserManagement } from '@/components/features/user-management'
 import { IntegrationHealth } from '@/components/features/integration-health'
 import { SeasonalTemplateSettings } from '@/components/features/seasonal-template-settings'
-import { IecIntegration } from '@/components/features/iec-connect'
 import { isGmailConnected } from '@/lib/gmail'
 
 export default async function SettingsPage() {
@@ -46,13 +45,6 @@ export default async function SettingsPage() {
           Lodgify Integration
         </p>
         <LodgifyPropertyMapper />
-      </section>
-
-      <section>
-        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Israel Electric (IEC)
-        </p>
-        <IecIntegration />
       </section>
 
       <section>

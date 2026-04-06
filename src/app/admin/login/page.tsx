@@ -95,6 +95,7 @@ export default function AdminLoginPage() {
               )
             ) : (
               <form onSubmit={handleLogin} className="space-y-4">
+                <input type="hidden" name="destination" value="admin" />
                 <div className="space-y-1.5">
                   <Label htmlFor="email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email</Label>
                   <Input id="email" name="email" type="email" placeholder="admin@marcus-properties.com" required className="h-11" />

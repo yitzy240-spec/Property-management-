@@ -7,7 +7,7 @@
  * 2. verify_otp(code) → returns JWT token
  * 3. Use token for all subsequent requests (refresh when expired)
  *
- * For ApartmentOS: Marcus does OTP once per contract, we store the token.
+ * Per-property: Each property has its own IEC auth (different TZ per property).
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
@@ -44,14 +44,18 @@ interface IecTokens {
   contractIds: string[]
 }
 
-// ── Token Management ──
+// ── Token Management (per-property) ──
 
-async function getStoredTokens(): Promise<IecTokens | null> {
+function tokenKey(propertyId: string): string {
+  return `iec_tokens_${propertyId}`
+}
+
+async function getStoredTokens(propertyId: string): Promise<IecTokens | null> {
   const serviceClient = createServiceClient()
   const { data } = await serviceClient
     .from('app_settings')
     .select('value')
-    .eq('key', 'iec_tokens')
+    .eq('key', tokenKey(propertyId))
     .single()
 
   if (!data?.value) return null
@@ -63,14 +67,14 @@ async function getStoredTokens(): Promise<IecTokens | null> {
   }
 }
 
-async function storeTokens(tokens: IecTokens): Promise<void> {
+async function storeTokens(propertyId: string, tokens: IecTokens): Promise<void> {
   const serviceClient = createServiceClient()
   await serviceClient
     .from('app_settings')
     .upsert({
-      key: 'iec_tokens',
+      key: tokenKey(propertyId),
       value: await encrypt(JSON.stringify(tokens)),
-      description: 'IEC API tokens (encrypted)',
+      description: `IEC tokens for property ${propertyId}`,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'key' })
 }
@@ -108,10 +112,9 @@ export async function initLogin(israeliId: string): Promise<{ factorId: string }
 
 /**
  * Step 2: Verify OTP code sent to phone.
- * Returns JWT tokens for API access.
+ * Returns JWT tokens for API access. Stores per-property.
  */
-export async function verifyOtp(israeliId: string, otpCode: string): Promise<IecTokens> {
-  // The actual OTP verification endpoint varies — this follows the py-iec-api pattern
+export async function verifyOtp(israeliId: string, otpCode: string, propertyId: string): Promise<IecTokens> {
   const res = await fetch(`${IEC_BASE}/Authentication/VerifyOtp`, {
     method: 'POST',
     headers: HEADERS,
@@ -158,37 +161,42 @@ export async function verifyOtp(israeliId: string, otpCode: string): Promise<Iec
     // Customer fetch failed — tokens still valid
   }
 
-  await storeTokens(tokens)
+  await storeTokens(propertyId, tokens)
   return tokens
+}
+
+/**
+ * Check if a property has IEC connected.
+ */
+export async function getIecStatus(propertyId: string): Promise<{ connected: boolean; contracts: string[] }> {
+  const tokens = await getStoredTokens(propertyId)
+  if (!tokens) return { connected: false, contracts: [] }
+  return { connected: true, contracts: tokens.contractIds }
 }
 
 // ── Bill Fetching ──
 
 /**
- * Get all billing invoices for a contract.
+ * Get all billing invoices for a property's IEC account.
  */
 export async function getBillingInvoices(
+  propertyId: string,
   contractId?: string,
   bpNumber?: string,
-  onlyOpen?: boolean
 ): Promise<IecInvoice[]> {
-  const tokens = await getStoredTokens()
-  if (!tokens) throw new Error('IEC not connected. Complete OTP auth first.')
+  const tokens = await getStoredTokens(propertyId)
+  if (!tokens) throw new Error('IEC not connected for this property. Complete OTP auth first.')
 
   const bp = bpNumber || tokens.bpNumber
   const contract = contractId || tokens.contractIds[0]
 
-  if (!bp || !contract) throw new Error('No IEC contract configured')
+  if (!bp || !contract) throw new Error('No IEC contract found for this property')
 
-  let url = `${IEC_BASE}/BillingCollection/invoices/${contract}/${bp}`
-  if (onlyOpen !== undefined) {
-    url += `?onlyOpen=${onlyOpen}`
-  }
+  const url = `${IEC_BASE}/BillingCollection/invoices/${contract}/${bp}`
 
   const res = await authenticatedFetch(url, tokens.idToken)
 
   if (res.status === 401) {
-    // Token expired — would need re-auth
     throw new Error('IEC token expired. Re-authenticate required.')
   }
 
@@ -213,11 +221,12 @@ export async function getBillingInvoices(
  * Download an invoice PDF.
  */
 export async function getInvoicePdf(
+  propertyId: string,
   invoiceNumber: string,
   contractId?: string,
   bpNumber?: string
 ): Promise<Buffer> {
-  const tokens = await getStoredTokens()
+  const tokens = await getStoredTokens(propertyId)
   if (!tokens) throw new Error('IEC not connected.')
 
   const bp = bpNumber || tokens.bpNumber
@@ -246,38 +255,31 @@ export async function getInvoicePdf(
 }
 
 /**
- * Sync IEC invoices into the bills table.
- * Deduplicates by invoice_number to prevent double-recording
- * (from both IEC API and Gmail email parsing).
+ * Sync IEC invoices for a specific property into the bills table.
  */
-export async function syncIecBills(): Promise<{ synced: number; skipped: number; errors: string[] }> {
+export async function syncIecBills(propertyId: string): Promise<{ synced: number; skipped: number; errors: string[] }> {
   const result = { synced: 0, skipped: 0, errors: [] as string[] }
 
-  const tokens = await getStoredTokens()
+  const tokens = await getStoredTokens(propertyId)
   if (!tokens) {
-    result.errors.push('IEC not connected')
+    result.errors.push('IEC not connected for this property')
     return result
   }
 
   const serviceClient = createServiceClient()
 
-  // Get properties with IEC contract mapping
-  // For now, we match by the IEC contract address to our properties
-  const { data: properties } = await serviceClient
-    .from('properties')
-    .select('id, name, address')
-    .eq('is_active', true)
-
   for (const contractId of tokens.contractIds) {
     try {
-      const invoices = await getBillingInvoices(contractId, tokens.bpNumber)
+      const invoices = await getBillingInvoices(propertyId, contractId, tokens.bpNumber)
 
       for (const inv of invoices) {
         // Dedup: check if this invoice number already exists
         const { data: existing } = await serviceClient
           .from('bills')
           .select('id')
-          .or(`ai_parsed_data->>account_number.eq.${inv.invoiceNumber},ai_parsed_data->>invoice_number.eq.${inv.invoiceNumber}`)
+          .eq('property_id', propertyId)
+          .eq('bill_type', 'iec')
+          .or(`ai_parsed_data->>invoice_number.eq.${inv.invoiceNumber},ai_parsed_data->>account_number.eq.${inv.invoiceNumber}`)
           .limit(1)
 
         if (existing && existing.length > 0) {
@@ -285,24 +287,10 @@ export async function syncIecBills(): Promise<{ synced: number; skipped: number;
           continue
         }
 
-        // Also check by gmail_message_id pattern for IEC emails
-        const { data: emailExisting } = await serviceClient
-          .from('bills')
-          .select('id')
-          .eq('bill_type', 'iec')
-          .gte('created_at', inv.fromDate)
-          .lte('created_at', inv.toDate || new Date().toISOString())
-          .limit(1)
-
-        if (emailExisting && emailExisting.length > 0) {
-          result.skipped++
-          continue
-        }
-
         // Download PDF
         let storagePath: string | null = null
         try {
-          const pdf = await getInvoicePdf(inv.invoiceNumber, contractId, tokens.bpNumber)
+          const pdf = await getInvoicePdf(propertyId, inv.invoiceNumber, contractId, tokens.bpNumber)
           storagePath = `bills/iec_${inv.invoiceNumber}.pdf`
           await serviceClient.storage
             .from('documents')
@@ -311,11 +299,11 @@ export async function syncIecBills(): Promise<{ synced: number; skipped: number;
           // PDF download failed — create bill without PDF
         }
 
-        // Create bill
+        // Create bill linked to this property
         const amountAgorot = Math.round(inv.totalAmount * 100)
 
         await serviceClient.from('bills').insert({
-          property_id: null, // Needs manual assignment or address matching
+          property_id: propertyId,
           bill_type: 'iec',
           amount_agorot: amountAgorot,
           due_date: inv.invoiceDate || null,
@@ -328,7 +316,6 @@ export async function syncIecBills(): Promise<{ synced: number; skipped: number;
             invoice_number: inv.invoiceNumber,
             contract_id: contractId,
             bp_number: tokens.bpNumber,
-            account_number: inv.invoiceNumber,
           },
         })
 

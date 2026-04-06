@@ -8,13 +8,33 @@ export async function loginWithEmail(formData: FormData) {
 
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  const destination = (formData.get('destination') as string) || 'owner'
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
     return { error: error.message }
   }
 
+  // If logging in from /login (owner portal), go to /owner
+  // If logging in from /admin/login, go to /dashboard
+  if (destination === 'admin') {
+    redirect('/dashboard')
+  }
+
+  // Check if this user is also an owner
+  const serviceClient = createServiceClient()
+  const { data: owner } = await serviceClient
+    .from('owners')
+    .select('id')
+    .eq('auth_user_id', data.user.id)
+    .single()
+
+  if (owner) {
+    redirect('/owner')
+  }
+
+  // Admin with no owner record — send to dashboard
   redirect('/dashboard')
 }
 

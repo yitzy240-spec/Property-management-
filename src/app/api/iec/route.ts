@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
-import { initLogin, verifyOtp, syncIecBills, getBillingInvoices } from '@/lib/iec-api'
+import { initLogin, verifyOtp, syncIecBills, getBillingInvoices, getIecStatus } from '@/lib/iec-api'
 
 /**
- * POST /api/iec — IEC operations
- * Body: { action: 'login' | 'verify_otp' | 'sync' | 'invoices', ... }
+ * POST /api/iec — IEC operations (per-property)
+ * Body: { action: 'status' | 'login' | 'verify_otp' | 'sync' | 'invoices', propertyId, ... }
  */
 export async function POST(request: Request) {
   try {
@@ -15,27 +15,17 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { action } = body
+  const { action, propertyId } = body
 
   try {
     switch (action) {
       case 'status': {
-        // Check if IEC is connected
-        try {
-          const { createServiceClient } = await import('@/lib/supabase/server')
-          const { decrypt } = await import('@/lib/encryption')
-          const sc = createServiceClient()
-          const { data } = await sc.from('app_settings').select('value').eq('key', 'iec_tokens').single()
-          if (data?.value) {
-            const tokens = JSON.parse(await decrypt(data.value))
-            return NextResponse.json({ connected: true, contracts: tokens.contractIds || [] })
-          }
-        } catch {}
-        return NextResponse.json({ connected: false, contracts: [] })
+        if (!propertyId) return NextResponse.json({ error: 'propertyId required' }, { status: 400 })
+        const status = await getIecStatus(propertyId)
+        return NextResponse.json(status)
       }
 
       case 'login': {
-        // Step 1: Send OTP
         const { israeliId } = body
         if (!israeliId) return NextResponse.json({ error: 'israeliId required' }, { status: 400 })
         const result = await initLogin(israeliId)
@@ -43,10 +33,9 @@ export async function POST(request: Request) {
       }
 
       case 'verify_otp': {
-        // Step 2: Verify OTP and get tokens
         const { israeliId: id, otpCode } = body
-        if (!id || !otpCode) return NextResponse.json({ error: 'israeliId and otpCode required' }, { status: 400 })
-        const tokens = await verifyOtp(id, otpCode)
+        if (!id || !otpCode || !propertyId) return NextResponse.json({ error: 'israeliId, otpCode, and propertyId required' }, { status: 400 })
+        const tokens = await verifyOtp(id, otpCode, propertyId)
         return NextResponse.json({
           success: true,
           bpNumber: tokens.bpNumber,
@@ -55,15 +44,15 @@ export async function POST(request: Request) {
       }
 
       case 'sync': {
-        // Pull all invoices and sync to bills table
-        const result = await syncIecBills()
+        if (!propertyId) return NextResponse.json({ error: 'propertyId required' }, { status: 400 })
+        const result = await syncIecBills(propertyId)
         return NextResponse.json(result)
       }
 
       case 'invoices': {
-        // Just list invoices without syncing
+        if (!propertyId) return NextResponse.json({ error: 'propertyId required' }, { status: 400 })
         const { contractId, bpNumber } = body
-        const invoices = await getBillingInvoices(contractId, bpNumber)
+        const invoices = await getBillingInvoices(propertyId, contractId, bpNumber)
         return NextResponse.json({ invoices })
       }
 
