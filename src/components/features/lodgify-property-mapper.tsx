@@ -53,9 +53,10 @@ export function LodgifyPropertyMapper() {
         const body = await res.json()
         throw new Error(body.error || 'Failed to fetch')
       }
-      const { properties } = await res.json()
-      setLodgifyProps(properties)
-      toast.success(`Found ${properties.length} Lodgify properties`)
+      const data = await res.json()
+      const props = Array.isArray(data.properties) ? data.properties : (data.properties?.items || [])
+      setLodgifyProps(props)
+      toast.success(`Found ${props.length} Lodgify properties`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to fetch Lodgify properties')
     } finally {

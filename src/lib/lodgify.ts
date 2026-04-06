@@ -179,7 +179,9 @@ export async function pushKeyCodes(bookingId: string, keyCodes: string[]): Promi
 // ══════════════════════════════════════
 
 export async function fetchLodgifyProperties(apiKey: string): Promise<LodgifyPropertyFull[]> {
-  return lodgifyFetch<LodgifyPropertyFull[]>('/v2/properties', apiKey)
+  const data = await lodgifyFetch<{ items?: LodgifyPropertyFull[] } | LodgifyPropertyFull[]>('/v2/properties', apiKey)
+  if (Array.isArray(data)) return data
+  return data.items || []
 }
 
 /** Get full property details including photos, amenities, rooms */
