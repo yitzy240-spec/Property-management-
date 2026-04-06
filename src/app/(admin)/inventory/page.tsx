@@ -84,30 +84,43 @@ export default async function InventoryPage() {
         </p>
 
         {inventory && inventory.length > 0 ? (
-          <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
-            {/* Table header */}
-            <div className="grid grid-cols-5 gap-0 border-b border-border bg-muted/30 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              <span className="col-span-2">Item</span>
-              <span className="text-center">Closet</span>
-              <span className="text-center">Laundry</span>
-              <span className="text-center">Damaged</span>
-            </div>
-            {inventory.map((item, i) => {
-              const belowPar = item.par_level && item.quantity_in_closet < item.par_level
-              return (
-                <div key={item.id} className={`grid grid-cols-5 items-center gap-0 px-4 py-2.5 ${i > 0 ? 'border-t border-border' : ''}`}>
-                  <div className="col-span-2">
-                    <p className="text-sm font-medium">{item.item_name}</p>
-                    <p className="text-xs text-muted-foreground">{(item.properties as { name: string } | null)?.name}</p>
+          <div className="space-y-4">
+            {(() => {
+              const grouped = {} as { [key: string]: typeof inventory }
+              for (const item of inventory) {
+                const propName = (item.properties as { name: string } | null)?.name || 'Unassigned'
+                if (!grouped[propName]) grouped[propName] = []
+                grouped[propName].push(item)
+              }
+              return Object.entries(grouped).map(([propName, items]) => (
+                <div key={propName} className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+                  <div className="border-b border-border bg-muted/30 px-4 py-2">
+                    <p className="text-xs font-semibold">{propName}</p>
                   </div>
-                  <div className={belowPar ? 'font-bold text-status-warning' : ''}>
-                    <InventoryAdjust itemId={item.id} field="quantity_in_closet" currentValue={item.quantity_in_closet} />
+                  <div className="grid grid-cols-5 gap-0 border-b border-border px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    <span className="col-span-2">Item</span>
+                    <span className="text-center">Closet</span>
+                    <span className="text-center">Laundry</span>
+                    <span className="text-center">Dmg</span>
                   </div>
-                  <InventoryAdjust itemId={item.id} field="quantity_at_laundry" currentValue={item.quantity_at_laundry} />
-                  <InventoryAdjust itemId={item.id} field="quantity_damaged" currentValue={item.quantity_damaged} />
+                  {items.map((item, i) => {
+                    const belowPar = item.par_level && item.quantity_in_closet < item.par_level
+                    return (
+                      <div key={item.id} className={`grid grid-cols-5 items-center gap-0 px-4 py-2 ${i > 0 ? 'border-t border-border' : ''}`}>
+                        <div className="col-span-2">
+                          <p className="text-sm font-medium">{item.item_name}</p>
+                        </div>
+                        <div className={belowPar ? 'font-bold text-status-warning' : ''}>
+                          <InventoryAdjust itemId={item.id} field="quantity_in_closet" currentValue={item.quantity_in_closet} />
+                        </div>
+                        <InventoryAdjust itemId={item.id} field="quantity_at_laundry" currentValue={item.quantity_at_laundry} />
+                        <InventoryAdjust itemId={item.id} field="quantity_damaged" currentValue={item.quantity_damaged} />
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
+              ))
+            })()}
           </div>
         ) : (
           <div className="rounded-[10px] border border-border bg-card py-10 text-center shadow-sm">

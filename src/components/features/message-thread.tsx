@@ -47,28 +47,19 @@ export function MessageThread({ propertyId, propertyName, currentRole }: Message
 
   useEffect(() => {
     async function loadMessages() {
-      const { data } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('property_id', propertyId)
-        .order('created_at', { ascending: true })
-
-      if (data) setMessages(data as Message[])
-
-      // Mark unread messages as read
-      if (data && data.length > 0) {
-        const unread = data.filter(m => !m.is_read && m.sender_role !== currentRole)
-        if (unread.length > 0) {
-          await supabase
-            .from('messages')
-            .update({ is_read: true })
-            .in('id', unread.map(m => m.id))
+      try {
+        const res = await fetch('/api/messages?property_id=' + propertyId)
+        if (res.ok) {
+          const data = await res.json()
+          setMessages(data.messages || [])
         }
+      } catch {
+        // silent fail
       }
     }
 
     loadMessages()
-  }, [propertyId, currentRole, supabase])
+  }, [propertyId, currentRole])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -78,19 +69,26 @@ export function MessageThread({ propertyId, propertyName, currentRole }: Message
     if (!newMessage.trim()) return
     setSending(true)
 
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({
-        property_id: propertyId,
-        sender_role: currentRole,
-        body: newMessage.trim(),
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          property_id: propertyId,
+          sender_role: currentRole,
+          body: newMessage.trim(),
+        }),
       })
-      .select()
-      .single()
 
-    if (!error && data) {
-      setMessages(prev => [...prev, data as Message])
-      setNewMessage('')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.message) {
+          setMessages(prev => [...prev, data.message as Message])
+          setNewMessage('')
+        }
+      }
+    } catch {
+      // silent fail
     }
 
     setSending(false)
