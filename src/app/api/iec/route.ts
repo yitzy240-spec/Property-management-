@@ -19,6 +19,21 @@ export async function POST(request: Request) {
 
   try {
     switch (action) {
+      case 'status': {
+        // Check if IEC is connected
+        try {
+          const { createServiceClient } = await import('@/lib/supabase/server')
+          const { decrypt } = await import('@/lib/encryption')
+          const sc = createServiceClient()
+          const { data } = await sc.from('app_settings').select('value').eq('key', 'iec_tokens').single()
+          if (data?.value) {
+            const tokens = JSON.parse(await decrypt(data.value))
+            return NextResponse.json({ connected: true, contracts: tokens.contractIds || [] })
+          }
+        } catch {}
+        return NextResponse.json({ connected: false, contracts: [] })
+      }
+
       case 'login': {
         // Step 1: Send OTP
         const { israeliId } = body

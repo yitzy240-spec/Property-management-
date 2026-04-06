@@ -14,7 +14,7 @@ import { TaskCreateDialog } from '@/components/features/task-create-dialog'
 import { BillAddButton } from '@/components/features/bill-add'
 import { LaundryPickupButton } from '@/components/features/laundry-pickup'
 import { WorkLogButton, WorkLogList } from '@/components/features/work-log'
-import { IecConnect } from '@/components/features/iec-connect'
+// IEC integration is in Settings (one auth for all properties)
 import { UtilityAccountsSection } from '@/components/features/utility-accounts'
 import { BookingList } from '@/components/features/booking-list'
 
@@ -279,7 +279,6 @@ export default async function PropertyDetailPage({
           Quick Actions
         </p>
         <div className="flex flex-wrap gap-2">
-          <IecConnect propertyId={params.id} propertyName={property.name} />
           <MagicLinkGenerator propertyId={params.id} propertyName={property.name} />
           <LaundryPickupButton
             properties={[{ id: params.id, name: property.name, address: property.address }]}
