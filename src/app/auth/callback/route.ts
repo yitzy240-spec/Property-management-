@@ -14,12 +14,13 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = createServerSupabaseClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { error, data } = await supabase.auth.exchangeCodeForSession(code)
 
     if (error) {
       // Code exchange failed — redirect to login with error
       return NextResponse.redirect(new URL('/login?error=expired', url.origin))
     }
+
   }
 
   return NextResponse.redirect(new URL(next, url.origin))

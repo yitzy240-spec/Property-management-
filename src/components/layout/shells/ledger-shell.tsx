@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { signOut } from '@/app/login/actions'
+import { BiometricPrompt } from '@/components/features/biometric-prompt'
 
 /** Primary bottom nav — Ledger's entity-first tabs */
 const bottomTabs = [
@@ -171,6 +172,9 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
           })}
         </div>
       </nav>
+
+      {/* Biometric enrollment prompt */}
+      <BiometricPrompt />
     </div>
   )
 }

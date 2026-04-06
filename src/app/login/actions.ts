@@ -103,7 +103,10 @@ export async function updatePassword(formData: FormData) {
     return { error: error.message }
   }
 
-  redirect('/dashboard')
+  // Redirect based on role
+  const { data: { user } } = await supabase.auth.getUser()
+  const role = user?.app_metadata?.role
+  redirect(role === 'owner' ? '/owner' : '/dashboard')
 }
 
 export async function signOut() {

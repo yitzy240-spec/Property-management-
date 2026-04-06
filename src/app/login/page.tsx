@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Loader2, Fingerprint } from 'lucide-react'
+import { startAuthentication } from '@simplewebauthn/browser'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +14,62 @@ export default function LoginPage() {
   const [magicLinkSent, setMagicLinkSent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<'password' | 'magic'>('password')
+  const [hasBiometric, setHasBiometric] = useState(false)
+
+  useEffect(() => {
+    // Check if user has registered a passkey on this device
+    if (typeof window !== 'undefined' && localStorage.getItem('biometric_registered') === '1') {
+      setHasBiometric(true)
+    }
+  }, [])
+
+  async function handleBiometricLogin() {
+    setLoading(true)
+    setError(null)
+    try {
+      // Get auth options
+      const optionsRes = await fetch('/api/auth/webauthn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login_options' }),
+      })
+      if (!optionsRes.ok) throw new Error('No passkey found')
+      const options = await optionsRes.json()
+
+      // Trigger biometric
+      const credential = await startAuthentication({ optionsJSON: options })
+
+      // Verify with server
+      const verifyRes = await fetch('/api/auth/webauthn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'login_verify',
+          response: credential,
+          userId: options.userId,
+        }),
+      })
+
+      if (!verifyRes.ok) throw new Error('Verification failed')
+
+      const { verification_url } = await verifyRes.json()
+
+      // Exchange the magic link for a session
+      if (verification_url) {
+        window.location.href = verification_url
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === 'NotAllowedError') {
+        // User cancelled biometric
+        setLoading(false)
+        return
+      }
+      setError('Biometric login failed. Use password instead.')
+      localStorage.removeItem('biometric_registered')
+      setHasBiometric(false)
+      setLoading(false)
+    }
+  }
 
   async function handlePasswordLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -70,6 +127,16 @@ export default function LoginPage() {
             Owner Portal
           </h1>
         </div>
+
+        {hasBiometric && (
+          <button
+            onClick={handleBiometricLogin}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-[10px] border border-border bg-card py-3.5 text-sm font-medium shadow-md transition-colors hover:bg-muted"
+          >
+            <Fingerprint className="h-5 w-5 text-primary" />
+            Sign in with biometrics
+          </button>
+        )}
 
         <div className="rounded-[10px] border border-border bg-card shadow-md">
           <div className="p-6">

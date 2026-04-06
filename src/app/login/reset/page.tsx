@@ -10,6 +10,7 @@ import { updatePassword } from '../actions'
 export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const isSetup = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('setup') === '1'
 
   async function handleSubmit(formData: FormData) {
     setLoading(true)
@@ -45,8 +46,13 @@ export default function ResetPasswordPage() {
             className="mx-auto mb-4 h-16 w-auto"
           />
           <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground">
-            Set New Password
+            {isSetup ? 'Create Your Password' : 'Set New Password'}
           </h1>
+          {isSetup && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Set a password so you can sign in directly next time.
+            </p>
+          )}
         </div>
 
         <div className="rounded-[10px] border border-border bg-card shadow-md">

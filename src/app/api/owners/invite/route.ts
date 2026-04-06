@@ -73,15 +73,16 @@ export async function POST(request: Request) {
       .eq('id', owner.id)
   }
 
-  // Generate a magic link for the owner
+  // Send a password reset link so the owner can set their password
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://apartmentos.app'
   let magicLink: string | null = null
 
+  // Generate a recovery/password-setup link
   const { data: linkData } = await serviceClient.auth.admin.generateLink({
-    type: 'magiclink',
+    type: 'recovery',
     email: owner.email,
     options: {
-      redirectTo: `${appUrl}/auth/callback?next=/owner`,
+      redirectTo: `${appUrl}/login/reset?setup=1`,
     },
   })
 
@@ -89,15 +90,12 @@ export async function POST(request: Request) {
     magicLink = linkData.properties.action_link
   }
 
-  // Also trigger Supabase's built-in OTP email as fallback (works even without Resend)
+  // Also trigger Supabase's built-in password reset email as fallback
   const { createServerSupabaseClient: createPublicClient } = await import('@/lib/supabase/server')
   const publicSupabase = createPublicClient()
-  await publicSupabase.auth.signInWithOtp({
-    email: owner.email,
-    options: {
-      emailRedirectTo: `${appUrl}/auth/callback?next=/owner`,
-    },
-  }).catch(() => {}) // silent fallback
+  await publicSupabase.auth.resetPasswordForEmail(owner.email, {
+    redirectTo: `${appUrl}/login/reset?setup=1`,
+  }).catch(() => {})
 
   const { data: properties } = await serviceClient
     .from('properties')
@@ -163,14 +161,14 @@ export async function POST(request: Request) {
           ${magicLink ? `
           <div style="text-align: center; margin-bottom: 24px;">
             <a href="${magicLink}" style="display: inline-block; background: #1E3A5F; color: #F8F7F4; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 600; letter-spacing: 0.3px;">
-              Open Your Portal
+              Set Up Your Password
             </a>
           </div>
           <p style="color: #9CA3AF; font-size: 12px; text-align: center; margin: 0 0 8px;">
             This link is valid for 24 hours.
           </p>
           <p style="color: #9CA3AF; font-size: 12px; text-align: center; margin: 0;">
-            After your first visit, sign in anytime at the <strong>Owner</strong> tab on the login page.
+            After setting your password, sign in anytime at <strong>${appUrl}/login</strong>
           </p>
           ` : `
           <div style="text-align: center; margin-bottom: 24px;">
