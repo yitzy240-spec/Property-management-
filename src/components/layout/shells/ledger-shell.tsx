@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -47,9 +47,30 @@ const menuItems = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
+function useUnreadMessages() {
+  const [unread, setUnread] = useState(0)
+  useEffect(() => {
+    let mounted = true
+    async function check() {
+      try {
+        const res = await fetch('/api/messages/unread')
+        if (res.ok && mounted) {
+          const data = await res.json()
+          setUnread(data.unread || 0)
+        }
+      } catch {}
+    }
+    check()
+    const interval = setInterval(check, 30_000) // poll every 30s
+    return () => { mounted = false; clearInterval(interval) }
+  }, [])
+  return unread
+}
+
 export function LedgerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
+  const unreadMessages = useUnreadMessages()
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -57,8 +78,11 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 grid h-12 grid-cols-3 items-center border-b bg-card px-4">
         <div className="flex items-center">
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-            <SheetTrigger className="flex h-11 w-11 items-center justify-center rounded-md hover:bg-muted -ml-2" aria-label="Open navigation menu">
+            <SheetTrigger className="relative flex h-11 w-11 items-center justify-center rounded-md hover:bg-muted -ml-2" aria-label="Open navigation menu">
               <Menu className="h-5 w-5" />
+              {unreadMessages > 0 && (
+                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-status-danger" />
+              )}
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0">
               <div className="flex h-12 items-center gap-2.5 border-b px-4">
@@ -82,6 +106,11 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       {item.label}
+                      {item.href === '/messages' && unreadMessages > 0 && (
+                        <span className="ml-auto rounded-full bg-status-danger px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                          {unreadMessages}
+                        </span>
+                      )}
                     </Link>
                   )
                 })}
