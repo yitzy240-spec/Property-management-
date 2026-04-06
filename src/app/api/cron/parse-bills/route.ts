@@ -46,29 +46,11 @@ export async function GET(request: Request) {
   ])
 
   try {
-    const { messages } = await fetchBillEmails(15)
+    // Per-sender targeted queries — 10 emails per sender, ~6 senders
+    const { messages } = await fetchBillEmails(10)
 
     if (messages.length === 0) {
-      // Debug: try raw Gmail search to see what we're getting
-      try {
-        const { getGmailAccessToken } = await import('@/lib/gmail')
-        const token = await getGmailAccessToken()
-        const debugRes = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent('from:iec.co.il OR from:hagihon OR from:printernet.co.il')}&maxResults=5`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
-        const debugData = await debugRes.json()
-        return NextResponse.json({
-          message: 'No new bill emails found',
-          parsed: 0,
-          debug: {
-            rawSearchResults: debugData.resultSizeEstimate || 0,
-            messageIds: (debugData.messages || []).map((m: { id: string }) => m.id),
-          },
-        })
-      } catch {
-        return NextResponse.json({ message: 'No new bill emails found', parsed: 0 })
-      }
+      return NextResponse.json({ message: 'No new bill emails found', parsed: 0 })
     }
 
     let parsed = 0
