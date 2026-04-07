@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import {
   Drawer,
   DrawerContent,
@@ -252,25 +252,28 @@ function TaskEditDrawer({
 
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Priority</Label>
-              <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
-                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
+              <NativeSelect
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as TaskPriority)}
+                options={[
+                  { value: 'low', label: 'Low' },
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'high', label: 'High' },
+                  { value: 'urgent', label: 'Urgent' },
+                ]}
+                className="h-11"
+              />
             </div>
 
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contractor</Label>
-              <Select value={contractorId} onValueChange={(v) => setContractorId(v || '')}>
-                <SelectTrigger className="h-11"><SelectValue placeholder="Unassigned" /></SelectTrigger>
-                <SelectContent>
-                  {contractors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <NativeSelect
+                value={contractorId}
+                onChange={(e) => setContractorId(e.target.value)}
+                placeholder="Unassigned"
+                options={contractors.map(c => ({ value: c.id, label: c.name }))}
+                className="h-11"
+              />
             </div>
 
             <div className="space-y-1.5">

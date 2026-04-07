@@ -171,7 +171,7 @@ export default async function InventoryPage() {
                       <span className="font-mono text-xs text-muted-foreground">
                         {batchItems.length} items
                       </span>
-                      <LaundryEditButton batchId={batch.id} items={batchItems} />
+                      <LaundryEditButton batchId={batch.id} propertyId={batch.property_id} items={batchItems} />
                       <LaundryReturnButton batchId={batch.id} propertyId={batch.property_id} items={batchItems} />
                     </div>
                   </summary>

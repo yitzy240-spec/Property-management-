@@ -363,8 +363,9 @@ export function LaundryReturnButton({ batchId, propertyId, items }: {
 }
 
 /** Edit a laundry batch — adjust item quantities */
-export function LaundryEditButton({ batchId, items: initialItems }: {
+export function LaundryEditButton({ batchId, propertyId, items: initialItems }: {
   batchId: string
+  propertyId: string
   items: { item_name: string; quantity: number }[]
 }) {
   const supabase = createClient()
@@ -389,11 +390,37 @@ export function LaundryEditButton({ batchId, items: initialItems }: {
 
     if (error) {
       toast.error('Save failed')
-    } else {
-      toast.success('Batch updated')
-      setOpen(false)
-      router.refresh()
+      setSaving(false)
+      return
     }
+
+    // Sync inventory: adjust based on diff between old and new quantities
+    for (let i = 0; i < initialItems.length; i++) {
+      const oldQty = initialItems[i].quantity
+      const newQty = items[i]?.quantity || 0
+      const diff = newQty - oldQty // positive = more to laundry, negative = returned to closet
+
+      if (diff !== 0) {
+        const { data: invItem } = await supabase
+          .from('inventory_items')
+          .select('id, quantity_in_closet, quantity_at_laundry')
+          .eq('property_id', propertyId)
+          .ilike('item_name', initialItems[i].item_name)
+          .single()
+
+        if (invItem) {
+          await supabase.from('inventory_items').update({
+            quantity_in_closet: Math.max(0, invItem.quantity_in_closet - diff),
+            quantity_at_laundry: Math.max(0, invItem.quantity_at_laundry + diff),
+            last_counted_at: new Date().toISOString(),
+          }).eq('id', invItem.id)
+        }
+      }
+    }
+
+    toast.success('Batch updated — inventory synced')
+    setOpen(false)
+    router.refresh()
     setSaving(false)
   }
 

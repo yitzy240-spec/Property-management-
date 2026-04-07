@@ -202,18 +202,20 @@ export default async function PropertyDetailPage({
         {bills && bills.length > 0 ? (
           <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
             {bills.map((bill, i) => (
-              <div key={bill.id} className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}>
-                <div>
-                  <p className="text-sm font-medium capitalize">{bill.bill_type.replace('_', ' ')}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {bill.due_date ? `Due ${bill.due_date}` : 'No due date'}
-                  </p>
+              <Link key={bill.id} href={`/bills?highlight=${bill.id}`} className="block">
+                <div className={`flex items-center justify-between px-4 py-3 transition-colors hover:bg-muted/40 ${i > 0 ? 'border-t border-border' : ''}`}>
+                  <div>
+                    <p className="text-sm font-medium capitalize">{bill.bill_type.replace('_', ' ')}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {bill.due_date ? `Due ${bill.due_date}` : 'No due date'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={bill.status} size="sm" />
+                    <CurrencyDisplay agorot={bill.amount_agorot} className="text-sm font-semibold" />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={bill.status} size="sm" />
-                  <CurrencyDisplay agorot={bill.amount_agorot} className="text-sm font-semibold" />
-                </div>
-              </div>
+              </Link>
             ))}
           </div>
         ) : (

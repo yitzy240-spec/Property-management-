@@ -31,6 +31,35 @@ export function BillActions({ billId, propertyId, propertyName, matchMethod }: B
   const [doneAction, setDoneAction] = useState<'approved' | 'rejected' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  async function handlePayment(paymentMethod: string) {
+    setLoading(paymentMethod)
+    setError(null)
+
+    const result = await updateBillStatus(billId, 'approved')
+    if (result.error) {
+      setError(result.error)
+      toast.error('Failed to update bill')
+      setLoading(null)
+      return
+    }
+
+    // Store payment method on the bill
+    const supabase = (await import('@/lib/supabase/client')).createClient()
+    await supabase.from('bills').update({
+      payment_method: paymentMethod,
+    }).eq('id', billId)
+
+    setDoneAction('approved')
+    setLoading(null)
+    const labels: Record<string, string> = {
+      paid_by_owner_cash: 'Marked as paid by owner (cash)',
+      paid_by_owner_cc: 'Marked as paid by owner (CC)',
+      paid_by_admin: 'Marked as paid by you',
+    }
+    toast.success(labels[paymentMethod] || 'Bill approved')
+    router.refresh()
+  }
+
   async function handleAction(action: 'approved' | 'rejected') {
     setLoading(action)
     setError(null)
@@ -93,26 +122,19 @@ export function BillActions({ billId, propertyId, propertyName, matchMethod }: B
       )}
 
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          className="text-status-safe hover:bg-[hsl(var(--status-safe)/0.08)] hover:text-status-safe"
-          disabled={loading !== null}
-          onClick={() => handleAction('approved')}
-        >
-          <Check className="mr-1 h-3.5 w-3.5" />
-          {loading === 'approved' ? 'Approving...' : 'Approve'}
+      <div className="flex flex-wrap gap-1.5">
+        <Button size="sm" variant="outline" className="h-7 text-[10px] text-status-safe hover:bg-[hsl(var(--status-safe)/0.08)]" disabled={loading !== null} onClick={() => handlePayment('paid_by_owner_cash')}>
+          {loading === 'paid_by_owner_cash' ? '...' : 'Owner Paid (Cash)'}
         </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="text-status-danger hover:bg-[hsl(var(--status-danger)/0.08)] hover:text-status-danger"
-          disabled={loading !== null}
-          onClick={() => handleAction('rejected')}
-        >
-          <X className="mr-1 h-3.5 w-3.5" />
-          {loading === 'rejected' ? 'Rejecting...' : 'Reject'}
+        <Button size="sm" variant="outline" className="h-7 text-[10px] text-status-safe hover:bg-[hsl(var(--status-safe)/0.08)]" disabled={loading !== null} onClick={() => handlePayment('paid_by_owner_cc')}>
+          {loading === 'paid_by_owner_cc' ? '...' : 'Owner Paid (CC)'}
+        </Button>
+        <Button size="sm" variant="outline" className="h-7 text-[10px] text-status-info hover:bg-[hsl(var(--status-info)/0.08)]" disabled={loading !== null} onClick={() => handlePayment('paid_by_admin')}>
+          {loading === 'paid_by_admin' ? '...' : 'Paid by Me'}
+        </Button>
+        <Button size="sm" variant="outline" className="h-7 text-[10px] text-status-danger hover:bg-[hsl(var(--status-danger)/0.08)]" disabled={loading !== null} onClick={() => handleAction('rejected')}>
+          <X className="mr-0.5 h-3 w-3" />
+          {loading === 'rejected' ? '...' : 'Reject'}
         </Button>
       </div>
     </div>
