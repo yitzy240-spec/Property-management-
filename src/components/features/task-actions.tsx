@@ -20,6 +20,7 @@ import type { TaskStatus, TaskPriority } from '@/types'
 
 interface TaskActionsProps {
   taskId: string
+  propertyId: string
   currentStatus: TaskStatus
   currentPriority: TaskPriority
   currentContractorId: string | null
@@ -30,6 +31,7 @@ interface TaskActionsProps {
 
 export function TaskActions({
   taskId,
+  propertyId,
   currentStatus,
   currentPriority,
   currentContractorId,
@@ -53,10 +55,40 @@ export function TaskActions({
 
     if (error) {
       toast.error('Failed to update', { description: error.message })
+      setLoading(null)
+      return
+    }
+
+    // When starting a task with a contractor, auto-generate magic link
+    if (status === 'in_progress' && currentContractorId) {
+      try {
+        const res = await fetch('/api/magic-links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            property_id: propertyId,
+            task_id: taskId,
+            contractor_id: currentContractorId,
+            link_type: 'contractor',
+          }),
+        })
+        if (res.ok) {
+          const { url } = await res.json()
+          // Copy link to clipboard
+          await navigator.clipboard.writeText(url).catch(() => {})
+          toast.success('Task started — magic link copied to clipboard', {
+            description: 'Send it to the contractor',
+            duration: 5000,
+          })
+        }
+      } catch {
+        // Non-critical — task still started
+      }
     } else {
       toast.success(`Task ${status === 'completed' ? 'completed' : status === 'cancelled' ? 'cancelled' : 'started'}`)
-      router.refresh()
     }
+
+    router.refresh()
     setLoading(null)
   }
 

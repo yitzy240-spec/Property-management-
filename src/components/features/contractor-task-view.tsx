@@ -153,8 +153,21 @@ export function ContractorTaskView({
       <div className="space-y-4 p-4">
         {/* Property Info + Entry Code */}
         <div className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">{property.name}</h2>
-          <p className="text-xs text-muted-foreground">{property.address}</p>
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-sm font-semibold">{property.name}</h2>
+              <p className="text-xs text-muted-foreground">{property.address}</p>
+            </div>
+            <a
+              href={`https://waze.com/ul?q=${encodeURIComponent(property.address)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-medium hover:bg-muted"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Waze
+            </a>
+          </div>
 
           {(property.entry_code || property.building_entry_code) && (
             <div className="mt-3 space-y-2">

@@ -66,6 +66,7 @@ export default async function TaskDetailPage({
       {/* Task Actions — edit, status change, reassign, cancel */}
       <TaskActions
         taskId={task.id}
+        propertyId={task.property_id}
         currentStatus={task.status}
         currentPriority={task.priority}
         currentContractorId={task.contractor_id}

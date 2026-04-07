@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { notifyAdmins } from '@/lib/notifications'
 
 /**
  * GET /api/cron/cleaning-tasks
  *
- * Auto-creates cleaning tasks for upcoming checkouts.
- * Batch queries to avoid N+1 pattern.
+ * Auto-creates turnover cleaning tasks for upcoming checkouts (7 days out).
+ * Includes next check-in info in description and auto-assigns cleaning contractor.
+ * Notifies admin when new tasks are created.
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
@@ -22,10 +24,12 @@ export async function GET(request: Request) {
   const todayStr = today.toISOString().split('T')[0]
   const nextWeekStr = nextWeek.toISOString().split('T')[0]
 
-  // Batch: get bookings and existing cleaning tasks in parallel
+  // Batch queries
   const [
     { data: upcomingCheckouts },
     { data: existingCleaningTasks },
+    { data: cleaningContractor },
+    { data: allUpcoming },
   ] = await Promise.all([
     serviceClient
       .from('bookings')
@@ -38,18 +42,45 @@ export async function GET(request: Request) {
       .eq('is_cleaning', true)
       .gte('due_date', todayStr)
       .lte('due_date', nextWeekStr),
+    // Find default cleaning contractor
+    serviceClient
+      .from('contractors')
+      .select('id, name')
+      .or('name.ilike.%clean%,name.ilike.%sara%')
+      .limit(1)
+      .single(),
+    // Get all upcoming bookings for next-check-in lookup
+    serviceClient
+      .from('bookings')
+      .select('property_id, guest_name, check_in')
+      .gte('check_in', todayStr)
+      .order('check_in'),
   ])
 
   if (!upcomingCheckouts || upcomingCheckouts.length === 0) {
     return NextResponse.json({ message: 'No upcoming checkouts', created: 0 })
   }
 
-  // Build set of existing cleaning tasks for fast lookup
+  // Build set of existing cleaning tasks
   const existingSet = new Set(
     (existingCleaningTasks ?? []).map(t => `${t.property_id}_${t.due_date}`)
   )
 
-  // Filter to only checkouts that need a cleaning task
+  // Build next-check-in map per property (after each checkout)
+  const nextCheckInMap = new Map<string, { guest: string; date: string }>()
+  for (const checkout of upcomingCheckouts) {
+    const nextBooking = (allUpcoming ?? []).find(
+      b => b.property_id === checkout.property_id && b.check_in > checkout.check_out
+    )
+    if (nextBooking) {
+      nextCheckInMap.set(`${checkout.property_id}_${checkout.check_out}`, {
+        guest: nextBooking.guest_name || 'Guest',
+        date: nextBooking.check_in,
+      })
+    }
+  }
+
+  // Filter to only checkouts that need a task
   const toCreate = upcomingCheckouts.filter(
     b => !existingSet.has(`${b.property_id}_${b.check_out}`)
   )
@@ -58,22 +89,38 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'All cleaning tasks already exist', created: 0 })
   }
 
-  // Batch insert all new cleaning tasks
-  const { error, count } = await serviceClient.from('tasks').insert(
+  // Create tasks with next check-in info
+  const { error } = await serviceClient.from('tasks').insert(
     toCreate.map(booking => {
       const propertyName = (booking.properties as unknown as { name: string } | null)?.name || 'Unknown'
+      const nextCheckIn = nextCheckInMap.get(`${booking.property_id}_${booking.check_out}`)
+      const nextInfo = nextCheckIn
+        ? `\nNext check-in: ${nextCheckIn.guest} on ${nextCheckIn.date}`
+        : '\nNo upcoming check-in scheduled'
+
       return {
         property_id: booking.property_id,
         title: `Turnover clean — ${propertyName}`,
-        description: `Post-checkout cleaning for ${booking.guest_name || 'guest'}. Checkout date: ${booking.check_out}`,
+        description: `Post-checkout cleaning for ${booking.guest_name || 'guest'}. Checkout: ${booking.check_out}${nextInfo}`,
         status: 'pending',
         priority: 'high',
         is_cleaning: true,
         due_date: booking.check_out,
+        contractor_id: cleaningContractor?.id || null,
       }
     })
   )
 
   const created = error ? 0 : toCreate.length
+
+  // Notify admin
+  if (created > 0) {
+    await notifyAdmins({
+      title: `${created} turnover task${created > 1 ? 's' : ''} created`,
+      body: toCreate.map(b => (b.properties as unknown as { name: string })?.name).join(', '),
+      link: '/tasks',
+    })
+  }
+
   return NextResponse.json({ message: `Created ${created} cleaning tasks`, created })
 }

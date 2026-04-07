@@ -8,6 +8,7 @@ import { FeeEntryAddButton } from '@/components/features/fee-entry-add'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { formatILS } from '@/lib/utils'
 import { InvoiceHistory } from '@/components/features/invoice-history'
+import { RevenueBreakdown } from '@/components/features/revenue-breakdown'
 
 export default async function FinancialsPage() {
   const supabase = createServerSupabaseClient()
@@ -120,6 +121,11 @@ export default async function FinancialsPage() {
             <p className="mt-1 text-xs text-muted-foreground">Fees are calculated from completed bookings and tasks</p>
           </div>
         )}
+      </section>
+
+      {/* Revenue Breakdown with Date Filter */}
+      <section>
+        <RevenueBreakdown />
       </section>
 
       {/* Green Invoice History */}

@@ -58,17 +58,17 @@ export default async function DashboardPage() {
         </div>
 
         <div className="rounded-[10px] border border-border bg-card p-5 shadow-sm">
-          <div className="flex items-baseline justify-between">
+          <Link href="/financials" className="flex items-baseline justify-between group">
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 YTD Revenue
               </p>
               <CurrencyDisplay agorot={ytdRevenue} variant="income" className="mt-1 text-2xl font-bold" />
             </div>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(152_54%_25%/0.08)]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(152_54%_25%/0.08)] group-hover:bg-[hsl(152_54%_25%/0.15)] transition-colors">
               <TrendingUp className="h-4 w-4 text-financial-income" />
             </div>
-          </div>
+          </Link>
 
           {/* KPI row */}
           <div className="mt-5 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-border bg-border">
