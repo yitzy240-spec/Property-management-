@@ -7,6 +7,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { OwnerForm } from '@/components/features/owner-form'
+import { OwnerDeleteButton } from '@/components/features/owner-delete'
 
 export default async function OwnerDetailPage({
   params,
@@ -115,6 +116,24 @@ export default async function OwnerDetailPage({
           Edit Owner
         </p>
         <OwnerForm owner={owner} />
+      </section>
+
+      {/* Danger Zone */}
+      <section>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Danger Zone
+        </p>
+        <div className="rounded-[10px] border border-destructive/30 bg-destructive/[0.03] p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Delete Owner</p>
+              <p className="text-xs text-muted-foreground">
+                Properties will be unlinked, not deleted. This cannot be undone.
+              </p>
+            </div>
+            <OwnerDeleteButton ownerId={owner.id} ownerName={owner.full_name} authUserId={owner.auth_user_id} />
+          </div>
+        </div>
       </section>
     </div>
   )

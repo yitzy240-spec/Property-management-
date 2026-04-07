@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAuth, AuthError } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
+import { createNotification, notifyAdmins } from '@/lib/notifications'
 
 /**
  * GET /api/messages?property_id=xxx — Get messages for a property
@@ -94,7 +95,13 @@ async function notifyMessageRecipient(
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://apartmentos.app'
 
   if (senderRole === 'owner') {
-    // Owner sent → notify admin
+    // Owner sent → notify admin (in-app + email)
+    await notifyAdmins({
+      title: `New message — ${property.name}`,
+      body: messageBody.slice(0, 100),
+      link: '/messages',
+    })
+
     const adminEmail = process.env.ADMIN_EMAIL
     if (!adminEmail) return
 
@@ -115,16 +122,28 @@ async function notifyMessageRecipient(
       `,
     })
   } else {
-    // Admin sent → notify owner
+    // Admin sent → notify owner (in-app + email)
     if (!property.owner_id) return
 
     const { data: owner } = await serviceClient
       .from('owners')
-      .select('email, full_name')
+      .select('email, full_name, auth_user_id')
       .eq('id', property.owner_id)
       .single()
 
-    if (!owner?.email) return
+    if (!owner) return
+
+    // In-app notification for owner
+    if (owner.auth_user_id) {
+      await createNotification({
+        userId: owner.auth_user_id,
+        title: `Message from your property manager`,
+        body: messageBody.slice(0, 100),
+        link: '/owner',
+      })
+    }
+
+    if (!owner.email) return
 
     await sendEmail({
       to: owner.email,

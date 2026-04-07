@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Minus, RotateCcw } from 'lucide-react'
+import { Plus, Minus, RotateCcw, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -138,7 +138,29 @@ export function InventoryAdjust({ itemId, field, currentValue }: {
   )
 }
 
-/** Create a laundry batch */
+/** Delete an inventory item */
+export function InventoryDeleteButton({ itemId }: { itemId: string }) {
+  const supabase = createClient()
+  const router = useRouter()
+
+  async function handleDelete() {
+    if (!confirm('Delete this inventory item?')) return
+    const { error } = await supabase.from('inventory_items').delete().eq('id', itemId)
+    if (error) {
+      toast.error('Delete failed')
+    } else {
+      router.refresh()
+    }
+  }
+
+  return (
+    <button onClick={handleDelete} className="rounded p-1 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10" aria-label="Delete">
+      <Trash2 className="h-3 w-3" />
+    </button>
+  )
+}
+
+/** Create a laundry batch — pre-populates with property inventory */
 export function LaundryBatchButton() {
   const supabase = createClient()
   const router = useRouter()
@@ -146,6 +168,7 @@ export function LaundryBatchButton() {
   const [saving, setSaving] = useState(false)
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([])
   const [propertyId, setPropertyId] = useState('')
+  const [itemsText, setItemsText] = useState('')
 
   useEffect(() => {
     if (!open) return
@@ -155,13 +178,31 @@ export function LaundryBatchButton() {
       .catch(() => {})
   }, [open])
 
-  async function handleSubmit(formData: FormData) {
+  // When property changes, pre-populate with inventory items
+  async function handlePropertyChange(pid: string) {
+    setPropertyId(pid)
+    if (!pid) { setItemsText(''); return }
+
+    const { data } = await supabase
+      .from('inventory_items')
+      .select('item_name, quantity_in_closet')
+      .eq('property_id', pid)
+      .order('item_name')
+
+    if (data && data.length > 0) {
+      setItemsText(data.map(i => `${i.item_name} x ${i.quantity_in_closet}`).join('\n'))
+    } else {
+      // Default template if no inventory
+      setItemsText('Bath Towels x 4\nHand Towels x 4\nBed Sheets x 2\nPillow Cases x 4\nDuvet Covers x 2')
+    }
+  }
+
+  async function handleSubmit() {
     setSaving(true)
     if (!propertyId) { toast.error('Select a property'); setSaving(false); return }
 
-    const itemsRaw = formData.get('items') as string
-    const items = itemsRaw.split('\n').map(line => {
-      const parts = line.trim().split(/[x×:]\s*/i)
+    const items = itemsText.split('\n').map(line => {
+      const parts = line.trim().split(/\s*[x×:]\s*/i)
       return {
         item_name: parts[0]?.trim() || line.trim(),
         quantity: parseInt(parts[1]) || 1,
@@ -177,16 +218,38 @@ export function LaundryBatchButton() {
 
     if (error) {
       toast.error('Failed to create batch', { description: error.message })
-    } else {
-      toast.success('Laundry batch created')
-      setOpen(false)
-      router.refresh()
+      setSaving(false)
+      return
     }
+
+    // Auto-update inventory: closet → laundry
+    for (const item of items) {
+      const { data: invItem } = await supabase
+        .from('inventory_items')
+        .select('id, quantity_in_closet, quantity_at_laundry')
+        .eq('property_id', propertyId)
+        .ilike('item_name', item.item_name)
+        .single()
+
+      if (invItem) {
+        await supabase.from('inventory_items').update({
+          quantity_in_closet: Math.max(0, invItem.quantity_in_closet - item.quantity),
+          quantity_at_laundry: invItem.quantity_at_laundry + item.quantity,
+          last_counted_at: new Date().toISOString(),
+        }).eq('id', invItem.id)
+      }
+    }
+
+    toast.success('Laundry batch created — inventory updated')
+    setOpen(false)
+    setItemsText('')
+    setPropertyId('')
+    router.refresh()
     setSaving(false)
   }
 
   return (
-    <Drawer open={open} onOpenChange={setOpen}>
+    <Drawer open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setItemsText(''); setPropertyId('') } }}>
       <DrawerTrigger asChild>
         <Button size="sm" variant="outline" className="h-9 gap-1.5 rounded-[var(--radius-button)]">
           <Plus className="h-3.5 w-3.5" />
@@ -197,12 +260,12 @@ export function LaundryBatchButton() {
         <DrawerHeader>
           <DrawerTitle>Create Laundry Batch</DrawerTitle>
         </DrawerHeader>
-        <form action={handleSubmit} className="space-y-4 p-4">
+        <div className="space-y-4 p-4">
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Property</Label>
             <NativeSelect
               value={propertyId}
-              onChange={(e) => setPropertyId(e.target.value)}
+              onChange={(e) => handlePropertyChange(e.target.value)}
               placeholder="Select property"
               options={properties.map(p => ({ value: p.id, label: p.name }))}
             />
@@ -210,23 +273,29 @@ export function LaundryBatchButton() {
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Items (one per line, e.g. "Bath Towels x 4")</Label>
             <textarea
-              name="items"
-              className="min-h-[100px] w-full rounded-[10px] border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              value={itemsText}
+              onChange={(e) => setItemsText(e.target.value)}
+              className="min-h-[140px] w-full rounded-[10px] border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
               placeholder={"Bath Towels x 4\nBed Sheets x 2\nPillow Cases x 4"}
               required
             />
+            <p className="text-[10px] text-muted-foreground">Pre-filled from property inventory. Adjust quantities as needed.</p>
           </div>
-          <Button type="submit" disabled={saving} className="h-11 w-full bg-accent text-accent-foreground hover:bg-accent/90">
-            {saving ? 'Creating...' : 'Create Batch'}
+          <Button onClick={handleSubmit} disabled={saving || !itemsText.trim()} className="h-11 w-full bg-accent text-accent-foreground hover:bg-accent/90">
+            {saving ? 'Creating...' : 'Create Batch & Update Inventory'}
           </Button>
-        </form>
+        </div>
       </DrawerContent>
     </Drawer>
   )
 }
 
-/** Mark a laundry batch as returned */
-export function LaundryReturnButton({ batchId }: { batchId: string }) {
+/** Mark a laundry batch as returned — auto-updates inventory */
+export function LaundryReturnButton({ batchId, propertyId, items }: {
+  batchId: string
+  propertyId: string
+  items: { item_name: string; quantity: number }[]
+}) {
   const supabase = createClient()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -240,10 +309,30 @@ export function LaundryReturnButton({ batchId }: { batchId: string }) {
 
     if (error) {
       toast.error('Update failed')
-    } else {
-      toast.success('Batch marked as returned')
-      router.refresh()
+      setLoading(false)
+      return
     }
+
+    // Auto-update inventory: laundry → closet
+    for (const item of items) {
+      const { data: invItem } = await supabase
+        .from('inventory_items')
+        .select('id, quantity_in_closet, quantity_at_laundry')
+        .eq('property_id', propertyId)
+        .ilike('item_name', item.item_name)
+        .single()
+
+      if (invItem) {
+        await supabase.from('inventory_items').update({
+          quantity_in_closet: invItem.quantity_in_closet + item.quantity,
+          quantity_at_laundry: Math.max(0, invItem.quantity_at_laundry - item.quantity),
+          last_counted_at: new Date().toISOString(),
+        }).eq('id', invItem.id)
+      }
+    }
+
+    toast.success('Batch returned — inventory updated')
+    router.refresh()
     setLoading(false)
   }
 

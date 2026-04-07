@@ -117,11 +117,8 @@ function BookingAccordionRow({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {booking.platform && <StatusBadge status="neutral" label={booking.platform} size="sm" />}
-          {booking.currency !== 'ILS' && (
-            <span className="text-xs text-muted-foreground">$</span>
-          )}
           {booking.gross_rental_agorot ? (
-            <CurrencyDisplay agorot={booking.gross_rental_agorot} className="text-sm font-semibold" />
+            <CurrencyDisplay agorot={booking.gross_rental_agorot} currency={booking.currency || 'ILS'} className="text-sm font-semibold" />
           ) : (
             <span className="text-xs text-muted-foreground">—</span>
           )}
@@ -139,7 +136,7 @@ function BookingAccordionRow({
             <div className="mt-1 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className="font-mono text-xs text-muted-foreground">{Math.round(commissionRate * 100)}%</span>
-                <CurrencyDisplay agorot={booking.commission_amount_agorot || calculatedCommission} className="text-sm font-semibold" />
+                <CurrencyDisplay agorot={booking.commission_amount_agorot || calculatedCommission} currency={booking.currency || 'ILS'} className="text-sm font-semibold" />
               </div>
               <Button
                 size="sm"
@@ -180,7 +177,7 @@ function BookingAccordionRow({
           {booking.deposit_amount_agorot && booking.deposit_amount_agorot > 0 && (
             <div>
               <p className="text-xs font-medium text-muted-foreground">Deposit</p>
-              <CurrencyDisplay agorot={booking.deposit_amount_agorot} className="mt-0.5 text-sm" />
+              <CurrencyDisplay agorot={booking.deposit_amount_agorot} currency={booking.currency || 'ILS'} className="mt-0.5 text-sm" />
             </div>
           )}
 

@@ -3,6 +3,7 @@ import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/
 import { sendEmail } from '@/lib/email'
 import { blockDates } from '@/lib/lodgify'
 import { requireAuth, AuthError } from '@/lib/auth'
+import { notifyAdmins } from '@/lib/notifications'
 
 /**
  * POST /api/owner/request-stay
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
 
   const { data: property } = await serviceClient
     .from('properties')
-    .select('name, owner_id, lodgify_property_id')
+    .select('id, name, owner_id, lodgify_property_id')
     .eq('id', property_id)
     .single()
 
@@ -95,6 +96,13 @@ export async function POST(request: Request) {
       // Non-critical — dates blocked locally even if Lodgify fails
     }
   }
+
+  // Notify admin in-app
+  await notifyAdmins({
+    title: `Owner stay request — ${property.name}`,
+    body: `${owner.full_name}: ${check_in} → ${check_out}`,
+    link: `/properties/${property.id}`,
+  })
 
   // Notify admin via email
   await sendEmail({

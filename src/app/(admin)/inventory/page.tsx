@@ -5,7 +5,7 @@ import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/
 import { formatDateJerusalem } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { LinenForecast } from '@/components/features/linen-forecast'
-import { InventoryAddButton, InventoryAdjust, LaundryBatchButton, LaundryReturnButton } from '@/components/features/inventory-manage'
+import { InventoryAddButton, InventoryAdjust, InventoryDeleteButton, LaundryBatchButton, LaundryReturnButton } from '@/components/features/inventory-manage'
 import { LaundryPickupButton } from '@/components/features/laundry-pickup'
 
 export default async function InventoryPage() {
@@ -97,16 +97,17 @@ export default async function InventoryPage() {
                   <div className="border-b border-border bg-muted/30 px-4 py-2">
                     <p className="text-xs font-semibold">{propName}</p>
                   </div>
-                  <div className="grid grid-cols-5 gap-0 border-b border-border px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  <div className="grid grid-cols-6 gap-0 border-b border-border px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     <span className="col-span-2">Item</span>
                     <span className="text-center">Closet</span>
                     <span className="text-center">Laundry</span>
                     <span className="text-center">Dmg</span>
+                    <span></span>
                   </div>
                   {items.map((item, i) => {
                     const belowPar = item.par_level && item.quantity_in_closet < item.par_level
                     return (
-                      <div key={item.id} className={`grid grid-cols-5 items-center gap-0 px-4 py-2 ${i > 0 ? 'border-t border-border' : ''}`}>
+                      <div key={item.id} className={`grid grid-cols-6 items-center gap-0 px-4 py-2 ${i > 0 ? 'border-t border-border' : ''}`}>
                         <div className="col-span-2">
                           <p className="text-sm font-medium">{item.item_name}</p>
                         </div>
@@ -115,6 +116,9 @@ export default async function InventoryPage() {
                         </div>
                         <InventoryAdjust itemId={item.id} field="quantity_at_laundry" currentValue={item.quantity_at_laundry} />
                         <InventoryAdjust itemId={item.id} field="quantity_damaged" currentValue={item.quantity_damaged} />
+                        <div className="flex justify-center">
+                          <InventoryDeleteButton itemId={item.id} />
+                        </div>
                       </div>
                     )
                   })}
@@ -147,27 +151,40 @@ export default async function InventoryPage() {
 
         {laundryBatches && laundryBatches.length > 0 ? (
           <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
-            {laundryBatches.map((batch, i) => (
-              <div key={batch.id} className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}>
-                <div>
-                  <p className="text-sm font-medium">
-                    {(batch.properties as { name: string } | null)?.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Sent: {batch.sent_at ? formatDateJerusalem(batch.sent_at) : 'Not sent'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {batch.laundry_provider_notified && (
-                    <StatusBadge status="safe" label="Notified" size="sm" />
-                  )}
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {(batch.items as { item_name: string; quantity: number }[])?.length ?? 0} items
-                  </span>
-                  <LaundryReturnButton batchId={batch.id} />
-                </div>
-              </div>
-            ))}
+            {laundryBatches.map((batch, i) => {
+              const batchItems = (batch.items as { item_name: string; quantity: number }[]) || []
+              return (
+                <details key={batch.id} className={i > 0 ? 'border-t border-border' : ''}>
+                  <summary className="flex cursor-pointer items-center justify-between px-4 py-3 hover:bg-muted/30">
+                    <div>
+                      <p className="text-sm font-medium">
+                        {(batch.properties as { name: string } | null)?.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Sent: {batch.sent_at ? formatDateJerusalem(batch.sent_at) : 'Not sent'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {batch.laundry_provider_notified && (
+                        <StatusBadge status="safe" label="Notified" size="sm" />
+                      )}
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {batchItems.length} items
+                      </span>
+                      <LaundryReturnButton batchId={batch.id} propertyId={batch.property_id} items={batchItems} />
+                    </div>
+                  </summary>
+                  <div className="border-t border-border bg-muted/20 px-4 py-2">
+                    {batchItems.map((item, j) => (
+                      <div key={j} className="flex justify-between py-0.5 text-xs">
+                        <span>{item.item_name}</span>
+                        <span className="font-mono text-muted-foreground">x {item.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )
+            })}
           </div>
         ) : (
           <div className="rounded-[10px] border border-border bg-card py-6 text-center text-sm text-muted-foreground shadow-sm">

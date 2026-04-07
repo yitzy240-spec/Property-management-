@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Send, Sparkles } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
@@ -36,11 +37,20 @@ export function MessageThread({ propertyId, propertyName, currentRole }: Message
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ property_id: propertyId }),
       })
-      if (res.ok) {
+      if (!res.ok) {
+        toast.error('AI draft unavailable')
+      } else {
         const { draft } = await res.json()
-        if (draft) setNewMessage(draft)
+        if (draft) {
+          setNewMessage(draft)
+          toast.success('AI draft generated')
+        } else {
+          toast.error('AI returned empty draft')
+        }
       }
-    } catch { /* silently fail */ }
+    } catch {
+      toast.error('AI draft unavailable')
+    }
     setDrafting(false)
   }
   const scrollRef = useRef<HTMLDivElement>(null)

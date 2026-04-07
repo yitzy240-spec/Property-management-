@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Upload, X, ImageIcon, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import { createProperty, updateProperty } from '@/app/(admin)/properties/actions'
 import type { Property } from '@/types'
 
@@ -19,6 +19,15 @@ export function PropertyForm({ property }: PropertyFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [owners, setOwners] = useState<{ id: string; full_name: string; email: string }[]>([])
+  const [selectedOwnerId, setSelectedOwnerId] = useState(property?.owner_id || '')
+
+  useEffect(() => {
+    fetch('/api/owners/list')
+      .then(r => r.json())
+      .then(data => setOwners(data.owners || []))
+      .catch(() => {})
+  }, [])
 
   const isEditing = !!property
 
@@ -37,7 +46,7 @@ export function PropertyForm({ property }: PropertyFormProps) {
       building_entry_code: formData.get('building_entry_code') as string || null,
       youtube_tutorial_url: formData.get('youtube_tutorial_url') as string || null,
       canva_design_url: formData.get('canva_design_url') as string || null,
-      owner_id: formData.get('owner_id') as string,
+      owner_id: selectedOwnerId,
       commission_rate: parseFloat(formData.get('commission_rate') as string) || 0.20,
       management_fee_agorot: Math.round((parseFloat(formData.get('management_fee') as string) || 0) * 100),
       hourly_rate_agorot: Math.round((parseFloat(formData.get('hourly_rate') as string) || 0) * 100),
@@ -98,8 +107,14 @@ export function PropertyForm({ property }: PropertyFormProps) {
                 <Input id="name" name="name" placeholder="Yafo 42" defaultValue={property?.name} required className="h-11" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="owner_id" className="text-xs font-medium">Owner ID</Label>
-                <Input id="owner_id" name="owner_id" placeholder="Owner UUID" defaultValue={property?.owner_id} required className="h-11 font-mono text-xs" />
+                <Label htmlFor="owner_id" className="text-xs font-medium">Owner</Label>
+                <NativeSelect
+                  value={selectedOwnerId}
+                  onChange={(e) => setSelectedOwnerId(e.target.value)}
+                  placeholder="Select owner"
+                  options={owners.map(o => ({ value: o.id, label: `${o.full_name} (${o.email})` }))}
+                  className="h-11"
+                />
               </div>
             </div>
 

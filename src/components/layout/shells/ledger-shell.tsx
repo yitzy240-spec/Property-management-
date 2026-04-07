@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { signOut } from '@/app/login/actions'
 import { BiometricPrompt } from '@/components/features/biometric-prompt'
+import { NotificationBell } from '@/components/features/notification-bell'
 
 /** Primary bottom nav — Ledger's entity-first tabs */
 const bottomTabs = [
@@ -37,6 +38,7 @@ const bottomTabs = [
 
 /** Secondary nav — only items NOT in bottom tabs */
 const menuItems = [
+  { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/properties', label: 'Properties', icon: Building2 },
   { href: '/owners', label: 'Owners', icon: Users },
   { href: '/tasks', label: 'Tasks', icon: ClipboardList },
@@ -131,10 +133,12 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
           </Sheet>
         </div>
         <div className="flex justify-center">
-          <img src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400" alt="Marcus Properties" className="h-7 w-auto" />
+          <Link href="/dashboard">
+            <img src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400" alt="Marcus Properties" className="h-7 w-auto" />
+          </Link>
         </div>
         <div className="flex justify-end">
-          <span className="text-sm font-bold tracking-tight text-primary">ApartmentOS</span>
+          <NotificationBell />
         </div>
       </header>
 

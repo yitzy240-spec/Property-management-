@@ -3,8 +3,10 @@ import { cn } from '@/lib/utils'
 type CurrencyVariant = 'default' | 'income' | 'expense' | 'net' | 'hero'
 
 interface CurrencyDisplayProps {
-  /** Amount in agorot (integer). Converted to ILS for display. */
+  /** Amount in smallest unit (agorot for ILS, cents for USD). */
   agorot: number
+  /** Currency code. Defaults to ILS. */
+  currency?: string
   variant?: CurrencyVariant
   className?: string
   showSign?: boolean
@@ -18,21 +20,30 @@ const variantStyles: Record<CurrencyVariant, string> = {
   hero: 'text-foreground text-[length:var(--text-hero)] font-bold',
 }
 
+const currencySymbols: Record<string, string> = {
+  ILS: '₪',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+}
+
 /**
  * Universal currency display component.
  * - Always uses monospace font with tabular-nums
- * - Converts agorot to ILS with ₪ symbol
+ * - Converts smallest unit to display value
  * - Semantic coloring via financial tokens
  */
 export function CurrencyDisplay({
   agorot,
+  currency = 'ILS',
   variant = 'default',
   className,
   showSign = false,
 }: CurrencyDisplayProps) {
-  const ils = agorot / 100
+  const amount = agorot / 100
   const sign = showSign && agorot > 0 ? '+' : ''
-  const formatted = `${sign}₪${Math.abs(ils).toLocaleString('he-IL', {
+  const symbol = currencySymbols[currency] || currency + ' '
+  const formatted = `${sign}${symbol}${Math.abs(amount).toLocaleString('he-IL', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`
