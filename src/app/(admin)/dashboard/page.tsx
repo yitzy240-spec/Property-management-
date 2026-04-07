@@ -132,6 +132,8 @@ export default async function DashboardPage() {
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
             {properties.map((property) => {
               const ld = property.lodgify_data as { image_url?: string } | null
+              const heroImage = (property as Record<string, unknown>).image_url as string | null
+                || (ld?.image_url ? `https:${ld.image_url}` : null)
               const booking = propertyBookingMap[property.id]
               const tasks = propertyTaskCount[property.id] || 0
               const isOccupied = !!booking && booking.checkIn <= today && booking.checkOut >= today
@@ -140,8 +142,8 @@ export default async function DashboardPage() {
                 <Link key={property.id} href={`/properties/${property.id}`} className="group block">
                   <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
                     <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
-                      {ld?.image_url ? (
-                        <img src={`https:${ld.image_url}`} alt={property.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      {heroImage ? (
+                        <img src={heroImage} alt={property.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                       ) : (
                         <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">No image</div>
                       )}

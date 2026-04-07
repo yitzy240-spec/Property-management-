@@ -37,6 +37,8 @@ export default async function PropertiesPage() {
           {properties.map((property) => {
             const owner = property.owners as { full_name: string; profile: string } | null
             const ld = property.lodgify_data as { image_url?: string; min_price?: number; max_price?: number; currency_code?: string } | null
+            const heroImage = (property as Record<string, unknown>).image_url as string | null
+              || (ld?.image_url ? `https:${ld.image_url}` : null)
             const profileStatus = owner?.profile === 'investor' ? 'info' : owner?.profile === 'hybrid' ? 'warning' : 'safe'
 
             return (
@@ -44,9 +46,9 @@ export default async function PropertiesPage() {
                 <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
                   {/* Hero image */}
                   <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted">
-                    {ld?.image_url ? (
+                    {heroImage ? (
                       <img
-                        src={`https:${ld.image_url}`}
+                        src={heroImage}
                         alt={property.name}
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
