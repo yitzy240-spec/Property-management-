@@ -63,6 +63,19 @@ export default async function ContractorMagicLinkPage({
       checklistItems = items ?? []
     }
 
+    // Fetch inventory items for laundry count (only if cleaning task)
+    const isCleaning = task?.is_cleaning || task?.title?.toLowerCase().includes('clean') || task?.title?.toLowerCase().includes('turnover')
+    let inventoryItems: { item_name: string; quantity_in_closet: number }[] = []
+    if (isCleaning) {
+      const { data: invItems } = await serviceClient
+        .from('inventory_items')
+        .select('item_name, quantity_in_closet')
+        .eq('property_id', payload.property_id)
+        .gt('quantity_in_closet', 0)
+        .order('item_name')
+      inventoryItems = invItems ?? []
+    }
+
     return (
       <ContractorTaskView
         token={params.token}
@@ -70,6 +83,7 @@ export default async function ContractorMagicLinkPage({
         task={task}
         checklistItems={checklistItems}
         magicLinkId={magicLink.id}
+        inventoryItems={inventoryItems}
       />
     )
   } catch {

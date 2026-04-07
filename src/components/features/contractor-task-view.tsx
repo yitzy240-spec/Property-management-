@@ -77,15 +77,30 @@ const translations = {
   },
 }
 
-// ── Laundry items with clear images ──
+// ── Laundry item icon mapping ──
 
-const LAUNDRY_ITEMS = [
-  { key: 'pillow_case', en: 'Pillow Case', he: 'ציפית כרית', image: '/laundry/pillow-case.svg' },
-  { key: 'blanket_cover', en: 'Blanket Cover', he: 'שמיכה', image: '/laundry/blanket-cover.svg' },
-  { key: 'fitted_sheet', en: 'Fitted Sheet', he: 'סדין', image: '/laundry/fitted-sheet.svg' },
-  { key: 'shower_towel', en: 'Shower Towel', he: 'מגבת מקלחת', image: '/laundry/shower-towel.svg' },
-  { key: 'face_towel', en: 'Face Towel', he: 'מגבת פנים', image: '/laundry/face-towel.svg' },
-]
+const ITEM_ICONS: Record<string, string> = {
+  // Match by keyword in item name (case-insensitive)
+  'pillow': '/laundry/pillow-case.svg',
+  'blanket': '/laundry/blanket-cover.svg',
+  'duvet': '/laundry/blanket-cover.svg',
+  'sheet': '/laundry/fitted-sheet.svg',
+  'bath towel': '/laundry/shower-towel.svg',
+  'shower towel': '/laundry/shower-towel.svg',
+  'towel': '/laundry/shower-towel.svg',
+  'face towel': '/laundry/face-towel.svg',
+  'hand towel': '/laundry/face-towel.svg',
+}
+
+function getItemIcon(itemName: string): string {
+  const lower = itemName.toLowerCase()
+  // Check longest matches first for specificity
+  const keys = Object.keys(ITEM_ICONS).sort((a, b) => b.length - a.length)
+  for (const key of keys) {
+    if (lower.includes(key)) return ITEM_ICONS[key]
+  }
+  return '/laundry/fitted-sheet.svg' // default
+}
 
 // ── Types ──
 
@@ -113,6 +128,7 @@ interface ContractorTaskViewProps {
     sort_order: number
   }[]
   magicLinkId: string
+  inventoryItems?: { item_name: string; quantity_in_closet: number }[]
 }
 
 export function ContractorTaskView({
@@ -121,6 +137,7 @@ export function ContractorTaskView({
   task,
   checklistItems: initialItems,
   magicLinkId,
+  inventoryItems = [],
 }: ContractorTaskViewProps) {
   const [lang, setLang] = useState<'en' | 'he'>('en')
   const t = translations[lang]
@@ -131,9 +148,9 @@ export function ContractorTaskView({
   const [expenseAmount, setExpenseAmount] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Laundry counts
+  // Laundry counts — use actual inventory items from the property
   const [laundryCounts, setLaundryCounts] = useState<Record<string, number>>(
-    Object.fromEntries(LAUNDRY_ITEMS.map(i => [i.key, 0]))
+    Object.fromEntries(inventoryItems.map(i => [i.item_name, 0]))
   )
   const [laundrySubmitted, setLaundrySubmitted] = useState(false)
   const [laundrySubmitting, setLaundrySubmitting] = useState(false)
@@ -141,7 +158,7 @@ export function ContractorTaskView({
   const completedCount = checklist.filter((i) => i.is_completed).length
   const totalCount = checklist.length
   const allChecked = totalCount > 0 && completedCount === totalCount
-  const isCleaning = task?.is_cleaning || task?.title?.toLowerCase().includes('clean') || task?.title?.toLowerCase().includes('turnover')
+  const showLaundry = inventoryItems.length > 0
 
   function adjustCount(key: string, delta: number) {
     setLaundryCounts(prev => ({
@@ -202,9 +219,9 @@ export function ContractorTaskView({
   async function handleSubmitLaundry() {
     setLaundrySubmitting(true)
     try {
-      const items = LAUNDRY_ITEMS
-        .filter(i => laundryCounts[i.key] > 0)
-        .map(i => ({ item_name: i.en, quantity: laundryCounts[i.key] }))
+      const items = inventoryItems
+        .filter(i => laundryCounts[i.item_name] > 0)
+        .map(i => ({ item_name: i.item_name, quantity: laundryCounts[i.item_name] }))
 
       const res = await fetch('/api/contractor/laundry', {
         method: 'POST',
@@ -371,35 +388,36 @@ export function ContractorTaskView({
           </div>
         )}
 
-        {/* Laundry Count — shown for cleaning/turnover tasks */}
-        {isCleaning && (
+        {/* Laundry Count — shown only for cleaning tasks with inventory items */}
+        {showLaundry && (
           <div className="rounded-[10px] border border-border bg-card shadow-sm">
             <div className="border-b border-border px-4 py-3">
               <p className="text-sm font-semibold">{t.laundryCount}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">{t.laundryDesc}</p>
             </div>
             <div className="p-2">
-              {LAUNDRY_ITEMS.map((item) => (
-                <div key={item.key} className="flex items-center justify-between px-3 py-2.5">
+              {inventoryItems.map((item) => (
+                <div key={item.item_name} className="flex items-center justify-between px-3 py-2.5">
                   <div className="flex items-center gap-3">
-                    <img src={item.image} alt={item.en} className="h-10 w-10 object-contain" />
+                    <img src={getItemIcon(item.item_name)} alt={item.item_name} className="h-10 w-10 object-contain" />
                     <div>
-                      <p className="text-sm font-medium">{lang === 'he' ? item.he : item.en}</p>
+                      <p className="text-sm font-medium">{item.item_name}</p>
+                      <p className="text-[10px] text-muted-foreground">in closet: {item.quantity_in_closet}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => adjustCount(item.key, -1)}
-                      disabled={laundryCounts[item.key] === 0 || laundrySubmitted}
+                      onClick={() => adjustCount(item.item_name, -1)}
+                      disabled={laundryCounts[item.item_name] === 0 || laundrySubmitted}
                       className="flex h-8 w-8 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-30"
                     >
                       <Minus className="h-4 w-4" />
                     </button>
                     <span className="w-8 text-center font-mono text-lg font-bold">
-                      {laundryCounts[item.key]}
+                      {laundryCounts[item.item_name] || 0}
                     </span>
                     <button
-                      onClick={() => adjustCount(item.key, 1)}
+                      onClick={() => adjustCount(item.item_name, 1)}
                       disabled={laundrySubmitted}
                       className="flex h-8 w-8 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-30"
                     >
