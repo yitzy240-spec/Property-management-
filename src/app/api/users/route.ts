@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
+import { sendEmail } from '@/lib/email'
 
 /**
  * GET /api/users — List all admin users
@@ -88,10 +89,43 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  // Send password setup email via Resend
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://apartmentos.app'
+  const loginPath = role === 'admin' ? '/admin/login' : '/login'
+
+  const { data: linkData } = await serviceClient.auth.admin.generateLink({
+    type: 'recovery',
+    email,
+    options: {
+      redirectTo: `${appUrl}/login/reset?setup=1`,
+    },
+  })
+
+  const resetLink = linkData?.properties?.action_link
+
+  if (resetLink) {
+    await sendEmail({
+      to: email,
+      subject: `You've been added to ApartmentOS`,
+      html: `
+        <div style="font-family: Inter, system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+          <img src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400" alt="Marcus Properties" style="height: 40px; margin-bottom: 16px;" />
+          <h2 style="color: #1E3A5F; margin: 0 0 8px;">Welcome to ApartmentOS</h2>
+          <p style="color: #6B7280; font-size: 14px; margin: 0 0 16px;">
+            You've been added as ${role === 'admin' ? 'an administrator' : 'an owner'}. Set your password to get started.
+          </p>
+          <a href="${resetLink}" style="display: inline-block; background: #1E3A5F; color: #F8F7F4; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500;">Set Your Password</a>
+          <p style="color: #9CA3AF; font-size: 12px; margin-top: 24px;">After setting your password, sign in at <strong>${appUrl}${loginPath}</strong></p>
+          <p style="color: #9CA3AF; font-size: 11px; margin-top: 16px;">— Marcus Properties via ApartmentOS</p>
+        </div>
+      `,
+    })
+  }
+
   return NextResponse.json({
     success: true,
     user_id: newUser.user.id,
-    message: `${role} user created. They can sign in at /login.`,
+    message: `${role} user created — password setup email sent.`,
   })
 }
 
