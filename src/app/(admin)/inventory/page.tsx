@@ -5,7 +5,7 @@ import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/
 import { formatDateJerusalem } from '@/lib/utils'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { LinenForecast } from '@/components/features/linen-forecast'
-import { InventoryAddButton, InventoryAdjust, InventoryDeleteButton, LaundryBatchButton, LaundryReturnButton } from '@/components/features/inventory-manage'
+import { InventoryAddButton, InventoryAdjust, InventoryDeleteButton, LaundryBatchButton, LaundryReturnButton, LaundryEditButton } from '@/components/features/inventory-manage'
 import { LaundryPickupButton } from '@/components/features/laundry-pickup'
 
 export default async function InventoryPage() {
@@ -171,6 +171,7 @@ export default async function InventoryPage() {
                       <span className="font-mono text-xs text-muted-foreground">
                         {batchItems.length} items
                       </span>
+                      <LaundryEditButton batchId={batch.id} items={batchItems} />
                       <LaundryReturnButton batchId={batch.id} propertyId={batch.property_id} items={batchItems} />
                     </div>
                   </summary>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Minus, RotateCcw, Trash2 } from 'lucide-react'
+import { Plus, Minus, RotateCcw, Trash2, Pencil } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -359,5 +359,78 @@ export function LaundryReturnButton({ batchId, propertyId, items }: {
       <RotateCcw className="h-3 w-3" />
       {loading ? '...' : 'Returned'}
     </Button>
+  )
+}
+
+/** Edit a laundry batch — adjust item quantities */
+export function LaundryEditButton({ batchId, items: initialItems }: {
+  batchId: string
+  items: { item_name: string; quantity: number }[]
+}) {
+  const supabase = createClient()
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [items, setItems] = useState(initialItems)
+
+  function updateQuantity(index: number, delta: number) {
+    setItems(prev => prev.map((item, i) =>
+      i === index ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item
+    ))
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const nonZero = items.filter(i => i.quantity > 0)
+    const { error } = await supabase
+      .from('laundry_batches')
+      .update({ items: nonZero })
+      .eq('id', batchId)
+
+    if (error) {
+      toast.error('Save failed')
+    } else {
+      toast.success('Batch updated')
+      setOpen(false)
+      router.refresh()
+    }
+    setSaving(false)
+  }
+
+  return (
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
+        <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs">
+          <Pencil className="h-3 w-3" />
+          Edit
+        </Button>
+      </DrawerTrigger>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Edit Laundry Batch</DrawerTitle>
+        </DrawerHeader>
+        <div className="space-y-2 p-4">
+          {items.map((item, i) => (
+            <div key={i} className="flex items-center justify-between rounded-lg border border-border p-3">
+              <span className="text-sm font-medium">{item.item_name}</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => updateQuantity(i, -1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-border hover:bg-muted">
+                  <Minus className="h-4 w-4" />
+                </button>
+                <span className="w-8 text-center font-mono text-lg font-bold">{item.quantity}</span>
+                <button onClick={() => updateQuantity(i, 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-border hover:bg-muted">
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="p-4">
+          <Button onClick={handleSave} disabled={saving} className="h-11 w-full">
+            {saving ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </div>
+      </DrawerContent>
+    </Drawer>
   )
 }

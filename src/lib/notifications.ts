@@ -44,48 +44,44 @@ export async function notifyAdmins({
     const serviceClient = createServiceClient()
     const adminEmail = process.env.ADMIN_EMAIL
 
-    if (!adminEmail) return
+    if (!adminEmail) {
+      console.warn('[Notification] ADMIN_EMAIL not set')
+      return
+    }
 
-    // Look up admin user directly by email (no listUsers scan)
-    const { data: adminOwner } = await serviceClient
-      .from('owners')
-      .select('auth_user_id')
-      .eq('email', adminEmail)
-      .single()
-
-    // Also check auth users directly via the admin API
-    // Use a targeted approach — get user by email from app_settings cache or direct lookup
-    const adminUserIds: string[] = []
-
-    // Try to find admin via stored admin user ID
-    const { data: adminSetting } = await serviceClient
+    // Check cache first
+    const { data: cached } = await serviceClient
       .from('app_settings')
       .select('value')
       .eq('key', 'admin_user_id')
       .single()
 
-    if (adminSetting?.value) {
-      adminUserIds.push(adminSetting.value)
-    } else {
-      // First-time: look up and cache the admin user ID
-      const { data: userData } = await serviceClient.auth.admin.getUserById(
-        adminOwner?.auth_user_id || ''
-      )
-      if (userData?.user) {
-        adminUserIds.push(userData.user.id)
-        // Cache for future lookups
-        await serviceClient.from('app_settings').upsert({
-          key: 'admin_user_id',
-          value: userData.user.id,
-          description: 'Cached admin user ID for notifications',
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'key' })
-      }
+    if (cached?.value) {
+      await createNotification({ userId: cached.value, title, body, link })
+      return
     }
 
-    for (const userId of adminUserIds) {
-      await createNotification({ userId, title, body, link })
+    // No cache — find admin by email using generateLink (doesn't scan all users)
+    const { data: linkData } = await serviceClient.auth.admin.generateLink({
+      type: 'magiclink',
+      email: adminEmail,
+    })
+
+    const adminUserId = linkData?.user?.id
+    if (!adminUserId) {
+      console.error('[Notification] Could not find admin user for', adminEmail)
+      return
     }
+
+    // Cache for future
+    await serviceClient.from('app_settings').upsert({
+      key: 'admin_user_id',
+      value: adminUserId,
+      description: 'Cached admin user ID for notifications',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'key' })
+
+    await createNotification({ userId: adminUserId, title, body, link })
   } catch (err) {
     console.error('[Notification] Failed to notify admins:', err)
   }

@@ -188,32 +188,26 @@ export function ContractorTaskView({
     if (!file || !task) return
 
     const MAX_SIZE = 25 * 1024 * 1024
-    if (file.size > MAX_SIZE) return
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) return
+    if (file.size > MAX_SIZE) { toast.error('File too large (max 25MB)'); return }
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) { toast.error('Only images and videos'); return }
 
-    const supabase = createClient()
-    const folder = type === 'receipt' ? 'receipts' : 'tasks'
-    const filePath = `${folder}/${task.id}/${Date.now()}_${file.name}`
+    const form = new FormData()
+    form.append('file', file)
+    form.append('token', token)
+    form.append('task_id', task.id)
+    form.append('media_type', file.type.startsWith('video') ? 'video' : 'image')
+    if (type === 'receipt') form.append('caption', 'Expense receipt')
 
-    const { error: uploadError } = await supabase.storage.from('task-media').upload(filePath, file)
-    if (uploadError) {
-      toast.error('Upload failed', { description: uploadError.message })
-      return
+    try {
+      const res = await fetch('/api/contractor/upload', { method: 'POST', body: form })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Upload failed')
+      }
+      toast.success(type === 'receipt' ? 'Receipt uploaded' : 'Photo uploaded')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Upload failed')
     }
-
-    toast.success(type === 'receipt' ? 'Receipt uploaded' : 'Photo uploaded')
-
-    await fetch('/api/contractor/media', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token,
-        task_id: task.id,
-        storage_path: filePath,
-        media_type: file.type.startsWith('video') ? 'video' : 'image',
-        caption: type === 'receipt' ? 'Expense receipt' : null,
-      }),
-    })
   }
 
   async function handleSubmitLaundry() {
