@@ -106,18 +106,29 @@ export function MessageThread({ propertyId, propertyName, currentRole }: Message
 
   function formatTime(dateStr: string) {
     const d = new Date(dateStr)
-    const now = new Date()
-    const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
-
-    const time = d.toLocaleTimeString('en-IL', {
+    return d.toLocaleTimeString('en-IL', {
       hour: '2-digit',
       minute: '2-digit',
       timeZone: 'Asia/Jerusalem',
     })
+  }
 
-    if (diffDays === 0) return time
-    if (diffDays === 1) return `Yesterday ${time}`
-    return `${d.toLocaleDateString('en-IL', { day: 'numeric', month: 'short', timeZone: 'Asia/Jerusalem' })} ${time}`
+  function formatDateLabel(dateStr: string) {
+    const d = new Date(dateStr)
+    const now = new Date()
+    const msgDate = d.toLocaleDateString('en-IL', { timeZone: 'Asia/Jerusalem' })
+    const todayDate = now.toLocaleDateString('en-IL', { timeZone: 'Asia/Jerusalem' })
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayDate = yesterday.toLocaleDateString('en-IL', { timeZone: 'Asia/Jerusalem' })
+
+    if (msgDate === todayDate) return 'Today'
+    if (msgDate === yesterdayDate) return 'Yesterday'
+    return d.toLocaleDateString('en-IL', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'Asia/Jerusalem' })
+  }
+
+  function getDateKey(dateStr: string) {
+    return new Date(dateStr).toLocaleDateString('en-IL', { timeZone: 'Asia/Jerusalem' })
   }
 
   return (
@@ -137,30 +148,39 @@ export function MessageThread({ propertyId, propertyName, currentRole }: Message
             No messages yet. Start a conversation.
           </p>
         ) : (
-          messages.map((msg) => {
+          messages.map((msg, idx) => {
             const isMe = msg.sender_role === currentRole
+            const prevMsg = idx > 0 ? messages[idx - 1] : null
+            const showDateSeparator = !prevMsg || getDateKey(msg.created_at) !== getDateKey(prevMsg.created_at)
+
             return (
-              <div
-                key={msg.id}
-                className={cn('flex', isMe ? 'justify-end' : 'justify-start')}
-              >
-                <div
-                  className={cn(
-                    'max-w-[75%] rounded-lg px-3 py-2',
-                    isMe
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
-                  )}
-                >
-                  <p className="text-sm">{msg.body}</p>
-                  <p
+              <div key={msg.id}>
+                {showDateSeparator && (
+                  <div className="flex items-center justify-center py-2">
+                    <span className="rounded-full bg-muted px-3 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {formatDateLabel(msg.created_at)}
+                    </span>
+                  </div>
+                )}
+                <div className={cn('flex', isMe ? 'justify-end' : 'justify-start')}>
+                  <div
                     className={cn(
-                      'mt-1 text-xs',
-                      isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                      'max-w-[75%] rounded-lg px-3 py-2',
+                      isMe
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted'
                     )}
                   >
-                    {msg.sender_role === 'admin' ? 'Manager' : 'Owner'} · {formatTime(msg.created_at)}
-                  </p>
+                    <p className="text-sm">{msg.body}</p>
+                    <p
+                      className={cn(
+                        'mt-1 text-[10px]',
+                        isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                      )}
+                    >
+                      {msg.sender_role === 'admin' ? 'Manager' : 'Owner'} · {formatTime(msg.created_at)}
+                    </p>
+                  </div>
                 </div>
               </div>
             )
