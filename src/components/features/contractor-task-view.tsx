@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Camera, Receipt, ExternalLink, CheckCircle2 } from 'lucide-react'
+import { Check, Camera, Receipt, ExternalLink, CheckCircle2, Minus, Plus, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,77 @@ import {
 } from '@/components/ui/drawer'
 import { createClient } from '@/lib/supabase/client'
 
+// ── i18n ──
+
+const translations = {
+  en: {
+    taskAssignment: 'Task Assignment',
+    buildingEntrance: 'Building Entrance',
+    apartmentCode: 'Apartment Code',
+    watchTutorial: 'Watch Apartment Tutorial',
+    checklist: 'Checklist',
+    uploadPhotos: 'Upload Photos',
+    photoDesc: 'Take photos of completed work for the owner record.',
+    tapToUpload: 'Tap to take or upload photo',
+    expense: 'Expense (optional)',
+    expenseDesc: 'Log any materials purchased for this task.',
+    completeTask: 'Complete Task',
+    confirmCompletion: 'Confirm Completion',
+    confirmDesc: 'This will mark the task as done and notify the property manager.',
+    yesComplete: 'Yes, Complete Task',
+    cancel: 'Cancel',
+    completeAllItems: 'Complete all checklist items to submit',
+    taskComplete: 'Task Complete',
+    thankYou: 'Thank you! Your work has been logged.',
+    laundryCount: 'Laundry Count',
+    laundryDesc: 'Mark how many of each item are being sent to laundry.',
+    submitLaundry: 'Submit Laundry Count',
+    laundrySubmitted: 'Laundry count submitted',
+    submitting: 'Submitting...',
+    waze: 'Waze',
+    receipt: 'Receipt',
+  },
+  he: {
+    taskAssignment: 'משימה',
+    buildingEntrance: 'כניסה לבניין',
+    apartmentCode: 'קוד לדירה',
+    watchTutorial: 'צפה בסרטון הדרכה',
+    checklist: 'רשימת משימות',
+    uploadPhotos: 'העלאת תמונות',
+    photoDesc: 'צלם תמונות של העבודה שהושלמה.',
+    tapToUpload: 'לחץ לצלם או להעלות תמונה',
+    expense: 'הוצאה (לא חובה)',
+    expenseDesc: 'רשום חומרים שנרכשו למשימה.',
+    completeTask: 'סיום משימה',
+    confirmCompletion: 'אישור סיום',
+    confirmDesc: 'פעולה זו תסמן את המשימה כהושלמה ותשלח הודעה למנהל.',
+    yesComplete: 'כן, סיים משימה',
+    cancel: 'ביטול',
+    completeAllItems: 'השלם את כל הפריטים ברשימה',
+    taskComplete: 'המשימה הושלמה',
+    thankYou: '!תודה! העבודה נרשמה',
+    laundryCount: 'ספירת כביסה',
+    laundryDesc: 'סמן כמה מכל פריט נשלח לכביסה.',
+    submitLaundry: 'שלח ספירת כביסה',
+    laundrySubmitted: 'ספירת כביסה נשלחה',
+    submitting: '...שולח',
+    waze: 'Waze',
+    receipt: 'קבלה',
+  },
+}
+
+// ── Laundry items with emoji icons (language-independent) ──
+
+const LAUNDRY_ITEMS = [
+  { key: 'pillow_case', en: 'Pillow Case', he: 'ציפית כרית', icon: '🛏️' },
+  { key: 'blanket_cover', en: 'Blanket Cover', he: 'שמיכה', icon: '🛌' },
+  { key: 'fitted_sheet', en: 'Fitted Sheet', he: 'סדין', icon: '📋' },
+  { key: 'shower_towel', en: 'Shower Towel', he: 'מגבת מקלחת', icon: '🛁' },
+  { key: 'face_towel', en: 'Face Towel', he: 'מגבת פנים', icon: '🧴' },
+]
+
+// ── Types ──
+
 interface ContractorTaskViewProps {
   token: string
   property: {
@@ -33,6 +104,7 @@ interface ContractorTaskViewProps {
     title: string
     description: string | null
     status: string
+    is_cleaning?: boolean
   } | null
   checklistItems: {
     id: string
@@ -50,14 +122,33 @@ export function ContractorTaskView({
   checklistItems: initialItems,
   magicLinkId,
 }: ContractorTaskViewProps) {
+  const [lang, setLang] = useState<'en' | 'he'>('en')
+  const t = translations[lang]
+  const isRtl = lang === 'he'
+
   const [checklist, setChecklist] = useState(initialItems)
   const [completed, setCompleted] = useState(false)
   const [expenseAmount, setExpenseAmount] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  // Laundry counts
+  const [laundryCounts, setLaundryCounts] = useState<Record<string, number>>(
+    Object.fromEntries(LAUNDRY_ITEMS.map(i => [i.key, 0]))
+  )
+  const [laundrySubmitted, setLaundrySubmitted] = useState(false)
+  const [laundrySubmitting, setLaundrySubmitting] = useState(false)
+
   const completedCount = checklist.filter((i) => i.is_completed).length
   const totalCount = checklist.length
   const allChecked = totalCount > 0 && completedCount === totalCount
+  const isCleaning = task?.is_cleaning || task?.title?.toLowerCase().includes('clean') || task?.title?.toLowerCase().includes('turnover')
+
+  function adjustCount(key: string, delta: number) {
+    setLaundryCounts(prev => ({
+      ...prev,
+      [key]: Math.max(0, (prev[key] || 0) + delta),
+    }))
+  }
 
   async function toggleItem(itemId: string) {
     setChecklist((prev) =>
@@ -108,6 +199,33 @@ export function ContractorTaskView({
     })
   }
 
+  async function handleSubmitLaundry() {
+    setLaundrySubmitting(true)
+    try {
+      const items = LAUNDRY_ITEMS
+        .filter(i => laundryCounts[i.key] > 0)
+        .map(i => ({ item_name: i.en, quantity: laundryCounts[i.key] }))
+
+      const res = await fetch('/api/contractor/laundry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, items }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed')
+      }
+
+      setLaundrySubmitted(true)
+      toast.success(t.laundrySubmitted)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed')
+    } finally {
+      setLaundrySubmitting(false)
+    }
+  }
+
   async function handleComplete() {
     setSubmitting(true)
 
@@ -130,24 +248,31 @@ export function ContractorTaskView({
       <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] p-4">
         <div className="text-center">
           <CheckCircle2 className="mx-auto h-14 w-14 text-status-safe" />
-          <h1 className="mt-4 text-lg font-semibold text-foreground">Task Complete</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Thank you! Your work has been logged.
-          </p>
+          <h1 className="mt-4 text-lg font-semibold text-foreground">{t.taskComplete}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{t.thankYou}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-[#FAFAFA]">
+    <div className="mx-auto min-h-screen max-w-lg bg-[#FAFAFA]" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Header */}
       <div className="border-b border-border bg-card px-4 py-4">
-        <div className="flex items-center gap-2">
-          <img src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400" alt="Marcus Properties" className="h-6 w-auto" />
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">ApartmentOS</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src="https://l.icdbcdn.com/oh/74d2487f-0550-4566-92d4-6cace7f7964a.png?w=400" alt="Marcus Properties" className="h-6 w-auto" />
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">ApartmentOS</p>
+          </div>
+          <button
+            onClick={() => setLang(lang === 'en' ? 'he' : 'en')}
+            className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium hover:bg-muted"
+          >
+            <Globe className="h-3.5 w-3.5" />
+            {lang === 'en' ? 'עברית' : 'English'}
+          </button>
         </div>
-        <h1 className="mt-1 text-lg font-semibold">Task Assignment</h1>
+        <h1 className="mt-1 text-lg font-semibold">{t.taskAssignment}</h1>
       </div>
 
       <div className="space-y-4 p-4">
@@ -165,7 +290,7 @@ export function ContractorTaskView({
               className="flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-medium hover:bg-muted"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Waze
+              {t.waze}
             </a>
           </div>
 
@@ -173,13 +298,13 @@ export function ContractorTaskView({
             <div className="mt-3 space-y-2">
               {property.building_entry_code && (
                 <div className="rounded-lg bg-muted/50 p-3 text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Building Entrance</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{t.buildingEntrance}</p>
                   <p className="mt-1 font-mono text-2xl font-bold tracking-[0.15em]">{property.building_entry_code}</p>
                 </div>
               )}
               {property.entry_code && (
                 <div className="rounded-lg bg-primary/5 p-3 text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Apartment Code</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{t.apartmentCode}</p>
                   <p className="mt-1 font-mono text-4xl font-bold tracking-[0.2em]">{property.entry_code}</p>
                 </div>
               )}
@@ -187,15 +312,10 @@ export function ContractorTaskView({
           )}
 
           {property.youtube_tutorial_url && (
-            <a
-              href={property.youtube_tutorial_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 block"
-            >
+            <a href={property.youtube_tutorial_url} target="_blank" rel="noopener noreferrer" className="mt-3 block">
               <Button variant="outline" size="sm" className="w-full gap-1.5">
                 <ExternalLink className="h-3.5 w-3.5" />
-                Watch Apartment Tutorial
+                {t.watchTutorial}
               </Button>
             </a>
           )}
@@ -206,7 +326,7 @@ export function ContractorTaskView({
           <div className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
             <h3 className="text-sm font-semibold">{task.title}</h3>
             {task.description && (
-              <p className="mt-1 text-xs text-muted-foreground">{task.description}</p>
+              <p className="mt-1 text-xs text-muted-foreground whitespace-pre-line">{task.description}</p>
             )}
           </div>
         )}
@@ -216,7 +336,7 @@ export function ContractorTaskView({
           <div className="rounded-[10px] border border-border bg-card shadow-sm">
             <div className="border-b border-border px-4 py-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold">Checklist</p>
+                <p className="text-sm font-semibold">{t.checklist}</p>
                 <span className="font-mono text-xs text-muted-foreground">{completedCount}/{totalCount}</span>
               </div>
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -231,7 +351,7 @@ export function ContractorTaskView({
                 <button
                   key={item.id}
                   onClick={() => toggleItem(item.id)}
-                  className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-safe focus-visible:ring-offset-2 active:scale-[0.98]"
+                  className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-muted/50 active:scale-[0.98]"
                 >
                   <div
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
@@ -242,11 +362,7 @@ export function ContractorTaskView({
                   >
                     {item.is_completed && <Check className="h-4 w-4" />}
                   </div>
-                  <span
-                    className={`text-sm ${
-                      item.is_completed ? 'text-muted-foreground line-through' : 'font-medium'
-                    }`}
-                  >
+                  <span className={`text-sm ${item.is_completed ? 'text-muted-foreground line-through' : 'font-medium'}`}>
                     {item.label}
                   </span>
                 </button>
@@ -255,15 +371,72 @@ export function ContractorTaskView({
           </div>
         )}
 
+        {/* Laundry Count — shown for cleaning/turnover tasks */}
+        {isCleaning && (
+          <div className="rounded-[10px] border border-border bg-card shadow-sm">
+            <div className="border-b border-border px-4 py-3">
+              <p className="text-sm font-semibold">{t.laundryCount}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t.laundryDesc}</p>
+            </div>
+            <div className="p-2">
+              {LAUNDRY_ITEMS.map((item) => (
+                <div key={item.key} className="flex items-center justify-between px-3 py-2.5">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl" role="img" aria-label={item.en}>{item.icon}</span>
+                    <div>
+                      <p className="text-sm font-medium">{lang === 'he' ? item.he : item.en}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => adjustCount(item.key, -1)}
+                      disabled={laundryCounts[item.key] === 0 || laundrySubmitted}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-30"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="w-8 text-center font-mono text-lg font-bold">
+                      {laundryCounts[item.key]}
+                    </span>
+                    <button
+                      onClick={() => adjustCount(item.key, 1)}
+                      disabled={laundrySubmitted}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-30"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {!laundrySubmitted ? (
+              <div className="border-t border-border p-3">
+                <Button
+                  onClick={handleSubmitLaundry}
+                  disabled={laundrySubmitting || Object.values(laundryCounts).every(v => v === 0)}
+                  className="h-11 w-full"
+                >
+                  {laundrySubmitting ? t.submitting : t.submitLaundry}
+                </Button>
+              </div>
+            ) : (
+              <div className="border-t border-border p-3 text-center">
+                <div className="flex items-center justify-center gap-2 text-status-safe">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span className="text-sm font-medium">{t.laundrySubmitted}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Photo Upload */}
         <div className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
-          <Label className="text-xs font-semibold">Upload Photos</Label>
-          <p className="mb-3 text-xs text-muted-foreground">
-            Take photos of completed work for the owner record.
-          </p>
+          <Label className="text-xs font-semibold">{t.uploadPhotos}</Label>
+          <p className="mb-3 text-xs text-muted-foreground">{t.photoDesc}</p>
           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-4 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary">
             <Camera className="h-5 w-5" />
-            Tap to take or upload photo
+            {t.tapToUpload}
             <input
               type="file"
               accept="image/*,video/*"
@@ -276,15 +449,11 @@ export function ContractorTaskView({
 
         {/* Expense */}
         <div className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
-          <Label className="text-xs font-semibold">Expense (optional)</Label>
-          <p className="mb-3 text-xs text-muted-foreground">
-            Log any materials purchased for this task.
-          </p>
+          <Label className="text-xs font-semibold">{t.expense}</Label>
+          <p className="mb-3 text-xs text-muted-foreground">{t.expenseDesc}</p>
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                &#8362;
-              </span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">&#8362;</span>
               <Input
                 type="number"
                 step="0.01"
@@ -297,7 +466,7 @@ export function ContractorTaskView({
             </div>
             <label className="flex h-11 cursor-pointer items-center gap-1 rounded-[var(--radius-button)] border border-border px-3 text-xs text-muted-foreground hover:bg-muted">
               <Receipt className="h-3.5 w-3.5" />
-              Receipt
+              {t.receipt}
               <input
                 type="file"
                 accept="image/*"
@@ -309,22 +478,20 @@ export function ContractorTaskView({
           </div>
         </div>
 
-        {/* Complete — Drawer confirmation */}
+        {/* Complete */}
         <Drawer>
           <DrawerTrigger asChild>
             <Button
               disabled={totalCount > 0 && !allChecked}
               className="h-12 w-full rounded-[var(--radius-button)] bg-status-safe text-base font-semibold hover:bg-status-safe/90"
             >
-              Complete Task
+              {t.completeTask}
             </Button>
           </DrawerTrigger>
           <DrawerContent>
             <DrawerHeader>
-              <DrawerTitle>Confirm Completion</DrawerTitle>
-              <DrawerDescription>
-                This will mark the task as done and notify the property manager.
-              </DrawerDescription>
+              <DrawerTitle>{t.confirmCompletion}</DrawerTitle>
+              <DrawerDescription>{t.confirmDesc}</DrawerDescription>
             </DrawerHeader>
             <DrawerFooter>
               <Button
@@ -332,19 +499,17 @@ export function ContractorTaskView({
                 disabled={submitting}
                 className="h-12 w-full rounded-[var(--radius-button)] bg-status-safe text-base font-semibold hover:bg-status-safe/90"
               >
-                {submitting ? 'Submitting...' : 'Yes, Complete Task'}
+                {submitting ? t.submitting : t.yesComplete}
               </Button>
               <DrawerClose asChild>
-                <Button variant="outline" className="w-full">Cancel</Button>
+                <Button variant="outline" className="w-full">{t.cancel}</Button>
               </DrawerClose>
             </DrawerFooter>
           </DrawerContent>
         </Drawer>
 
         {totalCount > 0 && !allChecked && (
-          <p className="text-center text-xs text-muted-foreground">
-            Complete all checklist items to submit
-          </p>
+          <p className="text-center text-xs text-muted-foreground">{t.completeAllItems}</p>
         )}
       </div>
     </div>

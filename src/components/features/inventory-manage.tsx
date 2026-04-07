@@ -113,9 +113,27 @@ export function InventoryAdjust({ itemId, field, currentValue }: {
 
   async function adjust(delta: number) {
     const newVal = Math.max(0, currentValue + delta)
+    const updates: Record<string, unknown> = {
+      [field]: newVal,
+      last_counted_at: new Date().toISOString(),
+    }
+
+    // When marking as damaged (+1), auto-deduct from closet
+    if (field === 'quantity_damaged' && delta > 0) {
+      // Fetch current closet count to deduct
+      const { data: item } = await supabase
+        .from('inventory_items')
+        .select('quantity_in_closet')
+        .eq('id', itemId)
+        .single()
+      if (item) {
+        updates.quantity_in_closet = Math.max(0, item.quantity_in_closet - delta)
+      }
+    }
+
     const { error } = await supabase
       .from('inventory_items')
-      .update({ [field]: newVal, last_counted_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', itemId)
 
     if (error) {
