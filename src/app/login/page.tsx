@@ -21,6 +21,11 @@ export default function LoginPage() {
     if (typeof window !== 'undefined' && localStorage.getItem('biometric_registered') === '1') {
       setHasBiometric(true)
     }
+
+    // Detect Supabase recovery token in URL hash → redirect to set password page
+    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+      window.location.href = '/login/reset?setup=1' + window.location.hash
+    }
   }, [])
 
   async function handleBiometricLogin() {

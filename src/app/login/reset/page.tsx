@@ -1,16 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FullScreenLoader } from '@/components/ui/logo-spinner'
+import { createClient } from '@/lib/supabase/client'
 import { updatePassword } from '../actions'
 
 export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [ready, setReady] = useState(false)
   const isSetup = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('setup') === '1'
+
+  // Initialize Supabase session from URL hash (recovery token)
+  useEffect(() => {
+    const supabase = createClient()
+    // Supabase client auto-detects hash tokens on init
+    supabase.auth.getSession().then(() => setReady(true))
+  }, [])
 
   async function handleSubmit(formData: FormData) {
     setLoading(true)

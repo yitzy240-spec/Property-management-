@@ -9,18 +9,22 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
+  const type = url.searchParams.get('type')
   const raw = url.searchParams.get('next') || '/owner'
   const next = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/owner'
 
   if (code) {
     const supabase = createServerSupabaseClient()
-    const { error, data } = await supabase.auth.exchangeCodeForSession(code)
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (error) {
-      // Code exchange failed — redirect to login with error
       return NextResponse.redirect(new URL('/login?error=expired', url.origin))
     }
+  }
 
+  // Password reset / recovery → send to set password page
+  if (type === 'recovery' || next === '/login/reset') {
+    return NextResponse.redirect(new URL('/login/reset?setup=1', url.origin))
   }
 
   return NextResponse.redirect(new URL(next, url.origin))
