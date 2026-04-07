@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Folded blanket/duvet -->
+  <rect x="10" y="25" width="80" height="55" rx="4" fill="#E8E0F0" stroke="#8B6FB0" stroke-width="2.5"/>
+  <!-- Fold at top -->
+  <path d="M10 40 h80" stroke="#B8A0D0" stroke-width="1.5"/>
+  <rect x="10" y="25" width="80" height="15" rx="4" fill="#D8CCE8" stroke="#8B6FB0" stroke-width="2.5"/>
+  <!-- Quilting pattern -->
+  <line x1="35" y1="42" x2="35" y2="78" stroke="#D0C0E0" stroke-width="1"/>
+  <line x1="65" y1="42" x2="65" y2="78" stroke="#D0C0E0" stroke-width="1"/>
+  <line x1="12" y1="58" x2="88" y2="58" stroke="#D0C0E0" stroke-width="1"/>
+</svg>

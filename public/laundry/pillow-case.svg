@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- White pillow with blue border -->
+  <ellipse cx="50" cy="50" rx="42" ry="28" fill="#F0F4FF" stroke="#5B8DEF" stroke-width="2.5"/>
+  <ellipse cx="50" cy="50" rx="38" ry="24" fill="white" stroke="#93B4F5" stroke-width="1.5"/>
+  <!-- Pillow seam lines -->
+  <path d="M20 50 Q30 38 50 38 Q70 38 80 50" fill="none" stroke="#C5D5F5" stroke-width="1.2"/>
+  <path d="M20 50 Q30 62 50 62 Q70 62 80 50" fill="none" stroke="#C5D5F5" stroke-width="1.2"/>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Small folded hand/face towel -->
+  <rect x="15" y="30" width="70" height="45" rx="3" fill="#FFF3D4" stroke="#D4A940" stroke-width="2.5"/>
+  <!-- Fold line -->
+  <line x1="15" y1="50" x2="85" y2="50" stroke="#E8C870" stroke-width="1.5"/>
+  <!-- Top fold -->
+  <rect x="15" y="30" width="70" height="20" rx="3" fill="#FFEAAA" stroke="#D4A940" stroke-width="2.5"/>
+  <!-- Towel texture -->
+  <line x1="15" y1="55" x2="85" y2="55" stroke="#F0D888" stroke-width="1.5"/>
+  <line x1="15" y1="68" x2="85" y2="68" stroke="#F0D888" stroke-width="1.5"/>
+</svg>
