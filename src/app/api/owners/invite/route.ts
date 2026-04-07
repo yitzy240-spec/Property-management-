@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, escapeHtml } from '@/lib/email'
 
 /**
  * POST /api/owners/invite
@@ -48,8 +48,12 @@ export async function POST(request: Request) {
     if (createError) {
       // User might already exist in auth but not linked
       if (createError.message?.includes('already been registered')) {
-        const { data: { users } } = await serviceClient.auth.admin.listUsers()
-        const existing = users?.find(u => u.email === owner.email)
+        // Look up existing user by generating a link (returns user data without scanning all users)
+        const { data: existingLink } = await serviceClient.auth.admin.generateLink({
+          type: 'magiclink',
+          email: owner.email,
+        })
+        const existing = existingLink?.user
         if (existing) {
           authUserId = existing.id
           // Update their role to owner
@@ -119,7 +123,7 @@ export async function POST(request: Request) {
         <!-- Body -->
         <div style="background: #FFFFFF; padding: 32px 24px; border: 1px solid #E2E8F0; border-top: none;">
           <p style="color: #111827; font-size: 15px; margin: 0 0 16px; line-height: 1.5;">
-            Hi ${owner.full_name.split(' ')[0]},
+            Hi ${escapeHtml(owner.full_name.split(' ')[0])},
           </p>
           <p style="color: #6B7280; font-size: 14px; margin: 0 0 20px; line-height: 1.6;">
             Ariel Marcus has set up a dedicated portal for you to stay informed about your
@@ -130,7 +134,7 @@ export async function POST(request: Request) {
           ${propertyList ? `
           <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;">
             <p style="color: #9CA3AF; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 4px;">Your Properties</p>
-            <p style="color: #1E3A5F; font-size: 14px; font-weight: 600; margin: 0;">${propertyList}</p>
+            <p style="color: #1E3A5F; font-size: 14px; font-weight: 600; margin: 0;">${escapeHtml(propertyList)}</p>
           </div>
           ` : ''}
 

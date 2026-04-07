@@ -46,14 +46,45 @@ export async function notifyAdmins({
 
     if (!adminEmail) return
 
-    // Find admin user by email
-    const { data: { users } } = await serviceClient.auth.admin.listUsers()
-    const admins = users?.filter(u =>
-      u.email === adminEmail || u.app_metadata?.role === 'admin'
-    ) || []
+    // Look up admin user directly by email (no listUsers scan)
+    const { data: adminOwner } = await serviceClient
+      .from('owners')
+      .select('auth_user_id')
+      .eq('email', adminEmail)
+      .single()
 
-    for (const admin of admins) {
-      await createNotification({ userId: admin.id, title, body, link })
+    // Also check auth users directly via the admin API
+    // Use a targeted approach — get user by email from app_settings cache or direct lookup
+    const adminUserIds: string[] = []
+
+    // Try to find admin via stored admin user ID
+    const { data: adminSetting } = await serviceClient
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'admin_user_id')
+      .single()
+
+    if (adminSetting?.value) {
+      adminUserIds.push(adminSetting.value)
+    } else {
+      // First-time: look up and cache the admin user ID
+      const { data: userData } = await serviceClient.auth.admin.getUserById(
+        adminOwner?.auth_user_id || ''
+      )
+      if (userData?.user) {
+        adminUserIds.push(userData.user.id)
+        // Cache for future lookups
+        await serviceClient.from('app_settings').upsert({
+          key: 'admin_user_id',
+          value: userData.user.id,
+          description: 'Cached admin user ID for notifications',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' })
+      }
+    }
+
+    for (const userId of adminUserIds) {
+      await createNotification({ userId, title, body, link })
     }
   } catch (err) {
     console.error('[Notification] Failed to notify admins:', err)

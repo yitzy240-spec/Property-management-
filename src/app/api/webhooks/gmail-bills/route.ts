@@ -20,6 +20,15 @@ const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
  */
 export async function POST(request: Request) {
   try {
+    // Verify webhook authenticity
+    const webhookSecret = process.env.GMAIL_WEBHOOK_SECRET
+    if (webhookSecret) {
+      const authHeader = request.headers.get('authorization')
+      if (authHeader !== `Bearer ${webhookSecret}`) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    }
+
     const body = await request.json()
 
     const pubsubMessage = body.message

@@ -2,6 +2,11 @@ import { Resend } from 'resend'
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'ApartmentOS <noreply@apartmentos.app>'
 
+/** Escape HTML entities to prevent XSS in email templates */
+export function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 function getResend(): Resend | null {
   const key = process.env.RESEND_API_KEY
   if (!key) return null

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAuth, AuthError } from '@/lib/auth'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, escapeHtml } from '@/lib/email'
 import { createNotification, notifyAdmins } from '@/lib/notifications'
 
 /**
@@ -114,7 +114,7 @@ async function notifyMessageRecipient(
           <h2 style="color: #1E3A5F; margin: 0 0 8px;">New Message</h2>
           <p style="color: #6B7280; font-size: 14px; margin: 0 0 4px;">Property: <strong>${property.name}</strong></p>
           <div style="background: #F3F4F6; border-radius: 8px; padding: 12px 16px; margin: 12px 0;">
-            <p style="color: #111827; font-size: 14px; margin: 0;">${messageBody}</p>
+            <p style="color: #111827; font-size: 14px; margin: 0;">${escapeHtml(messageBody)}</p>
           </div>
           <a href="${appUrl}/messages" style="display: inline-block; background: #1E3A5F; color: #F8F7F4; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500; margin-top: 8px;">Reply in ApartmentOS</a>
           <p style="color: #9CA3AF; font-size: 11px; margin-top: 24px;">— ApartmentOS</p>
@@ -155,7 +155,7 @@ async function notifyMessageRecipient(
           <p style="color: #6B7280; font-size: 14px; margin: 0 0 16px;">Hi ${owner.full_name},</p>
           <p style="color: #6B7280; font-size: 14px; margin: 0 0 4px;">You have a new message about <strong>${property.name}</strong>:</p>
           <div style="background: #F3F4F6; border-radius: 8px; padding: 12px 16px; margin: 12px 0;">
-            <p style="color: #111827; font-size: 14px; margin: 0;">${messageBody}</p>
+            <p style="color: #111827; font-size: 14px; margin: 0;">${escapeHtml(messageBody)}</p>
           </div>
           <a href="${appUrl}/login" style="display: inline-block; background: #1E3A5F; color: #F8F7F4; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500; margin-top: 8px;">View in Portal</a>
           <p style="color: #9CA3AF; font-size: 11px; margin-top: 24px;">— Marcus Properties via ApartmentOS</p>

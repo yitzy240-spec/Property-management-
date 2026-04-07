@@ -46,17 +46,17 @@ export default function LoginPage() {
         body: JSON.stringify({
           action: 'login_verify',
           response: credential,
-          userId: options.userId,
+          challengeId: options.challengeId,
         }),
       })
 
       if (!verifyRes.ok) throw new Error('Verification failed')
 
-      const { verification_url } = await verifyRes.json()
+      const { redirect_url } = await verifyRes.json()
 
-      // Exchange the magic link for a session
-      if (verification_url) {
-        window.location.href = verification_url
+      // Navigate to Supabase callback to exchange for session
+      if (redirect_url) {
+        window.location.href = redirect_url
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'NotAllowedError') {

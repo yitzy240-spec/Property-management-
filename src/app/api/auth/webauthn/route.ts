@@ -121,68 +121,50 @@ export async function POST(request: Request) {
       case 'login_options': {
         const serviceClient = createServiceClient()
 
-        // Check if there are any passkeys for this email
-        const { email } = body
-        if (!email) {
-          // No email — generate options for any discoverable credential
-          const options = await generateAuthenticationOptions({
-            rpID: RP_ID,
-            userVerification: 'required',
-          })
+        // Generate a unique challenge ID to prevent race conditions
+        const challengeId = crypto.randomUUID()
 
-          await serviceClient.from('app_settings').upsert({
-            key: 'webauthn_login_challenge',
-            value: JSON.stringify({ challenge: options.challenge }),
-            description: 'Temporary WebAuthn login challenge',
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'key' })
-
-          return NextResponse.json(options)
-        }
-
-        // Find user by email
-        const { data: { users } } = await serviceClient.auth.admin.listUsers()
-        const authUser = users?.find(u => u.email === email)
-        if (!authUser) {
-          return NextResponse.json({ error: 'No passkey found' }, { status: 404 })
-        }
-
-        const { data: passkeys } = await serviceClient
+        // Get all passkeys (discoverable credentials — no email needed)
+        const { data: allPasskeys } = await serviceClient
           .from('passkeys')
-          .select('credential_id, transports')
-          .eq('user_id', authUser.id)
+          .select('credential_id, transports, user_id')
 
-        if (!passkeys?.length) {
-          return NextResponse.json({ error: 'No passkey found' }, { status: 404 })
+        if (!allPasskeys?.length) {
+          return NextResponse.json({ error: 'No passkeys registered' }, { status: 404 })
         }
 
         const options = await generateAuthenticationOptions({
           rpID: RP_ID,
           userVerification: 'required',
-          allowCredentials: passkeys.map(p => ({
+          allowCredentials: allPasskeys.map(p => ({
             id: p.credential_id,
             type: 'public-key' as const,
             transports: p.transports || [],
           })),
         })
 
+        // Store challenge with unique ID (prevents race condition)
         await serviceClient.from('app_settings').upsert({
-          key: `webauthn_login_challenge_${authUser.id}`,
-          value: JSON.stringify({ challenge: options.challenge, userId: authUser.id }),
+          key: `webauthn_challenge_${challengeId}`,
+          value: JSON.stringify({ challenge: options.challenge }),
           description: 'Temporary WebAuthn login challenge',
           updated_at: new Date().toISOString(),
         }, { onConflict: 'key' })
 
-        return NextResponse.json({ ...options, userId: authUser.id })
+        return NextResponse.json({ ...options, challengeId })
       }
 
       case 'login_verify': {
         const serviceClient = createServiceClient()
-        const { userId } = body
+        const { challengeId } = body
         const response = body.response as AuthenticationResponseJSON
 
-        // Get stored challenge
-        const challengeKey = userId ? `webauthn_login_challenge_${userId}` : 'webauthn_login_challenge'
+        if (!challengeId) {
+          return NextResponse.json({ error: 'challengeId required' }, { status: 400 })
+        }
+
+        // Get stored challenge by unique ID
+        const challengeKey = `webauthn_challenge_${challengeId}`
         const { data: challengeData } = await serviceClient
           .from('app_settings')
           .select('value')
@@ -195,7 +177,7 @@ export async function POST(request: Request) {
 
         const { challenge } = JSON.parse(challengeData.value)
 
-        // Find the passkey
+        // Find the passkey by credential ID
         const credentialId = response.id
         const { data: passkey } = await serviceClient
           .from('passkeys')
@@ -236,27 +218,32 @@ export async function POST(request: Request) {
         // Clean up challenge
         await serviceClient.from('app_settings').delete().eq('key', challengeKey)
 
-        // Generate a session for this user using Supabase admin
-        // We create a magic link and return it for the client to exchange
+        // Server-side session creation — get user email via getUserById (not listUsers)
+        const { data: userData } = await serviceClient.auth.admin.getUserById(passkey.user_id)
+        const userEmail = userData.user?.email
+
+        if (!userEmail) {
+          return NextResponse.json({ error: 'User not found' }, { status: 500 })
+        }
+
+        // Generate magic link server-side and return only the action URL
+        // The client will navigate to it to exchange for a session
         const { data: linkData } = await serviceClient.auth.admin.generateLink({
           type: 'magiclink',
-          email: (await serviceClient.auth.admin.getUserById(passkey.user_id)).data.user?.email || '',
+          email: userEmail,
+          options: {
+            redirectTo: `${ORIGIN}/auth/callback?next=/owner`,
+          },
         })
 
         if (!linkData?.properties?.action_link) {
           return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
         }
 
-        // Extract the token from the magic link
-        const url = new URL(linkData.properties.action_link)
-        const token_hash = url.searchParams.get('token_hash') || url.hash?.match(/token=([^&]+)/)?.[1] || ''
-
         return NextResponse.json({
           verified: true,
-          token_hash,
-          email: linkData.properties.email_otp ? undefined : url.searchParams.get('token'),
-          // Return the full verification URL for the client to call
-          verification_url: linkData.properties.action_link,
+          // Only return the redirect URL — session exchange happens via Supabase callback
+          redirect_url: linkData.properties.action_link,
         })
       }
 
