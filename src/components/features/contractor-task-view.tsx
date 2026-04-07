@@ -440,7 +440,6 @@ export function ContractorTaskView({
             <input
               type="file"
               accept="image/*,video/*"
-              capture="environment"
               className="hidden"
               onChange={(e) => handleFileUpload(e, 'photo')}
             />
@@ -470,8 +469,7 @@ export function ContractorTaskView({
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
-                className="hidden"
+                  className="hidden"
                 onChange={(e) => handleFileUpload(e, 'receipt')}
               />
             </label>
