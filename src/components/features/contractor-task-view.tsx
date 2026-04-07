@@ -77,14 +77,14 @@ const translations = {
   },
 }
 
-// ── Laundry items with emoji icons (language-independent) ──
+// ── Laundry items with clear images ──
 
 const LAUNDRY_ITEMS = [
-  { key: 'pillow_case', en: 'Pillow Case', he: 'ציפית כרית', icon: '🛏️' },
-  { key: 'blanket_cover', en: 'Blanket Cover', he: 'שמיכה', icon: '🛌' },
-  { key: 'fitted_sheet', en: 'Fitted Sheet', he: 'סדין', icon: '📋' },
-  { key: 'shower_towel', en: 'Shower Towel', he: 'מגבת מקלחת', icon: '🛁' },
-  { key: 'face_towel', en: 'Face Towel', he: 'מגבת פנים', icon: '🧴' },
+  { key: 'pillow_case', en: 'Pillow Case', he: 'ציפית כרית', image: 'https://cdn-icons-png.flaticon.com/128/3030/3030458.png' },
+  { key: 'blanket_cover', en: 'Blanket Cover', he: 'שמיכה', image: 'https://cdn-icons-png.flaticon.com/128/2413/2413075.png' },
+  { key: 'fitted_sheet', en: 'Fitted Sheet', he: 'סדין', image: 'https://cdn-icons-png.flaticon.com/128/2646/2646095.png' },
+  { key: 'shower_towel', en: 'Shower Towel', he: 'מגבת מקלחת', image: 'https://cdn-icons-png.flaticon.com/128/2553/2553642.png' },
+  { key: 'face_towel', en: 'Face Towel', he: 'מגבת פנים', image: 'https://cdn-icons-png.flaticon.com/128/5070/5070293.png' },
 ]
 
 // ── Types ──
@@ -382,7 +382,7 @@ export function ContractorTaskView({
               {LAUNDRY_ITEMS.map((item) => (
                 <div key={item.key} className="flex items-center justify-between px-3 py-2.5">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl" role="img" aria-label={item.en}>{item.icon}</span>
+                    <img src={item.image} alt={item.en} className="h-10 w-10 object-contain" />
                     <div>
                       <p className="text-sm font-medium">{lang === 'he' ? item.he : item.en}</p>
                     </div>
