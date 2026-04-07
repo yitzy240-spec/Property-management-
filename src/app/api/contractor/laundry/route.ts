@@ -40,7 +40,6 @@ export async function POST(request: Request) {
       items: nonZeroItems,
       sent_at: null, // Not sent until admin reviews
       laundry_provider_notified: false,
-      submitted_by: 'contractor',
     })
     .select('id')
     .single()
