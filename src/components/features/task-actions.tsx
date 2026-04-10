@@ -15,7 +15,6 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer'
-import { createClient } from '@/lib/supabase/client'
 import type { TaskStatus, TaskPriority } from '@/types'
 
 interface TaskActionsProps {
@@ -39,53 +38,57 @@ export function TaskActions({
   currentDescription,
   dueDate,
 }: TaskActionsProps) {
-  const supabase = createClient()
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
 
   async function updateStatus(status: TaskStatus) {
     setLoading(status)
-    const update: Record<string, unknown> = { status }
-    if (status === 'completed') update.completed_at = new Date().toISOString()
+    const updates: Record<string, unknown> = { status }
+    if (status === 'completed') updates.completed_at = new Date().toISOString()
 
-    const { error } = await supabase
-      .from('tasks')
-      .update(update)
-      .eq('id', taskId)
+    // Use API route (service client) to bypass RLS
+    const res = await fetch('/api/tasks/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, updates }),
+    })
 
-    if (error) {
-      toast.error('Failed to update', { description: error.message })
+    if (!res.ok) {
+      const data = await res.json()
+      toast.error('Failed to update', { description: data.error })
       setLoading(null)
       return
     }
 
-    // When starting a task with a contractor, auto-generate magic link
-    if (status === 'in_progress' && currentContractorId) {
+    // When starting a task, always generate a magic link
+    if (status === 'in_progress') {
       try {
-        const res = await fetch('/api/magic-links', {
+        const linkRes = await fetch('/api/magic-links', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             property_id: propertyId,
             task_id: taskId,
-            contractor_id: currentContractorId,
+            contractor_id: currentContractorId || undefined,
             link_type: 'contractor',
+            send_email: !!currentContractorId, // only email if contractor assigned
           }),
         })
-        if (res.ok) {
-          const { url } = await res.json()
-          // Copy link to clipboard
+        if (linkRes.ok) {
+          const { url } = await linkRes.json()
           await navigator.clipboard.writeText(url).catch(() => {})
           toast.success('Task started — magic link copied to clipboard', {
-            description: 'Send it to the contractor',
+            description: currentContractorId ? 'Email sent to contractor' : 'Share the link manually',
             duration: 5000,
           })
+        } else {
+          toast.success('Task started')
         }
       } catch {
-        // Non-critical — task still started
+        toast.success('Task started')
       }
     } else {
-      toast.success(`Task ${status === 'completed' ? 'completed' : status === 'cancelled' ? 'cancelled' : 'started'}`)
+      toast.success(`Task ${status === 'completed' ? 'completed' : status === 'cancelled' ? 'cancelled' : 'updated'}`)
     }
 
     router.refresh()
@@ -143,9 +146,13 @@ export function TaskActions({
         onClick={async () => {
           if (!confirm('Delete this task? This cannot be undone.')) return
           setLoading('delete')
-          const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-          if (error) {
-            toast.error('Failed to delete', { description: error.message })
+          const res = await fetch('/api/tasks/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ taskId, updates: { _delete: true } }),
+          })
+          if (!res.ok) {
+            toast.error('Failed to delete')
           } else {
             toast.success('Task deleted')
             router.push('/tasks')
@@ -186,7 +193,6 @@ function TaskEditDrawer({
   currentContractorId: string | null
   dueDate: string | null
 }) {
-  const supabase = createClient()
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -205,19 +211,24 @@ function TaskEditDrawer({
   async function handleSave(formData: FormData) {
     setSaving(true)
 
-    const { error } = await supabase
-      .from('tasks')
-      .update({
-        title: formData.get('title') as string,
-        description: formData.get('description') as string || null,
-        priority,
-        contractor_id: contractorId || null,
-        due_date: formData.get('due_date') as string || null,
-      })
-      .eq('id', taskId)
+    const res = await fetch('/api/tasks/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        taskId,
+        updates: {
+          title: formData.get('title') as string,
+          description: formData.get('description') as string || null,
+          priority,
+          contractor_id: contractorId || null,
+          due_date: formData.get('due_date') as string || null,
+        },
+      }),
+    })
 
-    if (error) {
-      toast.error('Failed to save', { description: error.message })
+    if (!res.ok) {
+      const data = await res.json()
+      toast.error('Failed to save', { description: data.error })
     } else {
       toast.success('Task updated')
       setOpen(false)

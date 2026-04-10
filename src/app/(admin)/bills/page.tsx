@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, FileText, Image as ImageIcon } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
@@ -120,6 +120,32 @@ export default async function BillsPage({
                   </div>
                 </div>
               </div>
+
+              {/* Attachments — PDF or contractor photos */}
+              {(bill.pdf_storage_path || (bill.ai_parsed_data as Record<string, unknown> | null)?.task_id) && (
+                <div className="mt-2 flex gap-2">
+                  {bill.pdf_storage_path && (
+                    <a
+                      href={`/api/download?path=${encodeURIComponent(bill.pdf_storage_path)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+                    >
+                      <FileText className="h-3 w-3" />
+                      View PDF
+                    </a>
+                  )}
+                  {(bill.ai_parsed_data as Record<string, unknown> | null)?.task_id && (
+                    <Link
+                      href={`/tasks/${(bill.ai_parsed_data as Record<string, unknown>).task_id}`}
+                      className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+                    >
+                      <ImageIcon className="h-3 w-3" />
+                      View Task & Photos
+                    </Link>
+                  )}
+                </div>
+              )}
 
               {(bill.status === 'pending_review' || bill.status === 'flagged') && (
                 <div className="mt-3 border-t border-border pt-3">
