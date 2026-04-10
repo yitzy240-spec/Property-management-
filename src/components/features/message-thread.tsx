@@ -69,6 +69,9 @@ export function MessageThread({ propertyId, propertyName, currentRole }: Message
     }
 
     loadMessages()
+    // Poll for new messages every 10 seconds
+    const interval = setInterval(loadMessages, 10_000)
+    return () => clearInterval(interval)
   }, [propertyId, currentRole])
 
   useEffect(() => {
