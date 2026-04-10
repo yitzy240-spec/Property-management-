@@ -42,19 +42,24 @@ export function BillAddButton({ preselectedPropertyId }: { preselectedPropertyId
     const amountStr = formData.get('amount') as string
     const amountAgorot = amountStr ? Math.round(parseFloat(amountStr) * 100) : 0
 
-    const { error } = await supabase.from('bills').insert({
-      property_id: propertyId,
-      bill_type: billType,
-      amount_agorot: amountAgorot,
-      due_date: formData.get('due_date') as string || null,
-      billing_period_start: formData.get('period_start') as string || null,
-      billing_period_end: formData.get('period_end') as string || null,
-      status: 'approved',
-      is_anomaly: false,
+    const res = await fetch('/api/bills/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        property_id: propertyId,
+        bill_type: billType,
+        amount_agorot: amountAgorot,
+        due_date: formData.get('due_date') as string || null,
+        billing_period_start: formData.get('period_start') as string || null,
+        billing_period_end: formData.get('period_end') as string || null,
+        status: 'approved',
+        is_anomaly: false,
+      }),
     })
 
-    if (error) {
-      toast.error('Failed to add bill', { description: error.message })
+    if (!res.ok) {
+      const data = await res.json()
+      toast.error('Failed to add bill', { description: data.error })
     } else {
       toast.success('Bill added')
       setOpen(false)

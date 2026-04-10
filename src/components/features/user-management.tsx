@@ -17,7 +17,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 
 interface AppUser {
   id: string
@@ -157,13 +157,15 @@ export function UserManagement() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Role</Label>
-                <Select value={newRole} onValueChange={(v) => setNewRole(v || 'admin')}>
-                  <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin — Full dashboard access</SelectItem>
-                    <SelectItem value="owner">Owner — Portal access only</SelectItem>
-                  </SelectContent>
-                </Select>
+                <NativeSelect
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value || 'admin')}
+                  className="h-11"
+                  options={[
+                    { value: 'admin', label: 'Admin — Full dashboard access' },
+                    { value: 'owner', label: 'Owner — Portal access only' },
+                  ]}
+                />
               </div>
             </div>
             <DrawerFooter>

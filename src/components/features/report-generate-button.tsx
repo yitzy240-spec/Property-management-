@@ -5,7 +5,7 @@ import { Sparkles } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import {
   Drawer,
   DrawerContent,
@@ -71,36 +71,41 @@ export function ReportGenerateButton({ owners, defaultQuarter, defaultYear }: Re
         <div className="space-y-4 p-4">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Owner</label>
-            <Select value={ownerId} onValueChange={(v) => setOwnerId(v || '')}>
-              <SelectTrigger className="h-11"><SelectValue placeholder="Select owner" /></SelectTrigger>
-              <SelectContent>
-                {owners.map(o => <SelectItem key={o.id} value={o.id}>{o.full_name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <NativeSelect
+              value={ownerId}
+              onChange={(e) => setOwnerId(e.target.value || '')}
+              placeholder="Select owner"
+              className="h-11"
+              options={owners.map(o => ({ value: o.id, label: o.full_name }))}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quarter</label>
-              <Select value={quarter} onValueChange={(v) => setQuarter(v || '1')}>
-                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">Q1 (Jan–Mar)</SelectItem>
-                  <SelectItem value="2">Q2 (Apr–Jun)</SelectItem>
-                  <SelectItem value="3">Q3 (Jul–Sep)</SelectItem>
-                  <SelectItem value="4">Q4 (Oct–Dec)</SelectItem>
-                </SelectContent>
-              </Select>
+              <NativeSelect
+                value={quarter}
+                onChange={(e) => setQuarter(e.target.value || '1')}
+                className="h-11"
+                options={[
+                  { value: '1', label: 'Q1 (Jan\u2013Mar)' },
+                  { value: '2', label: 'Q2 (Apr\u2013Jun)' },
+                  { value: '3', label: 'Q3 (Jul\u2013Sep)' },
+                  { value: '4', label: 'Q4 (Oct\u2013Dec)' },
+                ]}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Year</label>
-              <Select value={year} onValueChange={(v) => setYear(v || String(defaultYear))}>
-                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={String(defaultYear - 1)}>{defaultYear - 1}</SelectItem>
-                  <SelectItem value={String(defaultYear)}>{defaultYear}</SelectItem>
-                </SelectContent>
-              </Select>
+              <NativeSelect
+                value={year}
+                onChange={(e) => setYear(e.target.value || String(defaultYear))}
+                className="h-11"
+                options={[
+                  { value: String(defaultYear - 1), label: String(defaultYear - 1) },
+                  { value: String(defaultYear), label: String(defaultYear) },
+                ]}
+              />
             </div>
           </div>
 

@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import {
   Drawer,
   DrawerClose,
@@ -86,14 +86,13 @@ export function RequestStay({ properties }: RequestStayProps) {
             {properties.length > 1 && (
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Property</Label>
-                <Select value={selectedProperty} onValueChange={(v) => setSelectedProperty(v || '')}>
-                  <SelectTrigger className="h-11"><SelectValue placeholder="Select property" /></SelectTrigger>
-                  <SelectContent>
-                    {properties.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <NativeSelect
+                  value={selectedProperty}
+                  onChange={(e) => setSelectedProperty(e.target.value || '')}
+                  placeholder="Select property"
+                  className="h-11"
+                  options={properties.map(p => ({ value: p.id, label: p.name }))}
+                />
               </div>
             )}
 

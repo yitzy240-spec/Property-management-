@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import { toast } from 'sonner'
 import { createOwner, updateOwner } from '@/app/(admin)/properties/actions'
 import type { Owner, OwnerProfile } from '@/types'
@@ -101,22 +101,16 @@ export function OwnerForm({ owner }: OwnerFormProps) {
             </div>
             <div className="space-y-2">
               <Label>Owner Profile</Label>
-              <Select value={profile} onValueChange={(v) => setProfile(v as OwnerProfile)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="investor">
-                    Investor — Financials, bookings, occupancy
-                  </SelectItem>
-                  <SelectItem value="hybrid">
-                    Hybrid — All features
-                  </SelectItem>
-                  <SelectItem value="private">
-                    Private — Maintenance, vault only
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <NativeSelect
+                value={profile}
+                onChange={(e) => setProfile(e.target.value as OwnerProfile)}
+                className="h-11"
+                options={[
+                  { value: 'investor', label: 'Investor — Financials, bookings, occupancy' },
+                  { value: 'hybrid', label: 'Hybrid — All features' },
+                  { value: 'private', label: 'Private — Maintenance, vault only' },
+                ]}
+              />
               <p className="text-xs text-muted-foreground">
                 Controls which features the owner sees in their portal.
               </p>

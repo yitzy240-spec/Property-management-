@@ -102,7 +102,11 @@ export function RevenueBreakdown() {
 
       {/* Booking list */}
       {loading ? (
-        <p className="py-4 text-center text-xs text-muted-foreground">Loading...</p>
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
+          ))}
+        </div>
       ) : bookings.length === 0 ? (
         <p className="py-4 text-center text-xs text-muted-foreground">No bookings in selected range</p>
       ) : (

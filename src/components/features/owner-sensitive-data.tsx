@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 
 interface SensitiveItem {
   id: string
@@ -98,13 +98,15 @@ export function OwnerSensitiveData({ ownerId }: { ownerId: string }) {
               <form action={handleAdd} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Type</Label>
-                  <Select value={dataType} onValueChange={(v) => v && setDataType(v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="passport">Passport Number</SelectItem>
-                      <SelectItem value="credit_card_summary">Credit Card (last 4 only)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <NativeSelect
+                    value={dataType}
+                    onChange={(e) => e.target.value && setDataType(e.target.value)}
+                    className="h-11"
+                    options={[
+                      { value: 'passport', label: 'Passport Number' },
+                      { value: 'credit_card_summary', label: 'Credit Card (last 4 only)' },
+                    ]}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="label">Label</Label>

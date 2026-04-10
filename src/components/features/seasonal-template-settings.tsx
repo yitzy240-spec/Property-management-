@@ -14,7 +14,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import { createClient } from '@/lib/supabase/client'
 
 const monthNames = [
@@ -139,25 +139,28 @@ export function SeasonalTemplateSettings() {
                 <div className="grid gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Season Type</Label>
-                    <Select name="season_type" defaultValue="rain_roof">
-                      <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="rain_roof">Rain / Roof</SelectItem>
-                        <SelectItem value="boiler_heating">Boiler / Heating</SelectItem>
-                        <SelectItem value="ac_clean">AC Clean</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <NativeSelect
+                      name="season_type"
+                      defaultValue="rain_roof"
+                      className="h-11"
+                      options={[
+                        { value: 'rain_roof', label: 'Rain / Roof' },
+                        { value: 'boiler_heating', label: 'Boiler / Heating' },
+                        { value: 'ac_clean', label: 'AC Clean' },
+                      ]}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Trigger Month</Label>
-                    <Select name="month_trigger" defaultValue="9">
-                      <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {monthNames.slice(1).map((m, i) => (
-                          <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <NativeSelect
+                      name="month_trigger"
+                      defaultValue="9"
+                      className="h-11"
+                      options={monthNames.slice(1).map((m, i) => ({
+                        value: String(i + 1),
+                        label: m,
+                      }))}
+                    />
                   </div>
                 </div>
                 <div className="space-y-1.5">

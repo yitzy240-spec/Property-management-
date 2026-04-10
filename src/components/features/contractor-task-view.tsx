@@ -390,7 +390,7 @@ export function ContractorTaskView({
                   >
                     {item.is_completed && <Check className="h-4 w-4" />}
                   </div>
-                  <span className={`text-sm ${item.is_completed ? 'text-muted-foreground line-through' : 'font-medium'}`}>
+                  <span dir="auto" className={`text-sm ${item.is_completed ? 'text-muted-foreground line-through' : 'font-medium'}`}>
                     {item.label}
                   </span>
                 </button>
