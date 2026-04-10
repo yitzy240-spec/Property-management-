@@ -45,6 +45,7 @@ export async function POST(request: Request) {
       storage_path: filePath,
       media_type: mediaType,
       caption,
+      uploaded_by: 'contractor',
     })
   }
 

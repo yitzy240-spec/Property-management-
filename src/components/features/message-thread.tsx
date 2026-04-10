@@ -95,10 +95,10 @@ export function MessageThread({ propertyId, propertyName, currentRole }: Message
         setMessages(prev => [...prev, data.message as Message])
         setNewMessage('')
       } else {
-        console.error('[Messages] Send failed:', data.error || res.status)
+        toast.error('Failed to send message')
       }
-    } catch (err) {
-      console.error('[Messages] Send error:', err)
+    } catch {
+      toast.error('Network error — message not sent')
     }
 
     setSending(false)

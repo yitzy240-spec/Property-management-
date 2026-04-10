@@ -88,7 +88,7 @@ export async function createTask(data: Record<string, unknown>, checklistItems?:
   return { success: true }
 }
 
-export async function updateBillStatus(billId: string, status: 'approved' | 'rejected') {
+export async function updateBillStatus(billId: string, status: 'approved' | 'rejected', paymentMethod?: string) {
   const supabase = createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
@@ -102,13 +102,16 @@ export async function updateBillStatus(billId: string, status: 'approved' | 'rej
     .eq('id', billId)
     .single()
 
+  const updateData: Record<string, unknown> = {
+    status,
+    approved_at: status === 'approved' ? new Date().toISOString() : null,
+    approved_by: user.id,
+  }
+  if (paymentMethod) updateData.payment_method = paymentMethod
+
   const { error } = await serviceClient
     .from('bills')
-    .update({
-      status,
-      approved_at: status === 'approved' ? new Date().toISOString() : null,
-      approved_by: user.id,
-    })
+    .update(updateData)
     .eq('id', billId)
 
   if (error) return { error: error.message }

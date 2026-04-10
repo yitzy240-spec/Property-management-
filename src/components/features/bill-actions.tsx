@@ -35,7 +35,7 @@ export function BillActions({ billId, propertyId, propertyName, matchMethod }: B
     setLoading(paymentMethod)
     setError(null)
 
-    const result = await updateBillStatus(billId, 'approved')
+    const result = await updateBillStatus(billId, 'approved', paymentMethod)
     if (result.error) {
       setError(result.error)
       toast.error('Failed to update bill')
@@ -43,11 +43,13 @@ export function BillActions({ billId, propertyId, propertyName, matchMethod }: B
       return
     }
 
-    // Store payment method on the bill
-    const supabase = (await import('@/lib/supabase/client')).createClient()
-    await supabase.from('bills').update({
-      payment_method: paymentMethod,
-    }).eq('id', billId)
+    if ('approved' === 'approved' && propertyId) {
+      await fetch('/api/bills/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bill_id: billId, property_id: propertyId, confirm_mapping: true }),
+      })
+    }
 
     setDoneAction('approved')
     setLoading(null)

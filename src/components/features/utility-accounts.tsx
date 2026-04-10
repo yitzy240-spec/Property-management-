@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/native-select'
 import { StatusBadge } from '@/components/ui/status-badge'
 import {
   Drawer,
@@ -166,14 +166,12 @@ function AddUtilityButton({ propertyId, onAdded }: { propertyId: string; onAdded
         <form action={handleSubmit} className="space-y-4 p-4">
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Utility Type</Label>
-            <Select value={utilityType} onValueChange={(v) => setUtilityType(v || 'gas')}>
-              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(utilityLabels).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <NativeSelect
+              value={utilityType}
+              onChange={(e) => setUtilityType(e.target.value)}
+              options={Object.entries(utilityLabels).map(([key, label]) => ({ value: key, label }))}
+              className="h-11"
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Account Number</Label>
