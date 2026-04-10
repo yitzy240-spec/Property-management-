@@ -44,12 +44,10 @@ export function UtilityAccountsSection({ propertyId }: { propertyId: string }) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase
-      .from('property_utility_accounts')
-      .select('*')
-      .eq('property_id', propertyId)
-      .order('utility_type')
-      .then(({ data }) => setAccounts(data ?? []))
+    fetch(`/api/properties/utility-accounts?property_id=${propertyId}`)
+      .then(r => r.json())
+      .then(data => setAccounts(data.accounts ?? []))
+      .catch(() => {})
   }, [propertyId])
 
   function copyNumber(id: string, number: string) {
@@ -132,17 +130,22 @@ function AddUtilityButton({ propertyId, onAdded }: { propertyId: string; onAdded
 
   async function handleSubmit(formData: FormData) {
     setSaving(true)
-    const { error } = await supabase.from('property_utility_accounts').insert({
-      property_id: propertyId,
-      utility_type: utilityType,
-      label: formData.get('label') as string || '',
-      account_number: formData.get('account_number') as string,
-      provider_name: formData.get('provider_name') as string || null,
-      autopay,
+    const res = await fetch('/api/properties/utility-accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        property_id: propertyId,
+        utility_type: utilityType,
+        label: formData.get('label') as string || '',
+        account_number: formData.get('account_number') as string,
+        provider_name: formData.get('provider_name') as string || null,
+        autopay,
+      }),
     })
 
-    if (error) {
-      toast.error('Failed to add', { description: error.message })
+    if (!res.ok) {
+      const data = await res.json()
+      toast.error('Failed to add', { description: data.error })
     } else {
       toast.success('Utility account added')
       setOpen(false)

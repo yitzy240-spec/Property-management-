@@ -50,16 +50,21 @@ export function DocumentUpload() {
       return
     }
 
-    const filePath = `vault/${Date.now()}_${file.name}`
-    const { error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(filePath, file)
+    // Upload file via API (uses service client for storage)
+    const uploadForm = new FormData()
+    uploadForm.append('file', file)
+    uploadForm.append('title', titleVal)
+    uploadForm.append('category', category)
+    if (selectedPropertyId) uploadForm.append('property_id', selectedPropertyId)
 
-    if (uploadError) {
-      toast.error('Upload failed', { description: uploadError.message })
+    const uploadRes = await fetch('/api/documents/upload', { method: 'POST', body: uploadForm })
+    if (!uploadRes.ok) {
+      const data = await uploadRes.json()
+      toast.error('Upload failed', { description: data.error })
       setLoading(false)
       return
     }
+    const { storagePath: filePath } = await uploadRes.json()
 
     // AI classification
     let aiClassified = false
@@ -81,16 +86,21 @@ export function DocumentUpload() {
       setClassifying(false)
     }
 
-    await supabase.from('documents').insert({
-      title: titleVal,
-      category: aiClassified && aiData?.category ? aiData.category : category,
-      storage_path: filePath,
-      file_size: file.size,
-      uploaded_by: 'admin',
-      property_id: propertyId,
-      expiry_date: (aiClassified && aiData?.expiry_date) || formData.get('expiry_date') as string || null,
-      ai_classified: aiClassified,
-      ai_classification_data: aiData,
+    // Insert document record via API
+    await fetch('/api/documents/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: titleVal,
+        category: aiClassified && aiData?.category ? aiData.category : category,
+        storage_path: filePath,
+        file_size: file.size,
+        uploaded_by: 'admin',
+        property_id: propertyId,
+        expiry_date: (aiClassified && aiData?.expiry_date) || formData.get('expiry_date') as string || null,
+        ai_classified: aiClassified,
+        ai_classification_data: aiData,
+      }),
     })
 
     setOpen(false)

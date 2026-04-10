@@ -91,9 +91,13 @@ export function TaskCreateDialog({ preselectedPropertyId, preselectedPropertyNam
     const dueDate = formData.get('due_date') as string || null
     const checklistRaw = formData.get('checklist_items') as string
 
-    const { data: task, error } = await supabase
-      .from('tasks')
-      .insert({
+    const checklistItems = checklistRaw
+      ? checklistRaw.split('\n').map(s => s.trim()).filter(Boolean)
+      : []
+
+    const { createTask } = await import('@/app/(admin)/properties/actions')
+    const result = await createTask(
+      {
         title,
         description,
         property_id: propertyId || null,
@@ -101,27 +105,14 @@ export function TaskCreateDialog({ preselectedPropertyId, preselectedPropertyNam
         priority,
         status: 'pending',
         due_date: dueDate || null,
-      })
-      .select('id')
-      .single()
+      },
+      checklistItems.length > 0 ? checklistItems : undefined
+    )
 
-    if (error) {
-      toast.error('Failed to create task', { description: error.message })
+    if (result.error) {
+      toast.error('Failed to create task', { description: result.error })
       setSaving(false)
       return
-    }
-
-    if (task && checklistRaw) {
-      const items = checklistRaw.split('\n').map(s => s.trim()).filter(Boolean)
-      if (items.length > 0) {
-        await supabase.from('task_checklist_items').insert(
-          items.map((label, index) => ({
-            task_id: task.id,
-            label,
-            sort_order: index,
-          }))
-        )
-      }
     }
 
     setSaving(false)

@@ -23,6 +23,10 @@ export default async function OwnerPortalPage() {
     .single()
 
   if (!owner) {
+    // If user is an admin, redirect to dashboard instead of showing error
+    const isAdmin = user.app_metadata?.role === 'admin' || user.email === process.env.ADMIN_EMAIL
+    if (isAdmin) redirect('/dashboard')
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] p-4">
         <div className="text-center">

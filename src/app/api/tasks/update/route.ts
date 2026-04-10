@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
-import { notifyAdmins } from '@/lib/notifications'
 
 /**
  * POST /api/tasks/update — Update task fields (status, contractor, etc.)
  * Uses service client to bypass RLS issues with client-side updates.
+ * Revalidates task pages to prevent stale cache.
  */
 export async function POST(request: Request) {
   try {
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
   if (updates._delete) {
     const { error } = await serviceClient.from('tasks').delete().eq('id', taskId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    revalidatePath('/tasks')
     return NextResponse.json({ success: true })
   }
 
@@ -35,6 +37,10 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  // Bust the Next.js cache for task pages so detail view shows fresh data
+  revalidatePath('/tasks')
+  revalidatePath(`/tasks/${taskId}`)
 
   return NextResponse.json({ success: true })
 }
