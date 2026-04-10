@@ -1,6 +1,8 @@
 export const dynamic = 'force-dynamic'
 
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { ReportEditor } from '@/components/features/report-editor'
@@ -25,7 +27,11 @@ export default async function ReportDetailPage({
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex items-start gap-3">
+        <Link href="/reports" className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-muted">
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
+        <div>
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-semibold tracking-tight">
             {owner?.full_name} — Q{report.quarter} {report.year}
@@ -37,6 +43,7 @@ export default async function ReportDetailPage({
           />
         </div>
         <p className="text-xs text-muted-foreground">{owner?.email}</p>
+        </div>
       </div>
 
       <ReportEditor

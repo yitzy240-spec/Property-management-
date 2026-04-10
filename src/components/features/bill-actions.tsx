@@ -122,19 +122,19 @@ export function BillActions({ billId, propertyId, propertyName, matchMethod }: B
       )}
 
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex flex-wrap gap-1.5">
-        <Button size="sm" variant="outline" className="h-7 text-[10px] text-status-safe hover:bg-[hsl(var(--status-safe)/0.08)]" disabled={loading !== null} onClick={() => handlePayment('paid_by_owner_cash')}>
-          {loading === 'paid_by_owner_cash' ? '...' : 'Owner Paid (Cash)'}
+      <div className="grid grid-cols-2 gap-2">
+        <Button size="sm" variant="outline" className="h-9 text-xs text-status-safe hover:bg-[hsl(var(--status-safe)/0.08)]" disabled={loading !== null} onClick={() => handlePayment('paid_by_owner_cash')}>
+          {loading === 'paid_by_owner_cash' ? 'Saving...' : 'Owner Paid (Cash)'}
         </Button>
-        <Button size="sm" variant="outline" className="h-7 text-[10px] text-status-safe hover:bg-[hsl(var(--status-safe)/0.08)]" disabled={loading !== null} onClick={() => handlePayment('paid_by_owner_cc')}>
-          {loading === 'paid_by_owner_cc' ? '...' : 'Owner Paid (CC)'}
+        <Button size="sm" variant="outline" className="h-9 text-xs text-status-safe hover:bg-[hsl(var(--status-safe)/0.08)]" disabled={loading !== null} onClick={() => handlePayment('paid_by_owner_cc')}>
+          {loading === 'paid_by_owner_cc' ? 'Saving...' : 'Owner Paid (CC)'}
         </Button>
-        <Button size="sm" variant="outline" className="h-7 text-[10px] text-status-info hover:bg-[hsl(var(--status-info)/0.08)]" disabled={loading !== null} onClick={() => handlePayment('paid_by_admin')}>
-          {loading === 'paid_by_admin' ? '...' : 'Paid by Me'}
+        <Button size="sm" variant="outline" className="h-9 text-xs text-status-info hover:bg-[hsl(var(--status-info)/0.08)]" disabled={loading !== null} onClick={() => handlePayment('paid_by_admin')}>
+          {loading === 'paid_by_admin' ? 'Saving...' : 'Paid by Me'}
         </Button>
-        <Button size="sm" variant="outline" className="h-7 text-[10px] text-status-danger hover:bg-[hsl(var(--status-danger)/0.08)]" disabled={loading !== null} onClick={() => handleAction('rejected')}>
-          <X className="mr-0.5 h-3 w-3" />
-          {loading === 'rejected' ? '...' : 'Reject'}
+        <Button size="sm" variant="outline" className="h-9 text-xs text-status-danger hover:bg-[hsl(var(--status-danger)/0.08)]" disabled={loading !== null} onClick={() => handleAction('rejected')}>
+          <X className="mr-1 h-3.5 w-3.5" />
+          {loading === 'rejected' ? 'Saving...' : 'Reject'}
         </Button>
       </div>
     </div>

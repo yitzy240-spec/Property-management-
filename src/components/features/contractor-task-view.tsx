@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Camera, Receipt, ExternalLink, CheckCircle2, Minus, Plus, Globe } from 'lucide-react'
+import { Check, Camera, Receipt, ExternalLink, CheckCircle2, Minus, Plus, Globe, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -139,7 +139,12 @@ export function ContractorTaskView({
   magicLinkId,
   inventoryItems = [],
 }: ContractorTaskViewProps) {
-  const [lang, setLang] = useState<'en' | 'he'>('en')
+  const [lang, setLang] = useState<'en' | 'he'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('contractor_lang') as 'en' | 'he') || 'en'
+    }
+    return 'en'
+  })
   const t = translations[lang]
   const isRtl = lang === 'he'
 
@@ -154,6 +159,7 @@ export function ContractorTaskView({
   )
   const [laundrySubmitted, setLaundrySubmitted] = useState(false)
   const [laundrySubmitting, setLaundrySubmitting] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   const completedCount = checklist.filter((i) => i.is_completed).length
   const totalCount = checklist.length
@@ -191,6 +197,7 @@ export function ContractorTaskView({
     if (file.size > MAX_SIZE) { toast.error('File too large (max 25MB)'); return }
     if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) { toast.error('Only images and videos'); return }
 
+    setUploading(true)
     const form = new FormData()
     form.append('file', file)
     form.append('token', token)
@@ -207,6 +214,8 @@ export function ContractorTaskView({
       toast.success(type === 'receipt' ? 'Receipt uploaded' : 'Photo uploaded')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -239,18 +248,26 @@ export function ContractorTaskView({
 
   async function handleComplete() {
     setSubmitting(true)
-
-    await fetch('/api/contractor/complete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token,
-        task_id: task?.id,
-        expense_agorot: expenseAmount ? Math.round(parseFloat(expenseAmount) * 100) : 0,
-      }),
-    })
-
-    setCompleted(true)
+    try {
+      const res = await fetch('/api/contractor/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          task_id: task?.id,
+          expense_agorot: expenseAmount ? Math.round(parseFloat(expenseAmount) * 100) : 0,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || 'Failed to complete task. Please try again.')
+        setSubmitting(false)
+        return
+      }
+      setCompleted(true)
+    } catch {
+      toast.error('Network error. Please check your connection and try again.')
+    }
     setSubmitting(false)
   }
 
@@ -276,7 +293,7 @@ export function ContractorTaskView({
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">ApartmentOS</p>
           </div>
           <button
-            onClick={() => setLang(lang === 'en' ? 'he' : 'en')}
+            onClick={() => { const next = lang === 'en' ? 'he' : 'en'; localStorage.setItem('contractor_lang', next); setLang(next) }}
             className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium hover:bg-muted"
           >
             <Globe className="h-3.5 w-3.5" />
@@ -403,7 +420,7 @@ export function ContractorTaskView({
                     <button
                       onClick={() => adjustCount(item.item_name, -1)}
                       disabled={laundryCounts[item.item_name] === 0 || laundrySubmitted}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-30"
+                      className="flex h-11 w-11 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-30"
                     >
                       <Minus className="h-4 w-4" />
                     </button>
@@ -413,7 +430,7 @@ export function ContractorTaskView({
                     <button
                       onClick={() => adjustCount(item.item_name, 1)}
                       disabled={laundrySubmitted}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-30"
+                      className="flex h-11 w-11 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-30"
                     >
                       <Plus className="h-4 w-4" />
                     </button>
@@ -446,13 +463,14 @@ export function ContractorTaskView({
         <div className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
           <Label className="text-xs font-semibold">{t.uploadPhotos}</Label>
           <p className="mb-3 text-xs text-muted-foreground">{t.photoDesc}</p>
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-4 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary">
-            <Camera className="h-5 w-5" />
-            {t.tapToUpload}
+          <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-4 text-sm text-muted-foreground transition-colors ${uploading ? 'opacity-60' : 'hover:border-primary hover:text-primary'}`}>
+            {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+            {uploading ? 'Uploading...' : t.tapToUpload}
             <input
               type="file"
               accept="image/*,video/*"
               className="hidden"
+              disabled={uploading}
               onChange={(e) => handleFileUpload(e, 'photo')}
             />
           </label>

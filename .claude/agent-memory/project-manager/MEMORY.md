@@ -1,3 +1,4 @@
 - [Initial Audit April 2026](audit_2026_04_03.md) -- Project in scaffolding stage, schema complete, all pages are stubs, P1 build not yet started
 - [Full Audit April 5 2026](audit_2026_04_05.md) -- 85% complete, 21 pages, 33 routes, all 6 integrations working, gaps: PWA wiring + E2E tests
 - [Full Audit April 6 2026](audit_2026_04_06.md) -- 92% complete, 26 pages, 40+ routes, 28 new features verified, gaps: E2E CI + strict TS + seed data
+- [QA Audit April 10 2026](audit_2026_04_10.md) -- Pre-client QA walkthrough, 12 issues found, 3 critical, 4 medium, 5 low
