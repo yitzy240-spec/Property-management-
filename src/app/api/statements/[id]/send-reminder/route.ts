@@ -101,8 +101,15 @@ export async function POST(
 
   const bankTransferHtml = `
     <div style="border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px;">
-      <p style="font-size: 13px; font-weight: 600; color: #374151; margin: 0 0 4px;">Pay by Bank Transfer</p>
-      <p style="font-size: 12px; color: #6B7280; margin: 0;">No processing fee. Contact your property manager for transfer details.</p>
+      <p style="font-size: 13px; font-weight: 600; color: #374151; margin: 0 0 8px;">Pay by Bank Transfer</p>
+      <table style="width: 100%; font-size: 12px; color: #374151;">
+        <tr><td style="padding: 2px 0; color: #6B7280;">Beneficiary</td><td style="padding: 2px 0; text-align: right;">Sara & Ariel Marcus</td></tr>
+        <tr><td style="padding: 2px 0; color: #6B7280;">Bank</td><td style="padding: 2px 0; text-align: right;">First International Bank (31)</td></tr>
+        <tr><td style="padding: 2px 0; color: #6B7280;">Branch</td><td style="padding: 2px 0; text-align: right;">095</td></tr>
+        <tr><td style="padding: 2px 0; color: #6B7280;">Account</td><td style="padding: 2px 0; text-align: right;">259085</td></tr>
+        <tr><td style="padding: 2px 0; color: #6B7280;">Amount</td><td style="padding: 2px 0; text-align: right; font-weight: 600;">${formatILS(netAmount)}</td></tr>
+      </table>
+      <p style="font-size: 11px; color: #9CA3AF; margin: 8px 0 0;">No processing fee</p>
     </div>
   `
 
