@@ -16,6 +16,10 @@ export type FeeType = 'commission' | 'hourly' | 'fixed'
 export type DocumentCategory = 'tabu' | 'insurance' | 'contract' | 'warranty' | 'receipt' | 'other'
 export type SeasonType = 'rain_roof' | 'boiler_heating' | 'ac_clean'
 export type ReportStatus = 'draft' | 'approved' | 'sent'
+export type StatementStatus = 'draft' | 'pending_approval' | 'approved' | 'sent' | 'partially_paid' | 'paid' | 'overdue'
+export type StatementDirection = 'owner_owes' | 'marcus_owes' | 'zero'
+export type LineItemSection = 'bookings' | 'fees' | 'incidentals'
+export type LineItemCategory = 'rental_direct' | 'commission_direct' | 'commission_platform' | 'hourly' | 'fixed_fee' | 'bill_expense' | 'custom' | 'cc_surcharge'
 
 // ============================================
 // Core Entities
@@ -320,4 +324,86 @@ export interface BookingWithPayments extends Booking {
 
 export interface PropertyWithUtilities extends Property {
   utility_accounts: PropertyUtilityAccount[]
+}
+
+// ============================================
+// Monthly Billing & Statements
+// ============================================
+
+export interface MonthlyStatement {
+  id: string
+  owner_id: string
+  billing_month: string
+  status: StatementStatus
+  direction: StatementDirection
+  gross_rental_agorot: number
+  commission_agorot: number
+  hourly_charges_agorot: number
+  fixed_fee_agorot: number
+  bills_paid_agorot: number
+  cc_surcharge_agorot: number
+  net_amount_agorot: number
+  line_items: StatementLineItemData[]
+  gi_proforma_id: string | null
+  gi_proforma_number: number | null
+  gi_proforma_url: string | null
+  gi_receipt_id: string | null
+  gi_receipt_number: number | null
+  amount_paid_agorot: number
+  paid_at: string | null
+  payment_method: string | null
+  payment_reference: string | null
+  reminder_sent_at: string | null
+  sent_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface StatementLineItemData {
+  property_id: string
+  property_name: string
+  section: LineItemSection
+  category: LineItemCategory
+  description: string
+  amount_agorot: number
+  source_id?: string
+  source_type?: string
+  /** true if admin manually added/edited this item */
+  is_manual?: boolean
+}
+
+export interface StatementLineItem {
+  id: string
+  statement_id: string
+  property_id: string | null
+  category: string
+  description: string
+  amount_agorot: number
+  source_id: string | null
+  source_type: string | null
+  created_at: string
+}
+
+export interface StatementPayment {
+  id: string
+  statement_id: string
+  amount_agorot: number
+  payment_method: string
+  payment_date: string
+  reference: string | null
+  gi_receipt_id: string | null
+  gi_receipt_number: number | null
+  notes: string | null
+  recorded_by: string | null
+  created_at: string
+}
+
+export interface MonthlyStatementWithOwner extends MonthlyStatement {
+  owner: Owner
+}
+
+export interface MonthlyStatementWithDetails extends MonthlyStatement {
+  owner: Owner
+  payments: StatementPayment[]
 }

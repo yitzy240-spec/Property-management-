@@ -180,6 +180,12 @@ interface CreateDocumentOptions {
   remarks?: string
   date?: string
   dueDate?: string
+  /** If true, creates as draft — no email sent to client */
+  draft?: boolean
+  /** Custom text for GI email sent to customer */
+  emailContent?: string
+  /** Enable payment button on the document (requires active payment channels) */
+  paymentRequestData?: { pluginId?: number }
 }
 
 /** Create a document (invoice, receipt, etc.) */
@@ -196,10 +202,11 @@ export async function createDocument(options: CreateDocumentOptions): Promise<GI
 
   const body: Record<string, unknown> = {
     type: options.type,
-    lang: options.lang || 'he',
+    lang: options.lang || 'en',
     currency: options.currency || 'ILS',
     date: options.date || new Date().toISOString().split('T')[0],
     dueDate: options.dueDate,
+    draft: options.draft ?? false,
     client: {
       id: options.clientId || undefined,
       name: options.clientName,
@@ -208,6 +215,8 @@ export async function createDocument(options: CreateDocumentOptions): Promise<GI
     },
     income,
     remarks: options.remarks,
+    emailContent: options.emailContent,
+    paymentRequestData: options.paymentRequestData,
   }
 
   if (options.paymentType !== undefined && options.paymentType !== PAYMENT_TYPES.UNPAID) {
@@ -273,7 +282,7 @@ export async function createCommissionInvoice(params: {
     clientId: params.ownerGreenInvoiceId || undefined,
     clientName: params.ownerName,
     clientEmail: params.ownerEmail,
-    lang: params.lang || 'he',
+    lang: params.lang || 'en',
     items,
     paymentType: PAYMENT_TYPES.BANK_TRANSFER,
     remarks: `Marcus Properties — ${params.propertyName} management fees for ${params.billingMonth}`,
@@ -341,6 +350,182 @@ interface DownloadLinks {
 /** Get PDF download links (Hebrew + English) for a document */
 export async function getDocumentDownloadLinks(documentId: string): Promise<DownloadLinks> {
   return giFetch<DownloadLinks>(`/documents/${documentId}/download/links`)
+}
+
+// ══════════════════════════════════════
+// PAYMENT LINKS (Monthly Billing)
+// ══════════════════════════════════════
+
+/**
+ * Payment links are standalone URLs where customers can pay by credit card.
+ * Uses POST /payments/links (not /payments/form which is for iframe embeds).
+ * When the owner pays, GI auto-generates a receipt (type 400).
+ *
+ * Requires:
+ * - Active Grow digital payments terminal
+ * - GREEN_INVOICE_PLUGIN_ID env var (Grow terminal UUID)
+ */
+
+export interface GIPaymentLink {
+  id: string
+  url: string
+  shortUrl: string
+}
+
+interface PaymentLinkOptions {
+  /** Amount in agorot */
+  amountAgorot: number
+  /** Title shown on payment page */
+  description: string
+  /** Detail text shown on payment page */
+  content?: string
+  lang?: 'he' | 'en'
+  maxPayments?: number
+}
+
+/** Create a hosted payment link. Returns a URL the owner can visit to pay. */
+export async function createPaymentLink(options: PaymentLinkOptions): Promise<GIPaymentLink> {
+  const pluginId = process.env.GREEN_INVOICE_PLUGIN_ID
+  if (!pluginId) {
+    throw new Error('GREEN_INVOICE_PLUGIN_ID not configured — required for payment links')
+  }
+
+  // Enable all available payment methods: credit card, Bit, Apple Pay, Google Pay
+  const groups = [100, 120, 150, 160]
+  const plugins = groups.map(group => ({
+    id: pluginId,
+    type: 12200, // Grow
+    maxPayments: options.maxPayments || 1,
+    group,
+  }))
+
+  const body = {
+    type: 0,
+    price: options.amountAgorot / 100,
+    currency: 'ILS',
+    lang: options.lang || 'en',
+    description: options.description,
+    content: options.content || options.description,
+    documentType: DOC_TYPES.RECEIPT, // 400 — auto-generated after payment
+    documentVatType: 0,
+    plugins,
+    notify: true,
+    addClient: false,
+    maxPayments: options.maxPayments || 1,
+    maxQuantity: 1,
+  }
+
+  return giFetch<GIPaymentLink>('/payments/links', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+/**
+ * Create a document directly (proforma, receipt, etc.).
+ * Use for: payout receipts (marcus_owes), recording manual payments.
+ * For collecting payments from owners, use createPaymentForm() instead.
+ */
+
+/** Create a Receipt (type 400) after manual payment (bank transfer, cash, check) */
+export async function createReceipt(options: {
+  clientId?: string
+  clientName: string
+  clientEmail: string
+  items: { description: string; quantity: number; priceAgorot: number }[]
+  paymentType: number
+  paymentDate?: string
+  relatedDocumentId?: string
+  remarks?: string
+  lang?: 'he' | 'en'
+}): Promise<GIDocument> {
+  const income = options.items.map(item => ({
+    description: item.description,
+    quantity: item.quantity,
+    price: item.priceAgorot / 100,
+    currency: 'ILS',
+    vatType: 0,
+  }))
+
+  const totalILS = income.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const paymentDate = options.paymentDate || new Date().toISOString().split('T')[0]
+
+  const body: Record<string, unknown> = {
+    type: DOC_TYPES.RECEIPT,
+    lang: options.lang || 'en',
+    currency: 'ILS',
+    date: paymentDate,
+    client: {
+      id: options.clientId || undefined,
+      name: options.clientName,
+      emails: [options.clientEmail],
+      add: true,
+    },
+    income,
+    payment: [{
+      date: paymentDate,
+      type: options.paymentType,
+      price: totalILS,
+      currency: 'ILS',
+    }],
+    remarks: options.remarks,
+  }
+
+  if (options.relatedDocumentId) {
+    body.relatedDocuments = [{ id: options.relatedDocumentId }]
+  }
+
+  return giFetch<GIDocument>('/documents', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+/** Create a payout Receipt (type 400) documenting money Marcus pays to owner */
+export async function createPayoutReceipt(options: {
+  clientId?: string
+  clientName: string
+  clientEmail: string
+  amountAgorot: number
+  description: string
+  paymentType: number
+  paymentDate?: string
+  remarks?: string
+  lang?: 'he' | 'en'
+}): Promise<GIDocument> {
+  return createDocument({
+    type: DOC_TYPES.RECEIPT,
+    clientId: options.clientId,
+    clientName: options.clientName,
+    clientEmail: options.clientEmail,
+    lang: options.lang || 'en',
+    items: [{
+      description: options.description,
+      quantity: 1,
+      priceAgorot: options.amountAgorot,
+    }],
+    paymentType: options.paymentType,
+    date: options.paymentDate,
+    remarks: options.remarks,
+  })
+}
+
+/** Fetch a single document by ID */
+export async function getDocument(documentId: string): Promise<GIDocument> {
+  return giFetch<GIDocument>(`/documents/${documentId}`)
+}
+
+/** Get public PDF download links for a document (no auth required to access) */
+export async function getDocumentPdfLinks(documentId: string): Promise<{ he?: string; en?: string; origin?: string }> {
+  return giFetch(`/documents/${documentId}/download/links`)
+}
+
+/** Trigger Green Invoice's built-in email for a document (sends PDF to recipients) */
+export async function sendDocumentEmail(documentId: string, emails: string[]): Promise<void> {
+  await giFetch(`/documents/${documentId}/email`, {
+    method: 'POST',
+    body: JSON.stringify({ emails }),
+  })
 }
 
 // ── Expenses ──

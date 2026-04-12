@@ -50,7 +50,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/contractors') ||
     pathname.startsWith('/messages') ||
     pathname.startsWith('/owners') ||
-    pathname.startsWith('/owner')
+    pathname.startsWith('/owner') ||
+    pathname.startsWith('/billing')
 
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/')
 

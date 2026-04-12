@@ -20,6 +20,7 @@ import {
   HardHat,
   Sparkles,
   X,
+  Banknote,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -43,6 +44,7 @@ const menuItems = [
   { href: '/owners', label: 'Owners', icon: Users },
   { href: '/tasks', label: 'Tasks', icon: ClipboardList },
   { href: '/contractors', label: 'Contractors', icon: HardHat },
+  { href: '/billing', label: 'Billing', icon: Banknote },
   { href: '/reports', label: 'Owner Reports', icon: Sparkles },
   { href: '/inventory', label: 'Inventory', icon: Package },
   { href: '/messages', label: 'Messages', icon: MessageSquare },

@@ -9,6 +9,7 @@ import { signOut } from '@/app/login/actions'
 import { MessageThread } from '@/components/features/message-thread'
 import { RequestStay } from '@/components/features/request-stay'
 import { InvoiceHistory } from '@/components/features/invoice-history'
+import { OwnerStatements } from '@/components/features/billing/owner-statements'
 
 export default async function OwnerPortalPage() {
   const supabase = createServerSupabaseClient()
@@ -125,6 +126,14 @@ export default async function OwnerPortalPage() {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Monthly Statements */}
+        {showFinancials && (
+          <section>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Monthly Statements</p>
+            <OwnerStatements ownerId={owner.id} />
+          </section>
         )}
 
         {/* Financials */}

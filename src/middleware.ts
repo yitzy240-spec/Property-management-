@@ -26,6 +26,7 @@ export const config = {
     '/messages/:path*',
     '/owners/:path*',
     '/reports/:path*',
+    '/billing/:path*',
     '/notifications/:path*',
     '/owner/:path*',
     '/api/((?!webhooks|cron|contractor|auth).*)',
