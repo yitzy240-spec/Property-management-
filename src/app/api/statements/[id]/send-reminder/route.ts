@@ -162,9 +162,14 @@ export async function POST(
     ? `Reminder: Statement for ${monthLabel} — ${formatILS(netAmount)} due`
     : `Monthly Statement for ${monthLabel} — ${formatILS(netAmount)}`
 
+  // Test mode: route all emails to admin instead of real owners
+  const testEmails = process.env.TEST_EMAIL_OVERRIDE
+  const recipientEmail = testEmails || owner.email
+  const testSubjectPrefix = testEmails ? `[TEST for ${owner.full_name}] ` : ''
+
   const result = await sendEmail({
-    to: owner.email,
-    subject,
+    to: recipientEmail,
+    subject: `${testSubjectPrefix}${subject}`,
     html,
   })
 
