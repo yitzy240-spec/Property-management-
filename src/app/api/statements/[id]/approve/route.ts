@@ -35,7 +35,7 @@ export async function POST(
     return NextResponse.json({ error: `Cannot approve statement in "${statement.status}" status` }, { status: 400 })
   }
 
-  await serviceClient
+  const { error: updateErr } = await serviceClient
     .from('monthly_statements')
     .update({
       status: 'approved',
@@ -43,6 +43,10 @@ export async function POST(
       approved_by: user.id,
     })
     .eq('id', params.id)
+
+  if (updateErr) {
+    return NextResponse.json({ error: `Failed to approve: ${updateErr.message}` }, { status: 500 })
+  }
 
   return NextResponse.json({ message: 'Statement approved' })
 }

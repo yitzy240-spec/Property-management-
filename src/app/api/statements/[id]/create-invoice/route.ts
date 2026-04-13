@@ -94,16 +94,21 @@ export async function POST(
         console.error('[Create Invoice] Proforma creation failed:', docErr)
       }
 
-      await serviceClient
+      const { error: updateErr } = await serviceClient
         .from('monthly_statements')
         .update({
-          gi_proforma_id: docId || paymentLink.id,
+          gi_proforma_id: docId,
           gi_proforma_number: docNumber,
           gi_proforma_url: paymentLink.url,
           status: 'sent',
           sent_at: new Date().toISOString(),
         })
         .eq('id', params.id)
+
+      if (updateErr) {
+        console.error('[Create Invoice] Statement update failed:', updateErr)
+        return NextResponse.json({ error: 'Invoice created but failed to update statement' }, { status: 500 })
+      }
 
       return NextResponse.json({
         message: 'Invoice and payment link created',
@@ -125,7 +130,7 @@ export async function POST(
         remarks: `Marcus Properties — Payout for ${monthLabel}`,
       })
 
-      await serviceClient
+      const { error: updateErr2 } = await serviceClient
         .from('monthly_statements')
         .update({
           gi_receipt_id: doc.id,
@@ -135,6 +140,10 @@ export async function POST(
           payment_method: 'bank_transfer',
         })
         .eq('id', params.id)
+
+      if (updateErr2) {
+        console.error('[Create Invoice] Payout update failed:', updateErr2)
+      }
 
       return NextResponse.json({
         message: 'Payout receipt created',

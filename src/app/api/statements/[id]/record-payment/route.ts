@@ -4,6 +4,8 @@ import { requireAdmin, AuthError } from '@/lib/auth'
 import { createReceipt, PAYMENT_TYPES } from '@/lib/green-invoice'
 import { calculateCcSurcharge } from '@/lib/statements'
 
+const VALID_METHODS = ['credit_card', 'bank_transfer', 'cash', 'check'] as const
+
 /**
  * POST /api/statements/[id]/record-payment
  * Record a payment against a statement and create a Green Invoice receipt.
@@ -24,6 +26,7 @@ export async function POST(
   const body = await request.json()
   const { amount_agorot, payment_method, payment_date, reference, notes } = body
 
+  // Input validation
   if (!amount_agorot || !payment_method || !payment_date) {
     return NextResponse.json({ error: 'amount_agorot, payment_method, and payment_date required' }, { status: 400 })
   }
@@ -36,6 +39,10 @@ export async function POST(
     return NextResponse.json({ error: 'payment_date must be YYYY-MM-DD format' }, { status: 400 })
   }
 
+  if (!VALID_METHODS.includes(payment_method)) {
+    return NextResponse.json({ error: `Invalid payment_method. Must be one of: ${VALID_METHODS.join(', ')}` }, { status: 400 })
+  }
+
   const serviceClient = createServiceClient()
 
   const { data: statement, error } = await serviceClient
@@ -46,6 +53,14 @@ export async function POST(
 
   if (error || !statement) {
     return NextResponse.json({ error: 'Statement not found' }, { status: 404 })
+  }
+
+  // Status guard — can only record payment on sent/approved/partially_paid statements
+  if (statement.status === 'draft' || statement.status === 'pending_approval') {
+    return NextResponse.json({ error: 'Statement must be sent before recording payment' }, { status: 400 })
+  }
+  if (statement.status === 'paid') {
+    return NextResponse.json({ error: 'Statement already fully paid' }, { status: 400 })
   }
 
   const owner = statement.owners as { full_name: string; email: string; green_invoice_client_id: string | null }
@@ -67,7 +82,7 @@ export async function POST(
     totalPayment = amount_agorot + surchargeAgorot
   }
 
-  // Create Green Invoice receipt linked to proforma
+  // Create Green Invoice receipt
   let giReceiptId: string | null = null
   let giReceiptNumber: number | null = null
 
@@ -81,7 +96,6 @@ export async function POST(
       priceAgorot: li.amount_agorot,
     }))
 
-  // Add CC surcharge line item if applicable
   if (surchargeAgorot > 0) {
     items.push({
       description: 'Credit card processing fee (3.5%)',
@@ -105,10 +119,24 @@ export async function POST(
     giReceiptNumber = doc.number ?? null
   } catch (giErr) {
     console.error('[Record Payment] Green Invoice receipt failed:', giErr)
-    // Continue — still record the payment even if GI fails
   }
 
-  // Insert payment record
+  // Atomic update FIRST — if this fails, we don't insert the payment record
+  const { data: rpcResult, error: rpcErr } = await serviceClient.rpc('record_statement_payment', {
+    p_statement_id: params.id,
+    p_payment_amount: totalPayment,
+    p_surcharge_amount: surchargeAgorot,
+    p_payment_method: payment_method,
+    p_payment_reference: reference || null,
+    p_gi_receipt_id: giReceiptId,
+    p_gi_receipt_number: giReceiptNumber,
+  })
+
+  if (rpcErr) {
+    return NextResponse.json({ error: `Failed to update statement: ${rpcErr.message}` }, { status: 500 })
+  }
+
+  // RPC succeeded — now insert the payment record (audit trail)
   const { data: payment, error: payErr } = await serviceClient
     .from('statement_payments')
     .insert({
@@ -126,29 +154,15 @@ export async function POST(
     .single()
 
   if (payErr) {
-    return NextResponse.json({ error: `Failed to record payment: ${payErr.message}` }, { status: 500 })
-  }
-
-  // Atomic update — prevents race condition on concurrent payments
-  const { data: rpcResult, error: rpcErr } = await serviceClient.rpc('record_statement_payment', {
-    p_statement_id: params.id,
-    p_payment_amount: totalPayment,
-    p_surcharge_amount: surchargeAgorot,
-    p_payment_method: payment_method,
-    p_payment_reference: reference || null,
-    p_gi_receipt_id: giReceiptId,
-    p_gi_receipt_number: giReceiptNumber,
-  })
-
-  if (rpcErr) {
-    return NextResponse.json({ error: `Failed to update statement: ${rpcErr.message}` }, { status: 500 })
+    // RPC already updated totals — log the error but don't fail the request
+    console.error('[Record Payment] Payment record insert failed:', payErr)
   }
 
   const newStatus = rpcResult?.[0]?.new_status ?? 'partially_paid'
 
   return NextResponse.json({
     message: 'Payment recorded',
-    payment_id: payment.id,
+    payment_id: payment?.id,
     new_status: newStatus,
     surcharge_agorot: surchargeAgorot,
     gi_receipt_id: giReceiptId,

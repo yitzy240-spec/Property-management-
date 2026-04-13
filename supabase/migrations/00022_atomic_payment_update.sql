@@ -16,8 +16,8 @@ BEGIN
   -- Atomic update with row lock
   UPDATE monthly_statements
   SET
-    amount_paid_agorot = amount_paid_agorot + p_payment_amount,
-    cc_surcharge_agorot = CASE WHEN p_surcharge_amount > 0 THEN cc_surcharge_agorot + p_surcharge_amount ELSE cc_surcharge_agorot END,
+    amount_paid_agorot = COALESCE(amount_paid_agorot, 0) + p_payment_amount,
+    cc_surcharge_agorot = CASE WHEN p_surcharge_amount > 0 THEN COALESCE(cc_surcharge_agorot, 0) + p_surcharge_amount ELSE COALESCE(cc_surcharge_agorot, 0) END,
     payment_method = COALESCE(p_payment_method, payment_method),
     payment_reference = COALESCE(p_payment_reference, payment_reference)
   WHERE id = p_statement_id

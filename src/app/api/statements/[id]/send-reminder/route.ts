@@ -99,14 +99,19 @@ export async function POST(
     </table>
   ` : ''
 
+  const bankName = process.env.BANK_BENEFICIARY_NAME || 'Sara & Ariel Marcus'
+  const bankDisplay = process.env.BANK_DISPLAY_NAME || 'First International Bank (31)'
+  const bankBranch = process.env.BANK_BRANCH || '095'
+  const bankAccount = process.env.BANK_ACCOUNT || '259085'
+
   const bankTransferHtml = `
     <div style="border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px;">
       <p style="font-size: 13px; font-weight: 600; color: #374151; margin: 0 0 8px;">Pay by Bank Transfer</p>
       <table style="width: 100%; font-size: 12px; color: #374151;">
-        <tr><td style="padding: 2px 0; color: #6B7280;">Beneficiary</td><td style="padding: 2px 0; text-align: right;">Sara & Ariel Marcus</td></tr>
-        <tr><td style="padding: 2px 0; color: #6B7280;">Bank</td><td style="padding: 2px 0; text-align: right;">First International Bank (31)</td></tr>
-        <tr><td style="padding: 2px 0; color: #6B7280;">Branch</td><td style="padding: 2px 0; text-align: right;">095</td></tr>
-        <tr><td style="padding: 2px 0; color: #6B7280;">Account</td><td style="padding: 2px 0; text-align: right;">259085</td></tr>
+        <tr><td style="padding: 2px 0; color: #6B7280;">Beneficiary</td><td style="padding: 2px 0; text-align: right;">${escapeHtml(bankName)}</td></tr>
+        <tr><td style="padding: 2px 0; color: #6B7280;">Bank</td><td style="padding: 2px 0; text-align: right;">${escapeHtml(bankDisplay)}</td></tr>
+        <tr><td style="padding: 2px 0; color: #6B7280;">Branch</td><td style="padding: 2px 0; text-align: right;">${escapeHtml(bankBranch)}</td></tr>
+        <tr><td style="padding: 2px 0; color: #6B7280;">Account</td><td style="padding: 2px 0; text-align: right;">${escapeHtml(bankAccount)}</td></tr>
         <tr><td style="padding: 2px 0; color: #6B7280;">Amount</td><td style="padding: 2px 0; text-align: right; font-weight: 600;">${formatILS(netAmount)}</td></tr>
       </table>
       <p style="font-size: 11px; color: #9CA3AF; margin: 8px 0 0;">No processing fee</p>
@@ -167,15 +172,20 @@ export async function POST(
     return NextResponse.json({ error: `Email failed: ${result.error}` }, { status: 500 })
   }
 
-  // Update statement
-  await serviceClient
+  // Update statement — transition approved→sent on first send
+  const newStatus = (statement.status === 'approved') ? 'sent' : statement.status
+  const { error: updateErr } = await serviceClient
     .from('monthly_statements')
     .update({
       reminder_sent_at: new Date().toISOString(),
-      status: statement.status === 'draft' ? 'sent' : statement.status,
+      status: newStatus,
       sent_at: statement.sent_at || new Date().toISOString(),
     })
     .eq('id', params.id)
+
+  if (updateErr) {
+    console.error('[Send Reminder] Statement update failed:', updateErr)
+  }
 
   return NextResponse.json({ message: 'Reminder sent', email_id: result.id })
 }

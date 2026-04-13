@@ -163,8 +163,14 @@ export function OwnerStatements({ ownerId }: OwnerStatementsProps) {
                       Credit card, Apple Pay, Google Pay, or Bit — a 3.5% processing fee applies
                     </p>
                     <div className="rounded-md border border-border p-2.5 mt-2">
-                      <p className="text-xs font-medium">Bank Transfer</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">No processing fee. Contact your manager for transfer details.</p>
+                      <p className="text-xs font-medium mb-1">Bank Transfer</p>
+                      <div className="grid grid-cols-2 gap-x-2 text-[11px]">
+                        <span className="text-muted-foreground">Beneficiary</span><span className="text-right">Sara & Ariel Marcus</span>
+                        <span className="text-muted-foreground">Bank</span><span className="text-right">First International (31)</span>
+                        <span className="text-muted-foreground">Branch</span><span className="text-right">095</span>
+                        <span className="text-muted-foreground">Account</span><span className="text-right">259085</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">No processing fee</p>
                     </div>
                   </div>
                 )}

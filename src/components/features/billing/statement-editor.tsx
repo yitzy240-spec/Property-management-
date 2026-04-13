@@ -122,10 +122,11 @@ export function StatementEditor({ statementId, status, direction, lineItems: ini
   async function handleReopen() {
     setLoading('reopen')
     try {
+      // Send original items — don't save accidental browser edits
       const res = await fetch(`/api/statements/${statementId}/line-items`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ line_items: items }),
+        body: JSON.stringify({ line_items: initialItems }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
