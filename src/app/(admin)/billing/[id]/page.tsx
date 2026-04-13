@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { notFound, redirect } from 'next/navigation'
 import { createServiceClient, createServerSupabaseClient } from '@/lib/supabase/server'
+import { getDocument } from '@/lib/green-invoice'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { formatILS } from '@/lib/utils'
@@ -29,6 +30,46 @@ export default async function StatementDetailPage({
     .single()
 
   if (error || !statement) notFound()
+
+  // Auto-sync GI document status — detect voided/cancelled documents
+  const giDocId = statement.gi_receipt_id || statement.gi_proforma_id
+  if (giDocId && (statement.status === 'sent' || statement.status === 'paid')) {
+    try {
+      const giDoc = await getDocument(giDocId)
+      // GI status: 0 = draft, 1 = final, 2 = cancelled/voided
+      if (giDoc.status === 2) {
+        // Document was voided in GI — revert statement to approved
+        await serviceClient
+          .from('monthly_statements')
+          .update({
+            status: 'approved',
+            gi_proforma_id: null,
+            gi_proforma_number: null,
+            gi_proforma_url: null,
+            gi_receipt_id: null,
+            gi_receipt_number: null,
+            paid_at: null,
+            sent_at: null,
+            payment_method: null,
+            amount_paid_agorot: 0,
+          })
+          .eq('id', params.id)
+
+        // Re-fetch the updated statement
+        const { data: refreshed } = await serviceClient
+          .from('monthly_statements')
+          .select('*, owners(full_name, email)')
+          .eq('id', params.id)
+          .single()
+
+        if (refreshed) {
+          Object.assign(statement, refreshed)
+        }
+      }
+    } catch {
+      // GI API failed — continue with cached state
+    }
+  }
 
   const owner = statement.owners as { full_name: string; email: string }
   const monthLabel = new Date(statement.billing_month + 'T00:00:00Z').toLocaleDateString('en-US', {

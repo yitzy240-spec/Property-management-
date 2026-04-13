@@ -54,6 +54,7 @@ export function StatementEditor({ statementId, status, direction, lineItems: ini
   const canReopen = status === 'approved' && !hasInvoice
   const canInvoice = status === 'approved' && !hasInvoice
   const canSend = (status === 'approved' || status === 'sent') && direction === 'owner_owes'
+  const canVoidInvoice = hasInvoice || status === 'sent' || status === 'paid'
 
   const hasChanges = JSON.stringify(items) !== JSON.stringify(initialItems)
 
@@ -139,6 +140,25 @@ export function StatementEditor({ statementId, status, direction, lineItems: ini
     }
   }
 
+  async function handleVoidInvoice() {
+    if (!window.confirm('Void this invoice? This will clear the Green Invoice reference and revert the statement to Approved so you can re-issue.')) return
+    setLoading('void')
+    try {
+      const res = await fetch(`/api/statements/${statementId}/void-invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(data.message)
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to void invoice')
+    } finally {
+      setLoading(null)
+    }
+  }
+
   async function handleAction(action: 'approve' | 'create-invoice' | 'send-reminder') {
     // Confirmation for irreversible actions
     if (action === 'create-invoice') {
@@ -204,6 +224,12 @@ export function StatementEditor({ statementId, status, direction, lineItems: ini
           <Button size="sm" variant="outline" onClick={() => handleAction('send-reminder')} disabled={!!loading} className="gap-1.5">
             <Send className="h-3.5 w-3.5" />
             {loading === 'send-reminder' ? 'Sending...' : 'Send to Owner'}
+          </Button>
+        )}
+        {canVoidInvoice && (
+          <Button size="sm" variant="outline" onClick={handleVoidInvoice} disabled={!!loading} className="gap-1.5 text-status-danger border-status-danger/30">
+            <RotateCcw className="h-3.5 w-3.5" />
+            {loading === 'void' ? 'Voiding...' : 'Void Invoice'}
           </Button>
         )}
         {editable && (
