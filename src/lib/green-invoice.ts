@@ -44,8 +44,14 @@ async function getJwtToken(): Promise<string> {
     return cachedToken.jwt
   }
 
-  const apiId = process.env.GREEN_INVOICE_API_ID
-  const apiSecret = process.env.GREEN_INVOICE_API_SECRET
+  // Use sandbox-specific credentials when in sandbox mode
+  const isSandbox = process.env.GREEN_INVOICE_SANDBOX === 'true'
+  const apiId = isSandbox
+    ? (process.env.GREEN_INVOICE_SANDBOX_API_ID || process.env.GREEN_INVOICE_API_ID)
+    : process.env.GREEN_INVOICE_API_ID
+  const apiSecret = isSandbox
+    ? (process.env.GREEN_INVOICE_SANDBOX_API_SECRET || process.env.GREEN_INVOICE_API_SECRET)
+    : process.env.GREEN_INVOICE_API_SECRET
 
   if (!apiId || !apiSecret) {
     throw new Error('Green Invoice credentials not configured')
