@@ -384,12 +384,14 @@ export interface GIPaymentLink {
 }
 
 interface PaymentLinkOptions {
-  /** Amount in agorot */
+  /** Total amount in agorot (including any surcharges) */
   amountAgorot: number
   /** Title shown on payment page */
   description: string
   /** Detail text shown on payment page */
   content?: string
+  /** Line items shown on payment page and auto-generated receipt */
+  income?: { description: string; quantity: number; priceAgorot: number }[]
   lang?: 'he' | 'en'
   maxPayments?: number
 }
@@ -410,7 +412,7 @@ export async function createPaymentLink(options: PaymentLinkOptions): Promise<GI
     group,
   }))
 
-  const body = {
+  const body: Record<string, unknown> = {
     type: 0,
     price: options.amountAgorot / 100,
     currency: 'ILS',
@@ -424,6 +426,15 @@ export async function createPaymentLink(options: PaymentLinkOptions): Promise<GI
     addClient: false,
     maxPayments: options.maxPayments || 1,
     maxQuantity: 1,
+  }
+
+  if (options.income && options.income.length > 0) {
+    body.income = options.income.map(item => ({
+      description: item.description,
+      quantity: item.quantity,
+      price: item.priceAgorot / 100,
+      currency: 'ILS',
+    }))
   }
 
   return giFetch<GIPaymentLink>('/payments/links', {

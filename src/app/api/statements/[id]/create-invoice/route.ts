@@ -55,12 +55,28 @@ export async function POST(
         priceAgorot: li.amount_agorot,
       }))
 
-      // 1. Create payment link (hosted payment page)
-      const contentText = charges.map(li => li.description).join(', ')
+      // 1. Create payment link — amount includes 3.5% CC processing surcharge
+      const netAgorot = Math.abs(statement.net_amount_agorot)
+      const surchargeAgorot = Math.round(netAgorot * 0.035)
+      const paymentAmountAgorot = netAgorot + surchargeAgorot
+
+      // Build income line items for the payment page (shows breakdown to owner)
+      const paymentLineItems = charges.map(li => ({
+        description: li.description,
+        quantity: 1,
+        priceAgorot: li.amount_agorot,
+      }))
+      paymentLineItems.push({
+        description: 'Credit card processing fee (3.5%)',
+        quantity: 1,
+        priceAgorot: surchargeAgorot,
+      })
+
       const paymentLink = await createPaymentLink({
-        amountAgorot: Math.abs(statement.net_amount_agorot),
+        amountAgorot: paymentAmountAgorot,
         description: `Marcus Properties — ${monthLabel}`,
-        content: contentText.slice(0, 250), // GI may have length limits
+        content: charges.map(li => li.description).join(', '),
+        income: paymentLineItems,
       })
 
       // 2. Create proforma document (draft, no auto-email) for PDF record
