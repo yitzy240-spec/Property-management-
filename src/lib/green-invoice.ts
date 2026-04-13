@@ -53,6 +53,8 @@ async function getJwtToken(): Promise<string> {
     ? (process.env.GREEN_INVOICE_SANDBOX_API_SECRET || process.env.GREEN_INVOICE_API_SECRET)
     : process.env.GREEN_INVOICE_API_SECRET
 
+  console.log(`[GI Auth] sandbox=${isSandbox}, apiId=${apiId?.slice(0, 8)}..., baseUrl=${BASE_URL.split('//')[1]?.slice(0, 20)}`)
+
   if (!apiId || !apiSecret) {
     throw new Error('Green Invoice credentials not configured')
   }
@@ -76,6 +78,8 @@ async function getJwtToken(): Promise<string> {
 async function giFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = await getJwtToken()
 
+  console.log(`[GI API] ${options.method || 'GET'} ${path}`)
+
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -87,6 +91,7 @@ async function giFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
+    console.error(`[GI API] ${options.method || 'GET'} ${path} → ${res.status}:`, JSON.stringify(body).slice(0, 300))
     throw new Error(`Green Invoice API ${res.status}: ${body.errorMessage || JSON.stringify(body).slice(0, 200)}`)
   }
 
