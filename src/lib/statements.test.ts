@@ -69,10 +69,10 @@ describe('Statement Calculator', () => {
     expect(incidentalsItems[0].amount_agorot).toBe(80000)
   })
 
-  it('airbnb booking: commission only in bookings section, no rental credit', async () => {
+  it('airbnb booking: zero financial impact (Airbnb pays both owner + commission)', async () => {
     const client = buildMockClient({
       owners: [{ id: 'o1', full_name: 'Airbnb Owner', email: 'a@test.com', green_invoice_client_id: null }],
-      properties: [{ id: 'p1', owner_id: 'o1', name: 'Apt', commission_rate: 0.20, management_fee_agorot: 0, hourly_rate_agorot: 0, is_active: true }],
+      properties: [{ id: 'p1', owner_id: 'o1', name: 'Apt', commission_rate: 0.20, management_fee_agorot: 50000, hourly_rate_agorot: 0, is_active: true }],
       bookings: [{ id: 'b1', property_id: 'p1', platform: 'airbnb', gross_rental_agorot: 500000, guest_name: 'Airbnb Guest', check_in: '2026-04-01', check_out: '2026-04-05' }],
       work_logs: [],
       bills: [],
@@ -81,23 +81,46 @@ describe('Statement Calculator', () => {
     const results = await calculateMonthlyStatements(client as never, billingMonth)
     const stmt = results[0]
 
-    expect(stmt.grossRentalAgorot).toBe(0) // No rental through Marcus
-    expect(stmt.commissionAgorot).toBe(100000) // 500000 * 0.20
-    expect(stmt.netAmountAgorot).toBe(100000) // Owner owes commission
+    // Airbnb pays owner AND Marcus directly — no rental credit, no commission charge
+    expect(stmt.grossRentalAgorot).toBe(0)
+    expect(stmt.commissionAgorot).toBe(0)
+    // Only the fixed fee remains
+    expect(stmt.fixedFeeAgorot).toBe(50000)
+    expect(stmt.netAmountAgorot).toBe(50000) // Owner owes just the fixed fee
     expect(stmt.direction).toBe('owner_owes')
 
-    // Commission appears in bookings section (not fees) for platform bookings
+    // Airbnb booking appears as informational line item with ₪0 amount
     const bookingsItems = stmt.lineItems.filter(i => i.section === 'bookings')
     expect(bookingsItems).toHaveLength(1)
-    expect(bookingsItems[0].category).toBe('commission_platform')
-    expect(bookingsItems[0].description).toContain('airbnb')
-    expect(bookingsItems[0].description).toContain('commission')
+    expect(bookingsItems[0].amount_agorot).toBe(0)
+    expect(bookingsItems[0].description).toContain('Airbnb')
+    expect(bookingsItems[0].description).toContain('commission paid by Airbnb')
 
-    // No rental_direct items
+    // No rental_direct or commission charges
     expect(stmt.lineItems.filter(i => i.category === 'rental_direct')).toHaveLength(0)
+    expect(stmt.lineItems.filter(i => i.category === 'commission_direct')).toHaveLength(0)
   })
 
-  it('mixed direct + airbnb bookings', async () => {
+  it('booking_com: commission charged (unlike Airbnb)', async () => {
+    const client = buildMockClient({
+      owners: [{ id: 'o1', full_name: 'BCom Owner', email: 'b@test.com', green_invoice_client_id: null }],
+      properties: [{ id: 'p1', owner_id: 'o1', name: 'Apt', commission_rate: 0.20, management_fee_agorot: 0, hourly_rate_agorot: 0, is_active: true }],
+      bookings: [{ id: 'b1', property_id: 'p1', platform: 'booking_com', gross_rental_agorot: 500000, guest_name: 'BCom Guest', check_in: '2026-04-01', check_out: '2026-04-05' }],
+      work_logs: [],
+      bills: [],
+    })
+
+    const results = await calculateMonthlyStatements(client as never, billingMonth)
+    const stmt = results[0]
+
+    // Booking.com pays owner directly but Marcus still invoices commission
+    expect(stmt.grossRentalAgorot).toBe(0)
+    expect(stmt.commissionAgorot).toBe(100000) // 500000 * 0.20
+    expect(stmt.netAmountAgorot).toBe(100000)
+    expect(stmt.direction).toBe('owner_owes')
+  })
+
+  it('mixed direct + airbnb: only direct has financial impact', async () => {
     const client = buildMockClient({
       owners: [{ id: 'o1', full_name: 'Mix', email: 'm@test.com', green_invoice_client_id: null }],
       properties: [{ id: 'p1', owner_id: 'o1', name: 'Apt', commission_rate: 0.20, management_fee_agorot: 0, hourly_rate_agorot: 0, is_active: true }],
@@ -113,8 +136,8 @@ describe('Statement Calculator', () => {
     const stmt = results[0]
 
     expect(stmt.grossRentalAgorot).toBe(300000) // Only direct
-    expect(stmt.commissionAgorot).toBe(100000) // Both: 60000 + 40000
-    expect(stmt.netAmountAgorot).toBe(-200000) // 100000 - 300000
+    expect(stmt.commissionAgorot).toBe(60000) // Only direct commission (Airbnb = 0)
+    expect(stmt.netAmountAgorot).toBe(-240000) // 60000 - 300000
     expect(stmt.direction).toBe('marcus_owes')
   })
 

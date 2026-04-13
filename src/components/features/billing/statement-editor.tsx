@@ -140,6 +140,15 @@ export function StatementEditor({ statementId, status, direction, lineItems: ini
   }
 
   async function handleAction(action: 'approve' | 'create-invoice' | 'send-reminder') {
+    // Confirmation for irreversible actions
+    if (action === 'create-invoice') {
+      const label = direction === 'marcus_owes' ? 'record this payout' : 'create the invoice and payment link'
+      if (!window.confirm(`Are you sure you want to ${label}? This cannot be undone.`)) return
+    }
+    if (action === 'send-reminder') {
+      if (!window.confirm('Send the statement email to the owner?')) return
+    }
+
     setLoading(action)
     try {
       const endpoint = action === 'approve'
@@ -188,7 +197,7 @@ export function StatementEditor({ statementId, status, direction, lineItems: ini
         {canInvoice && (
           <Button size="sm" variant="default" onClick={() => handleAction('create-invoice')} disabled={!!loading} className="gap-1.5">
             <FileText className="h-3.5 w-3.5" />
-            {loading === 'create-invoice' ? 'Creating...' : 'Create Invoice'}
+            {loading === 'create-invoice' ? 'Creating...' : direction === 'marcus_owes' ? 'Record Payout' : 'Create Invoice'}
           </Button>
         )}
         {canSend && (

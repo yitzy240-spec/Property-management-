@@ -148,18 +148,22 @@ export async function calculateMonthlyStatements(
         if (platform === 'owner_stay') continue
         if (rental <= 0) continue
 
-        const isDirect = platform === 'direct'
         const guestLabel = booking.guest_name || 'Guest'
         const dateRange = `${booking.check_in} – ${booking.check_out}`
 
-        if (isDirect) {
-          // Direct: show full rental amount (Marcus collected it)
+        if (platform === 'airbnb') {
+          // Airbnb: pays owner their share AND pays Marcus commission directly.
+          // Zero financial impact on the statement — just informational.
+          lineItems.push(li(p, 'bookings', 'commission_platform',
+            `${guestLabel} via Airbnb (₪${(rental / 100).toLocaleString()}) — commission paid by Airbnb`,
+            0, booking.id, 'booking'))
+        } else if (platform === 'direct') {
+          // Direct: Marcus collected the rent, deducts commission
           totalRental += rental
           lineItems.push(li(p, 'bookings', 'rental_direct',
             `${guestLabel} (${dateRange})`,
             -rental, booking.id, 'booking'))
 
-          // Commission goes to fees section
           const commission = Math.round(rental * rate)
           if (commission > 0) {
             totalCommission += commission
@@ -168,7 +172,7 @@ export async function calculateMonthlyStatements(
               commission, booking.id, 'booking'))
           }
         } else {
-          // Platform: show only commission (platform paid owner directly)
+          // Other platforms (booking_com, etc): pay owner directly, Marcus invoices commission
           const commission = Math.round(rental * rate)
           if (commission > 0) {
             totalCommission += commission
