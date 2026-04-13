@@ -163,9 +163,9 @@ export async function POST(
     : `Monthly Statement for ${monthLabel} — ${formatILS(netAmount)}`
 
   // Test mode: route all emails to admin instead of real owners
-  const testEmails = process.env.TEST_EMAIL_OVERRIDE
-  const recipientEmail = testEmails || owner.email
-  const testSubjectPrefix = testEmails ? `[TEST for ${owner.full_name}] ` : ''
+  const testOverride = process.env.TEST_EMAIL_OVERRIDE
+  const recipientEmail = testOverride ? testOverride.split(',')[0].trim() : owner.email
+  const testSubjectPrefix = testOverride ? `[TEST for ${escapeHtml(owner.full_name)}] ` : ''
 
   const result = await sendEmail({
     to: recipientEmail,
