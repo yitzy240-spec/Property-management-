@@ -1,150 +1,87 @@
 export const dynamic = 'force-dynamic'
 
-import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { createServiceClient } from '@/lib/supabase/server'
+import { TurnoverCalendar } from '@/components/features/turnover-calendar'
 
 export default async function CalendarPage() {
-  const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
 
-  const today = new Date()
-  const twoWeeksOut = new Date(today)
-  twoWeeksOut.setDate(today.getDate() + 14)
+  // Fetch a wider range for calendar view (current month +/- 1 month)
+  const now = new Date()
+  const rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0)
+  const startStr = rangeStart.toISOString().split('T')[0]
+  const endStr = rangeEnd.toISOString().split('T')[0]
 
-  const todayStr = today.toISOString().split('T')[0]
-  const endStr = twoWeeksOut.toISOString().split('T')[0]
+  const [{ data: bookings }, { data: cleaningTasks }] = await Promise.all([
+    serviceClient
+      .from('bookings')
+      .select('id, guest_name, check_in, check_out, platform, properties(name)')
+      .or(`check_in.gte.${startStr},check_out.gte.${startStr}`)
+      .lte('check_in', endStr)
+      .order('check_in'),
+    serviceClient
+      .from('tasks')
+      .select('id, title, status, due_date, is_cleaning, properties(name)')
+      .eq('is_cleaning', true)
+      .in('status', ['pending', 'in_progress'])
+      .gte('due_date', startStr)
+      .lte('due_date', endStr)
+      .order('due_date'),
+  ])
 
-  const { data: bookings } = await serviceClient
-    .from('bookings')
-    .select('*, properties(name)')
-    .or(`check_in.gte.${todayStr},check_out.gte.${todayStr}`)
-    .lte('check_in', endStr)
-    .order('check_in')
+  // Build CalendarEvent array
+  const events: { id: string; date: string; type: 'checkout' | 'checkin' | 'cleaning'; title: string; property: string; detail?: string; urgent?: boolean }[] = []
 
-  const { data: cleaningTasks } = await serviceClient
-    .from('tasks')
-    .select('*, properties(name)')
-    .eq('is_cleaning', true)
-    .in('status', ['pending', 'in_progress'])
-    .gte('due_date', todayStr)
-    .lte('due_date', endStr)
-    .order('due_date')
+  // Track checkouts per property per date for gap detection
+  const checkoutsByPropertyDate = new Map<string, string>()
 
-  // Build day-by-day view
-  const days: { date: string; label: string; events: { type: string; title: string; property: string; detail: string; gapHours?: number }[] }[] = []
+  for (const b of bookings ?? []) {
+    const property = ((b.properties as unknown as { name: string } | null))?.name || 'Unknown'
 
-  for (let d = new Date(today); d <= twoWeeksOut; d.setDate(d.getDate() + 1)) {
-    const dateStr = d.toISOString().split('T')[0]
-    const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-    const events: typeof days[0]['events'] = []
-
-    const checkouts = bookings?.filter(b => b.check_out === dateStr) ?? []
-    for (const co of checkouts) {
+    if (b.check_out && b.check_out >= startStr && b.check_out <= endStr) {
       events.push({
+        id: `co-${b.id}`,
+        date: b.check_out,
         type: 'checkout',
-        title: `Check-out: ${co.guest_name || 'Guest'}`,
-        property: (co.properties as { name: string } | null)?.name || 'Unknown',
+        title: `Check-out: ${b.guest_name || 'Guest'}`,
+        property,
         detail: '10:00 AM',
       })
+      checkoutsByPropertyDate.set(`${property}-${b.check_out}`, b.id)
     }
 
-    const cleans = cleaningTasks?.filter(t => t.due_date === dateStr) ?? []
-    for (const clean of cleans) {
-      events.push({
-        type: 'cleaning',
-        title: clean.title,
-        property: (clean.properties as { name: string } | null)?.name || 'Unknown',
-        detail: clean.status === 'in_progress' ? 'In progress' : 'Scheduled',
-      })
-    }
-
-    const checkins = bookings?.filter(b => b.check_in === dateStr) ?? []
-    for (const ci of checkins) {
-      const propertyName = (ci.properties as { name: string } | null)?.name || 'Unknown'
-      const prevCheckout = checkouts.find(co =>
-        (co.properties as { name: string } | null)?.name === propertyName
-      )
-      const gapHours = prevCheckout ? 4 : undefined
+    if (b.check_in && b.check_in >= startStr && b.check_in <= endStr) {
+      // Detect tight gaps (same-day checkout + checkin on same property)
+      const hasSameDayCheckout = checkoutsByPropertyDate.has(`${property}-${b.check_in}`)
 
       events.push({
+        id: `ci-${b.id}`,
+        date: b.check_in,
         type: 'checkin',
-        title: `Check-in: ${ci.guest_name || 'Guest'}`,
-        property: propertyName,
-        detail: `2:00 PM · ${ci.check_out ? `→ ${ci.check_out}` : ''}`,
-        gapHours,
+        title: `Check-in: ${b.guest_name || 'Guest'}`,
+        property,
+        detail: `2:00 PM${b.check_out ? ` · → ${b.check_out}` : ''}`,
+        urgent: hasSameDayCheckout, // Same-day turnover = tight gap
       })
-    }
-
-    if (events.length > 0) {
-      days.push({ date: dateStr, label: dayLabel, events })
     }
   }
 
-  const eventTypeMap: Record<string, { label: string; status: string; borderColor: string }> = {
-    checkout: { label: 'Check-out', status: 'info', borderColor: 'border-l-[hsl(var(--event-checkout))]' },
-    cleaning: { label: 'Cleaning', status: 'neutral', borderColor: 'border-l-[hsl(var(--event-clean))]' },
-    checkin: { label: 'Check-in', status: 'info', borderColor: 'border-l-[hsl(var(--event-checkin))]' },
+  for (const t of cleaningTasks ?? []) {
+    if (!t.due_date) continue
+    events.push({
+      id: `cl-${t.id}`,
+      date: t.due_date,
+      type: 'cleaning',
+      title: t.title,
+      property: ((t.properties as unknown as { name: string } | null))?.name || 'Unknown',
+      detail: t.status === 'in_progress' ? 'In progress' : 'Scheduled',
+    })
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Turnover Calendar</h1>
-        <p className="text-xs text-muted-foreground">
-          Next 14 days — check-outs, cleaning windows, and check-ins.
-        </p>
-      </div>
-
-      {days.length > 0 ? (
-        <>
-        <div className="space-y-5">
-          {days.map((day) => (
-            <section key={day.date} id={day.date === todayStr ? 'today' : undefined}>
-              <div className="mb-2 flex items-center gap-2">
-                <h3 className="text-xs font-semibold text-muted-foreground">{day.label}</h3>
-                {day.date === todayStr && (
-                  <span className="rounded-[var(--radius-badge)] bg-primary px-1.5 py-0.5 text-xs font-medium text-primary-foreground">Today</span>
-                )}
-              </div>
-              <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
-                {day.events.map((event, i) => {
-                  const config = eventTypeMap[event.type] || eventTypeMap.cleaning
-                  return (
-                    <div
-                      key={i}
-                      className={`flex items-center justify-between border-l-4 px-4 py-3 ${config.borderColor} ${i > 0 ? 'border-t border-border' : ''}`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <StatusBadge status={config.status} label={config.label} size="sm" />
-                          <span className="truncate text-sm font-medium">{event.title}</span>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {event.property} · {event.detail}
-                        </p>
-                      </div>
-                      {event.gapHours !== undefined && event.gapHours < 5 && (
-                        <StatusBadge status="danger" label={`${event.gapHours}h gap`} size="sm" />
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
-        <a
-          href="#today"
-          className="fixed bottom-24 right-4 z-30 rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
-        >
-          Today
-        </a>
-        </>
-      ) : (
-        <div className="rounded-[10px] border border-border bg-card py-12 text-center shadow-sm">
-          <p className="text-sm text-muted-foreground">No turnovers in the next 14 days</p>
-        </div>
-      )}
+    <div className="space-y-4">
+      <TurnoverCalendar events={events} />
     </div>
   )
 }
