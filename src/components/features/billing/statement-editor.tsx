@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Trash2, Check, Send, FileText, Save } from 'lucide-react'
+import { Plus, Trash2, Check, Send, FileText, Save, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
@@ -51,6 +51,7 @@ export function StatementEditor({ statementId, status, direction, lineItems: ini
 
   const editable = status === 'draft' || status === 'pending_approval'
   const canApprove = status === 'draft' || status === 'pending_approval'
+  const canReopen = status === 'approved' && !hasInvoice
   const canInvoice = status === 'approved' && !hasInvoice
   const canSend = (status === 'approved' || status === 'sent') && direction === 'owner_owes'
 
@@ -118,6 +119,25 @@ export function StatementEditor({ statementId, status, direction, lineItems: ini
     }
   }
 
+  async function handleReopen() {
+    setLoading('reopen')
+    try {
+      const res = await fetch(`/api/statements/${statementId}/line-items`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ line_items: items }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success('Statement reopened for editing')
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to reopen')
+    } finally {
+      setLoading(null)
+    }
+  }
+
   async function handleAction(action: 'approve' | 'create-invoice' | 'send-reminder') {
     setLoading(action)
     try {
@@ -156,6 +176,12 @@ export function StatementEditor({ statementId, status, direction, lineItems: ini
           <Button size="sm" variant="default" onClick={() => handleAction('approve')} disabled={!!loading || hasChanges} className="gap-1.5 bg-status-safe hover:bg-status-safe/90 text-white">
             <Check className="h-3.5 w-3.5" />
             {loading === 'approve' ? 'Approving...' : 'Approve'}
+          </Button>
+        )}
+        {canReopen && (
+          <Button size="sm" variant="outline" onClick={handleReopen} disabled={!!loading} className="gap-1.5">
+            <RotateCcw className="h-3.5 w-3.5" />
+            {loading === 'reopen' ? 'Reopening...' : 'Reopen for Editing'}
           </Button>
         )}
         {canInvoice && (
