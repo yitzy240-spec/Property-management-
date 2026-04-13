@@ -128,13 +128,11 @@ export default async function OwnerPortalPage() {
           </div>
         )}
 
-        {/* Monthly Statements */}
-        {showFinancials && (
-          <section>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Monthly Statements</p>
-            <OwnerStatements ownerId={owner.id} />
-          </section>
-        )}
+        {/* Monthly Statements — visible to ALL profiles (if charges exist, owners need to see them) */}
+        <section>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Monthly Statements</p>
+          <OwnerStatements ownerId={owner.id} />
+        </section>
 
         {/* Financials */}
         {showFinancials && (

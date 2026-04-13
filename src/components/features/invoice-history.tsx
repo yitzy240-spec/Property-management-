@@ -16,10 +16,10 @@ interface GIDocument {
 
 const TYPE_SHORT: Record<number, string> = {
   10: 'Quote',
-  300: 'Proforma',
+  300: 'Payment Request',
   305: 'Invoice',
-  320: 'Inv/Rcpt',
-  330: 'Credit',
+  320: 'Invoice & Receipt',
+  330: 'Credit Note',
   400: 'Receipt',
 }
 
@@ -37,16 +37,13 @@ export function InvoiceHistory({ clientFilter, limit, showHeader = true }: Invoi
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('/api/green-invoice/invoices')
+        const url = clientFilter
+          ? `/api/green-invoice/invoices?client=${encodeURIComponent(clientFilter)}`
+          : '/api/green-invoice/invoices'
+        const res = await fetch(url)
         if (res.ok) {
           const data = await res.json()
           let items = data.items || []
-
-          if (clientFilter) {
-            items = items.filter((d: GIDocument) =>
-              d.client?.name?.toLowerCase().includes(clientFilter.toLowerCase())
-            )
-          }
 
           setTotal(items.length)
           if (limit) items = items.slice(0, limit)
@@ -106,7 +103,7 @@ export function InvoiceHistory({ clientFilter, limit, showHeader = true }: Invoi
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <p className="font-mono text-sm font-semibold">
-                {doc.currency === 'ILS' ? '₪' : '$'}{doc.amount.toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                {doc.currency === 'ILS' ? '₪' : '$'}{doc.amount.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
               <a
                 href={`/api/green-invoice/invoices/${doc.id}/download?lang=he`}

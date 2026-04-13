@@ -88,6 +88,7 @@ export function OwnerStatements({ ownerId }: OwnerStatementsProps) {
           description: string
           amount_agorot: number
           category: string
+          section: string
           property_name: string
         }>
 
@@ -132,17 +133,31 @@ export function OwnerStatements({ ownerId }: OwnerStatementsProps) {
 
             {isExpanded && (
               <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-3">
-                {/* Line items */}
-                <div className="space-y-1">
-                  {lineItems.map((li, j) => (
-                    <div key={j} className="flex justify-between text-xs">
-                      <span className="text-muted-foreground truncate mr-3">
-                        {li.property_name}: {li.description}
-                      </span>
-                      <CurrencyDisplay agorot={li.amount_agorot} className="shrink-0 text-xs" showSign />
-                    </div>
-                  ))}
-                  <div className="flex justify-between border-t border-border pt-2 mt-2">
+                {/* Line items grouped by section */}
+                <div className="space-y-2">
+                  {(['bookings', 'fees', 'incidentals'] as const).map(section => {
+                    const sectionItems = lineItems.filter(li => li.section === section)
+                    if (sectionItems.length === 0) return null
+                    const sectionLabel = section === 'bookings' ? 'Bookings' : section === 'fees' ? 'Fees & Commission' : 'Expenses'
+                    return (
+                      <div key={section}>
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">{sectionLabel}</p>
+                        {sectionItems.map((li, j) => (
+                          <div key={j} className="flex justify-between text-xs py-0.5">
+                            <span className="text-muted-foreground truncate mr-3">
+                              {li.property_name}: {li.description}
+                            </span>
+                            {li.amount_agorot !== 0 ? (
+                              <CurrencyDisplay agorot={li.amount_agorot} className="shrink-0 text-xs" showSign />
+                            ) : (
+                              <span className="shrink-0 text-xs text-muted-foreground">—</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })}
+                  <div className="flex justify-between border-t border-border pt-2 mt-1">
                     <span className="text-xs font-semibold">Net</span>
                     <CurrencyDisplay agorot={stmt.net_amount_agorot} className="text-xs font-bold" showSign />
                   </div>
@@ -159,27 +174,39 @@ export function OwnerStatements({ ownerId }: OwnerStatementsProps) {
                     >
                       Pay Online
                     </a>
-                    <p className="text-[11px] text-muted-foreground text-center">
+                    <p className="text-xs text-muted-foreground text-center">
                       Credit card, Apple Pay, Google Pay, or Bit — a 3.5% processing fee applies
                     </p>
                     <div className="rounded-md border border-border p-2.5 mt-2">
                       <p className="text-xs font-medium mb-1">Bank Transfer</p>
-                      <div className="grid grid-cols-2 gap-x-2 text-[11px]">
+                      <div className="grid grid-cols-2 gap-x-2 text-xs">
                         <span className="text-muted-foreground">Beneficiary</span><span className="text-right">Sara & Ariel Marcus</span>
                         <span className="text-muted-foreground">Bank</span><span className="text-right">First International (31)</span>
-                        <span className="text-muted-foreground">Branch</span><span className="text-right">095</span>
-                        <span className="text-muted-foreground">Account</span><span className="text-right">259085</span>
+                        <span className="text-muted-foreground">IBAN</span><span className="text-right font-mono text-[11px]">IL620310950000000259085</span>
+                        <span className="text-muted-foreground">SWIFT</span><span className="text-right font-mono">FIABORTTXXX</span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground mt-1">No processing fee</p>
+                      <p className="text-xs text-muted-foreground mt-1">No processing fee · Include your name in the transfer reference</p>
                     </div>
                   </div>
                 )}
 
-                {stmt.status === 'paid' && stmt.paid_at && (
-                  <p className="text-xs text-status-safe">
-                    Paid on {new Date(stmt.paid_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    {stmt.payment_method && ` via ${stmt.payment_method.replace('_', ' ')}`}
-                  </p>
+                {(stmt.status === 'paid' || stmt.status === 'partially_paid') && stmt.amount_paid_agorot > 0 && (
+                  <div className="rounded-md bg-status-safe/10 p-2">
+                    <p className="text-xs font-medium text-status-safe">
+                      {stmt.status === 'paid' ? 'Paid in full' : `Partial payment received: ${formatILS(stmt.amount_paid_agorot)}`}
+                    </p>
+                    {stmt.paid_at && (
+                      <p className="text-[11px] text-status-safe/80 mt-0.5">
+                        {new Date(stmt.paid_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Jerusalem' })}
+                        {stmt.payment_method && ` via ${stmt.payment_method.replace('_', ' ')}`}
+                      </p>
+                    )}
+                    {stmt.status === 'partially_paid' && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Remaining: {formatILS(remaining > 0 ? remaining : 0)}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             )}

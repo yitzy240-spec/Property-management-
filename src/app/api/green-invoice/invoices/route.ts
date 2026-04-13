@@ -1,26 +1,55 @@
 import { NextResponse } from 'next/server'
 import { fetchAllDocuments } from '@/lib/green-invoice'
 import { requireAuth, AuthError } from '@/lib/auth'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 /**
- * GET /api/green-invoice/invoices
- * Pull full invoice history from Green Invoice (all pages).
- * Accessible to both admins and owners.
+ * GET /api/green-invoice/invoices?client=OwnerName
+ * Pull invoice history from Green Invoice.
+ * Admin: sees all (or filtered by ?client=).
+ * Owner: only sees their own documents (filtered by their name).
  */
-export async function GET() {
+export async function GET(request: Request) {
+  let user
   try {
-    await requireAuth()
+    user = await requireAuth()
   } catch (err) {
     if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const isAdmin = user.app_metadata?.role === 'admin' || user.email === process.env.ADMIN_EMAIL
+  const { searchParams } = new URL(request.url)
+  let clientFilter = searchParams.get('client')
+
+  // Non-admin users can ONLY see their own documents
+  if (!isAdmin) {
+    const supabase = createServerSupabaseClient()
+    const { data: owner } = await supabase
+      .from('owners')
+      .select('full_name')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (owner) {
+      clientFilter = owner.full_name
+    } else {
+      return NextResponse.json({ items: [], total: 0 })
+    }
+  }
+
   try {
-    const items = await fetchAllDocuments()
+    const allItems = await fetchAllDocuments()
+
+    // Filter server-side by client name
+    const items = clientFilter
+      ? allItems.filter(d =>
+          d.client?.name?.toLowerCase() === clientFilter!.toLowerCase()
+        )
+      : allItems
+
     return NextResponse.json({ items, total: items.length })
   } catch {
-    // Green Invoice may not be configured or credentials may be invalid
-    // Return empty list instead of 500 to prevent console errors
     return NextResponse.json({ items: [], total: 0 })
   }
 }

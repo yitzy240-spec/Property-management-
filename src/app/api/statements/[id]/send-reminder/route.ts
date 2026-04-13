@@ -103,6 +103,9 @@ export async function POST(
   const bankDisplay = process.env.BANK_DISPLAY_NAME || 'First International Bank (31)'
   const bankBranch = process.env.BANK_BRANCH || '095'
   const bankAccount = process.env.BANK_ACCOUNT || '259085'
+  const bankIban = process.env.BANK_IBAN || ''
+  const bankSwift = process.env.BANK_SWIFT || ''
+  const statementRef = `STMT-${statement.billing_month.replace(/-/g, '').slice(0, 6)}-${params.id.slice(0, 6).toUpperCase()}`
 
   const bankTransferHtml = `
     <div style="border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px;">
@@ -110,11 +113,12 @@ export async function POST(
       <table style="width: 100%; font-size: 12px; color: #374151;">
         <tr><td style="padding: 2px 0; color: #6B7280;">Beneficiary</td><td style="padding: 2px 0; text-align: right;">${escapeHtml(bankName)}</td></tr>
         <tr><td style="padding: 2px 0; color: #6B7280;">Bank</td><td style="padding: 2px 0; text-align: right;">${escapeHtml(bankDisplay)}</td></tr>
-        <tr><td style="padding: 2px 0; color: #6B7280;">Branch</td><td style="padding: 2px 0; text-align: right;">${escapeHtml(bankBranch)}</td></tr>
-        <tr><td style="padding: 2px 0; color: #6B7280;">Account</td><td style="padding: 2px 0; text-align: right;">${escapeHtml(bankAccount)}</td></tr>
+        ${bankIban ? `<tr><td style="padding: 2px 0; color: #6B7280;">IBAN</td><td style="padding: 2px 0; text-align: right; font-family: monospace; font-size: 11px;">${escapeHtml(bankIban)}</td></tr>` : `<tr><td style="padding: 2px 0; color: #6B7280;">Branch</td><td style="padding: 2px 0; text-align: right;">${escapeHtml(bankBranch)}</td></tr><tr><td style="padding: 2px 0; color: #6B7280;">Account</td><td style="padding: 2px 0; text-align: right;">${escapeHtml(bankAccount)}</td></tr>`}
+        ${bankSwift ? `<tr><td style="padding: 2px 0; color: #6B7280;">SWIFT/BIC</td><td style="padding: 2px 0; text-align: right; font-family: monospace;">${escapeHtml(bankSwift)}</td></tr>` : ''}
         <tr><td style="padding: 2px 0; color: #6B7280;">Amount</td><td style="padding: 2px 0; text-align: right; font-weight: 600;">${formatILS(netAmount)}</td></tr>
+        <tr><td style="padding: 2px 0; color: #6B7280;">Reference</td><td style="padding: 2px 0; text-align: right; font-family: monospace; font-size: 11px;">${statementRef}</td></tr>
       </table>
-      <p style="font-size: 11px; color: #9CA3AF; margin: 8px 0 0;">No processing fee</p>
+      <p style="font-size: 11px; color: #9CA3AF; margin: 8px 0 0;">No processing fee · Please include the reference in your transfer</p>
     </div>
   `
 
@@ -153,7 +157,11 @@ export async function POST(
 
       ${invoicePdfHtml ? `<div style="margin-top: 16px; text-align: center;">${invoicePdfHtml}</div>` : ''}
 
-      <p style="color: #9CA3AF; font-size: 12px; margin-top: 24px;">If you've already made this payment, please disregard this email. For questions, reply directly to this email or contact your property manager.</p>
+      <div style="text-align: center; margin-top: 20px;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://app.marcus-properties.com'}/owner" style="color: #1E3A5F; font-size: 13px; text-decoration: underline;">View in Owner Portal</a>
+      </div>
+
+      <p style="color: #9CA3AF; font-size: 12px; margin-top: 20px;">If you've already made this payment, please disregard this email. For questions, reply directly to this email or contact your property manager.</p>
       <p style="color: #9CA3AF; font-size: 11px; margin-top: 16px;">— Marcus Properties via ApartmentOS</p>
     </div>
   `
