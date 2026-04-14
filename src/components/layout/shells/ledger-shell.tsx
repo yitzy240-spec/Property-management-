@@ -12,6 +12,7 @@ import {
   Users,
   Building2,
   ClipboardList,
+  ClipboardCheck,
   Package,
   MessageSquare,
   FileText,
@@ -41,6 +42,7 @@ const bottomTabs = [
 const menuItems = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/properties', label: 'Properties', icon: Building2 },
+  { href: '/visits', label: 'Visits', icon: ClipboardCheck },
   { href: '/owners', label: 'Owners', icon: Users },
   { href: '/tasks', label: 'Tasks', icon: ClipboardList },
   { href: '/contractors', label: 'Contractors', icon: HardHat },
