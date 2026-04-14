@@ -1,155 +1,134 @@
-import { createServiceClient } from "@/lib/supabase/service";
-import { Button } from "@/components/ui/button";
+export const dynamic = 'force-dynamic'
 
-// Helper: Calculate days until a date
+import Link from 'next/link'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getPropertyVisitStatuses } from '@/lib/visits'
+import { Button } from '@/components/ui/button'
+
 function daysUntil(dateStr: string): number {
-  const target = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const diffMs = target.getTime() - today.getTime();
-  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(dateStr)
+  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-// Helper: Format date as "Mon, day"
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
-  const day = date.getDate();
-  return `${dayName}, ${day}`;
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
-
-export const dynamic = "force-dynamic";
 
 export default async function VisitsPage({
   searchParams,
 }: {
-  searchParams: { filter?: string };
+  searchParams: { property?: string }
 }) {
-  const supabase = createServiceClient();
+  const supabase = createServiceClient()
+  const statuses = await getPropertyVisitStatuses(supabase)
 
-  // Fetch property visit statuses
-  const { data: properties } = await supabase
-    .from("properties")
-    .select(
-      `
-      id,
-      name,
-      occupancy_status,
-      visit_due_date,
-      checked_in_guest_name,
-      checked_in_guest_checkout,
-      admin_notes
-    `
-    )
-    .order("name");
+  const filtered = searchParams.property
+    ? statuses.filter(s => s.id === searchParams.property)
+    : statuses
 
-  // Apply filter if provided
-  let filtered = properties || [];
-  if (searchParams.filter) {
-    filtered = filtered.filter((p) =>
-      p.name.toLowerCase().includes(searchParams.filter.toLowerCase())
-    );
-  }
+  const thisWeek = filtered.filter(s => !s.is_occupied && daysUntil(s.next_visit_due) <= 7)
+    .sort((a, b) => daysUntil(a.next_visit_due) - daysUntil(b.next_visit_due))
+  const later = filtered.filter(s => !s.is_occupied && daysUntil(s.next_visit_due) > 7)
+    .sort((a, b) => daysUntil(a.next_visit_due) - daysUntil(b.next_visit_due))
+  const occupied = filtered.filter(s => s.is_occupied)
 
-  // Categorize properties
-  const thisWeek = filtered.filter((p) => {
-    if (p.occupancy_status === "occupied") return false;
-    const days = daysUntil(p.visit_due_date);
-    return days >= 0 && days <= 7;
-  });
-
-  const later = filtered.filter((p) => {
-    if (p.occupancy_status === "occupied") return false;
-    const days = daysUntil(p.visit_due_date);
-    return days > 7;
-  });
-
-  const occupied = filtered.filter((p) => p.occupancy_status === "occupied");
-
-  // Helper: Render property row
-  const PropertyRow = ({ property }: { property: (typeof filtered)[0] }) => {
-    const days = daysUntil(property.visit_due_date);
-    const isOverdue = days < 0;
-    const isWarning = days >= 0 && days <= 3;
-
-    return (
-      <div
-        key={property.id}
-        className={`border-l-4 p-4 ${
-          isOverdue
-            ? "border-red-500 bg-red-50"
-            : isWarning
-              ? "border-amber-500 bg-amber-50"
-              : "border-gray-300 bg-white"
-        }`}
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold">{property.name}</h3>
-            {property.occupancy_status === "occupied" && (
-              <p className="text-sm text-gray-600">
-                Guest: {property.checked_in_guest_name} (checkout:{" "}
-                {formatDate(property.checked_in_guest_checkout)})
-              </p>
-            )}
-            {property.admin_notes && (
-              <p className="text-sm text-gray-500 italic">{property.admin_notes}</p>
-            )}
-          </div>
-          {property.occupancy_status !== "occupied" && (
-            <Button
-              size="sm"
-              onClick={() =>
-                (window.location.href = `/admin/visits/${property.id}/log`)
-              }
-            >
-              Log Visit
-            </Button>
-          )}
-        </div>
-      </div>
-    );
-  };
+  const sections = [
+    { key: 'this_week', label: 'This Week', items: thisWeek },
+    { key: 'later', label: 'Later', items: later },
+    { key: 'occupied', label: 'Occupied', items: occupied },
+  ]
 
   return (
-    <div className="space-y-6 p-6">
-      <h1 className="text-3xl font-bold">Visits</h1>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-lg font-semibold tracking-tight">Visits</h1>
+        <p className="text-xs text-muted-foreground">
+          {filtered.length} properties · {thisWeek.filter(s => daysUntil(s.next_visit_due) < 0).length} overdue
+        </p>
+      </div>
 
-      {/* This Week */}
-      <section>
-        <h2 className="mb-4 text-xl font-semibold">This Week</h2>
-        <div className="space-y-2">
-          {thisWeek.length > 0 ? (
-            thisWeek.map((p) => <PropertyRow key={p.id} property={p} />)
-          ) : (
-            <p className="text-gray-500">No visits due this week</p>
-          )}
-        </div>
-      </section>
+      {sections.map((section) => (
+        <section key={section.key}>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            {section.label} ({section.items.length})
+          </p>
 
-      {/* Later */}
-      <section>
-        <h2 className="mb-4 text-xl font-semibold">Later</h2>
-        <div className="space-y-2">
-          {later.length > 0 ? (
-            later.map((p) => <PropertyRow key={p.id} property={p} />)
-          ) : (
-            <p className="text-gray-500">No visits scheduled later</p>
-          )}
-        </div>
-      </section>
+          {section.items.length > 0 ? (
+            <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+              {section.items.map((property, i) => {
+                const days = daysUntil(property.next_visit_due)
+                const isOverdue = days < 0 && !property.is_occupied
+                const isDueSoon = days >= 0 && days <= 7 && !property.is_occupied
 
-      {/* Occupied */}
-      <section>
-        <h2 className="mb-4 text-xl font-semibold">Occupied</h2>
-        <div className="space-y-2">
-          {occupied.length > 0 ? (
-            occupied.map((p) => <PropertyRow key={p.id} property={p} />)
+                return (
+                  <div
+                    key={property.id}
+                    className={`flex items-center justify-between gap-3 px-4 py-3.5 ${i > 0 ? 'border-t border-border' : ''} ${isOverdue ? 'border-l-[3px] border-l-destructive' : isDueSoon ? 'border-l-[3px] border-l-status-warning' : ''}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-sm font-semibold">{property.name}</h3>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {property.is_occupied ? (
+                          <>
+                            {property.occupancy_type === 'owner_stay' ? 'Owner stay until' : 'Guest checkout'}:{' '}
+                            {formatDate(property.occupancy_end!)} ·{' '}
+                            <span className="text-muted-foreground">
+                              Visits resume {formatDate(
+                                new Date(new Date(property.occupancy_end!).getTime() + 14 * 24 * 60 * 60 * 1000)
+                                  .toISOString().split('T')[0]
+                              )}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            Last visit: {property.last_visit_date ? formatDate(property.last_visit_date) : 'Never'} ·{' '}
+                            {isOverdue ? (
+                              <span className="font-semibold text-destructive">{Math.abs(days)} days overdue</span>
+                            ) : (
+                              `Due in ${days} days`
+                            )}
+                          </>
+                        )}
+                      </p>
+                      {property.last_admin_note && !property.is_occupied && (
+                        <p className="mt-1 text-[11px] text-accent">
+                          📌 {property.last_admin_note}
+                        </p>
+                      )}
+                    </div>
+
+                    {property.is_occupied ? (
+                      <span className="shrink-0 rounded-[var(--radius-badge)] border border-border bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                        Occupied
+                      </span>
+                    ) : (
+                      <Link href={`/visits/new?property=${property.id}&name=${encodeURIComponent(property.name)}`}>
+                        <Button
+                          size="sm"
+                          className={`h-8 text-xs ${
+                            section.key === 'this_week'
+                              ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+                              : ''
+                          }`}
+                          variant={section.key === 'this_week' ? 'default' : 'outline'}
+                        >
+                          Log Visit
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           ) : (
-            <p className="text-gray-500">No occupied properties</p>
+            <div className="rounded-[10px] border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">
+              No properties
+            </div>
           )}
-        </div>
-      </section>
+        </section>
+      ))}
     </div>
-  );
+  )
 }
