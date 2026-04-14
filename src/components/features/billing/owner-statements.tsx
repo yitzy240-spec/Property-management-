@@ -182,8 +182,8 @@ export function OwnerStatements({ ownerId }: OwnerStatementsProps) {
                       <div className="grid grid-cols-2 gap-x-2 text-xs">
                         <span className="text-muted-foreground">Beneficiary</span><span className="text-right">Sara & Ariel Marcus</span>
                         <span className="text-muted-foreground">Bank</span><span className="text-right">First International (31)</span>
-                        <span className="text-muted-foreground">IBAN</span><span className="text-right font-mono text-[11px]">IL620310950000000259085</span>
-                        <span className="text-muted-foreground">SWIFT</span><span className="text-right font-mono">FIABORTTXXX</span>
+                        <span className="text-muted-foreground">IBAN</span><span className="text-right font-mono text-[11px]">IL590310950000000259085</span>
+                        <span className="text-muted-foreground">SWIFT</span><span className="text-right font-mono">FIRBILITXXX</span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">No processing fee · Include your name in the transfer reference</p>
                     </div>
