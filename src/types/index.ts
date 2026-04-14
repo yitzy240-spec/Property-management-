@@ -407,3 +407,44 @@ export interface MonthlyStatementWithDetails extends MonthlyStatement {
   owner: Owner
   payments: StatementPayment[]
 }
+
+// ============================================
+// Visits
+// ============================================
+
+export const VISIT_CHECKLIST_ITEMS = [
+  { key: 'electricity_working', label: 'Electricity working' },
+  { key: 'run_sinks', label: 'Run sinks' },
+  { key: 'run_showers', label: 'Run showers' },
+  { key: 'flush_toilets', label: 'Flush toilets' },
+  { key: 'refrigerator_freezer', label: 'Refrigerator and Freezer working' },
+  { key: 'soap_stock', label: 'Soap / toilet paper / etc in stock' },
+  { key: 'boiler_off', label: 'Make sure boiler is off' },
+  { key: 'washer_door_open', label: 'Check washer door is open' },
+  { key: 'dryer_lint', label: 'Check dryer lint' },
+  { key: 'bedrooms_no_mold', label: 'Bedrooms no mold or leaking on walls' },
+  { key: 'check_mailbox', label: 'Check mailbox' },
+] as const
+
+export type ChecklistKey = typeof VISIT_CHECKLIST_ITEMS[number]['key']
+
+export interface Visit {
+  id: string
+  property_id: string
+  visited_at: string
+  checklist: Partial<Record<ChecklistKey, boolean>>
+  note: string | null
+  admin_note: string | null
+  created_by: string
+  created_at: string
+  properties?: { name: string }
+}
+
+export interface VisitMedia {
+  id: string
+  visit_id: string
+  file_path: string
+  file_type: 'image' | 'video'
+  is_private: boolean
+  created_at: string
+}
