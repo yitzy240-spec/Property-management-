@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ExternalLink, Pencil } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Pencil, ClipboardCheck } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -17,6 +17,7 @@ import { WorkLogButton, WorkLogList } from '@/components/features/work-log'
 import { IecConnect } from '@/components/features/iec-connect'
 import { UtilityAccountsSection } from '@/components/features/utility-accounts'
 import { BookingList } from '@/components/features/booking-list'
+import { VisitList } from '@/components/features/visit-list'
 
 export default async function PropertyDetailPage({
   params,
@@ -39,11 +40,13 @@ export default async function PropertyDetailPage({
     { data: bills },
     { data: tasks },
     { data: documents },
+    { data: visitRows },
   ] = await Promise.all([
     serviceClient.from('bookings').select('*').eq('property_id', params.id).gte('check_out', new Date().toISOString().split('T')[0]).order('check_in', { ascending: true }).limit(20),
     serviceClient.from('bills').select('*').eq('property_id', params.id).order('created_at', { ascending: false }).limit(10),
     serviceClient.from('tasks').select('*, contractors(name)').eq('property_id', params.id).order('created_at', { ascending: false }).limit(10),
     serviceClient.from('documents').select('*').eq('property_id', params.id).order('created_at', { ascending: false }),
+    serviceClient.from('visits').select('*').eq('property_id', params.id).order('visited_at', { ascending: false }).limit(5),
   ])
 
   const owner = property.owners as { full_name: string; email: string; profile: string } | null
@@ -147,6 +150,32 @@ export default async function PropertyDetailPage({
           </div>
         </div>
       )}
+
+      {/* Visits */}
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Visits ({visitRows?.length ?? 0})
+          </p>
+          <Link href={`/visits/new?property=${params.id}&name=${encodeURIComponent(property.name)}`}>
+            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
+              <ClipboardCheck className="h-3 w-3" />
+              Log Visit
+            </Button>
+          </Link>
+        </div>
+        <VisitList
+          visits={(visitRows ?? []).map(v => ({
+            id: v.id as string,
+            property_id: v.property_id as string,
+            visited_at: v.visited_at as string,
+            checklist: (v.checklist as Record<string, boolean>) ?? {},
+            note: v.note as string | null,
+            created_at: v.created_at as string,
+          }))}
+          viewAllHref={`/visits?property=${params.id}`}
+        />
+      </section>
 
       {/* IEC Electricity */}
       <section>

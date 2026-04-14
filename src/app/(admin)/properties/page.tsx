@@ -9,11 +9,24 @@ import { StatusBadge } from '@/components/ui/status-badge'
 export default async function PropertiesPage() {
   const supabase = createServiceClient()
 
-  const { data: properties } = await supabase
-    .from('properties')
-    .select('*, owners(full_name, profile), lodgify_data')
-    .eq('is_active', true)
-    .order('name')
+  const [{ data: properties }, { data: lastVisits }] = await Promise.all([
+    supabase
+      .from('properties')
+      .select('*, owners(full_name, profile), lodgify_data')
+      .eq('is_active', true)
+      .order('name'),
+    supabase
+      .from('visits')
+      .select('property_id, visited_at')
+      .order('visited_at', { ascending: false }),
+  ])
+
+  const lastVisitMap = new Map<string, string>()
+  for (const v of lastVisits ?? []) {
+    if (!lastVisitMap.has(v.property_id)) {
+      lastVisitMap.set(v.property_id, v.visited_at)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -94,6 +107,25 @@ export default async function PropertiesPage() {
                         <StatusBadge status={profileStatus} label={owner.profile} size="sm" />
                       </div>
                     )}
+
+                    {/* Last visit indicator */}
+                    {(() => {
+                      const lastVisit = lastVisitMap.get(property.id)
+                      const daysAgo = lastVisit
+                        ? Math.round((Date.now() - new Date(lastVisit).getTime()) / (1000 * 60 * 60 * 24))
+                        : null
+                      const isOverdue = daysAgo !== null && daysAgo > 14
+                      return (
+                        <div className="mt-2 flex items-center gap-1.5">
+                          <span className={`inline-block h-1.5 w-1.5 rounded-full ${isOverdue ? 'bg-destructive' : daysAgo !== null ? 'bg-status-safe' : 'bg-muted-foreground'}`} />
+                          <span className="text-[11px] text-muted-foreground">
+                            {lastVisit
+                              ? `Last visit: ${new Date(lastVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                              : 'No visits'}
+                          </span>
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
               </Link>

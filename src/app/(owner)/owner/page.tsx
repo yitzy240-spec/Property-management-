@@ -10,6 +10,7 @@ import { MessageThread } from '@/components/features/message-thread'
 import { RequestStay } from '@/components/features/request-stay'
 import { InvoiceHistory } from '@/components/features/invoice-history'
 import { OwnerStatements } from '@/components/features/billing/owner-statements'
+import { VisitList } from '@/components/features/visit-list'
 
 export default async function OwnerPortalPage() {
   const supabase = createServerSupabaseClient()
@@ -54,6 +55,7 @@ export default async function OwnerPortalPage() {
     { data: tasks },
     { data: documents },
     { data: taskMedia },
+    { data: ownerVisits },
   ] = await Promise.all([
     propertyIds.length > 0
       ? supabase.from('bookings').select('*').in('property_id', propertyIds).gte('check_in', new Date().toISOString().split('T')[0]).order('check_in').limit(5)
@@ -69,6 +71,9 @@ export default async function OwnerPortalPage() {
       : Promise.resolve({ data: [] }),
     propertyIds.length > 0
       ? supabase.from('task_media').select('*, tasks(title, is_cleaning, property_id, properties(name))').eq('uploaded_by', 'contractor').order('created_at', { ascending: false }).limit(20)
+      : Promise.resolve({ data: [] }),
+    propertyIds.length > 0
+      ? supabase.from('visits').select('id, property_id, visited_at, checklist, note, created_at, properties(name)').in('property_id', propertyIds).order('visited_at', { ascending: false }).limit(10)
       : Promise.resolve({ data: [] }),
   ])
 
@@ -127,6 +132,25 @@ export default async function OwnerPortalPage() {
             ))}
           </div>
         )}
+
+        {/* Recent Visits */}
+        <section>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Recent Visits ({(ownerVisits as unknown[])?.length ?? 0})
+          </p>
+          <VisitList
+            visits={((ownerVisits as Array<Record<string, unknown>>) ?? []).map(v => ({
+              id: v.id as string,
+              property_id: v.property_id as string,
+              visited_at: v.visited_at as string,
+              checklist: (v.checklist as Record<string, boolean>) ?? {},
+              note: v.note as string | null,
+              created_at: v.created_at as string,
+              properties: v.properties as { name: string } | null,
+            }))}
+            showPropertyName
+          />
+        </section>
 
         {/* Monthly Statements — visible to ALL profiles (if charges exist, owners need to see them) */}
         <section>
