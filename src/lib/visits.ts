@@ -21,13 +21,15 @@ export async function getPropertyVisitStatuses(
 
   const { data: properties } = await supabase
     .from('properties')
-    .select('id, name, neighborhood, city, owner_id, created_at')
+    .select('id, name, neighborhood, city, owner_id, created_at, exclude_from_visits')
     .eq('is_active', true)
     .order('name')
 
   if (!properties || properties.length === 0) return []
 
-  const propertyIds = properties.map(p => p.id)
+  // Filter out properties excluded from visits
+  const activeProperties = properties.filter(p => !p.exclude_from_visits)
+  const propertyIds = activeProperties.map(p => p.id)
 
   const { data: visits } = await supabase
     .from('visits')
@@ -74,7 +76,7 @@ export async function getPropertyVisitStatuses(
     }
   }
 
-  return properties.map(p => {
+  return activeProperties.map(p => {
     const lastVisit = lastVisitMap.get(p.id)
     const activeBooking = activeBookingMap.get(p.id)
     const lastCheckout = lastCheckoutMap.get(p.id)

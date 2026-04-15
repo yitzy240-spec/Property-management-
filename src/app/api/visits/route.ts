@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createServiceClient, createServerSupabaseClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
@@ -51,5 +52,55 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Revalidate all pages that show visit data
+  revalidatePath('/visits')
+  revalidatePath('/properties')
+  revalidatePath(`/properties/${property_id}`)
+
   return NextResponse.json({ id: visit.id })
+}
+
+export async function DELETE(req: NextRequest) {
+  const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { searchParams } = new URL(req.url)
+  const visitId = searchParams.get('id')
+
+  if (!visitId) {
+    return NextResponse.json({ error: 'Visit ID is required' }, { status: 400 })
+  }
+
+  // Get the visit first to know the property_id for revalidation
+  const { data: visit } = await serviceClient
+    .from('visits')
+    .select('property_id')
+    .eq('id', visitId)
+    .single()
+
+  // Delete media first (cascade should handle this, but be explicit)
+  await serviceClient
+    .from('visit_media')
+    .delete()
+    .eq('visit_id', visitId)
+
+  const { error } = await serviceClient
+    .from('visits')
+    .delete()
+    .eq('id', visitId)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  revalidatePath('/visits')
+  revalidatePath('/properties')
+  if (visit) revalidatePath(`/properties/${visit.property_id}`)
+
+  return NextResponse.json({ success: true })
 }
