@@ -78,15 +78,16 @@ export async function POST(request: Request) {
   }
 
   // Send a password reset link so the owner can set their password
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://apartmentos.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.marcus-properties.com'
   let magicLink: string | null = null
 
   // Generate a recovery/password-setup link
+  // IMPORTANT: Route through /auth/callback so PKCE code gets exchanged for a session
   const { data: linkData } = await serviceClient.auth.admin.generateLink({
     type: 'recovery',
     email: owner.email,
     options: {
-      redirectTo: `${appUrl}/login/reset?setup=1`,
+      redirectTo: `${appUrl}/auth/callback?next=/login/reset&setup=1`,
     },
   })
 
@@ -98,7 +99,7 @@ export async function POST(request: Request) {
   const { createServerSupabaseClient: createPublicClient } = await import('@/lib/supabase/server')
   const publicSupabase = createPublicClient()
   await publicSupabase.auth.resetPasswordForEmail(owner.email, {
-    redirectTo: `${appUrl}/login/reset?setup=1`,
+    redirectTo: `${appUrl}/auth/callback?next=/login/reset&setup=1`,
   }).catch(() => {})
 
   const { data: properties } = await serviceClient

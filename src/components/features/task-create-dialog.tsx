@@ -19,6 +19,7 @@ import {
 import { NativeSelect } from '@/components/ui/native-select'
 import { createClient } from '@/lib/supabase/client'
 import type { TaskPriority } from '@/types'
+import { CLEANING_CHECKLIST } from '@/lib/cleaning-checklist'
 
 export function TaskCreateDialog({ preselectedPropertyId, preselectedPropertyName }: { preselectedPropertyId?: string; preselectedPropertyName?: string } = {}) {
   const supabase = createClient()
@@ -83,6 +84,15 @@ export function TaskCreateDialog({ preselectedPropertyId, preselectedPropertyNam
       .catch(() => {})
   }, [open])
 
+  // Auto-populate cleaning checklist when title matches
+  function handleTitleChange(value: string) {
+    setTitleVal(value)
+    const isCleaningTitle = /clean/i.test(value)
+    if (isCleaningTitle && !checklistVal) {
+      setChecklistVal(CLEANING_CHECKLIST.join('\n'))
+    }
+  }
+
   async function handleCreate(formData: FormData) {
     setSaving(true)
 
@@ -140,7 +150,7 @@ export function TaskCreateDialog({ preselectedPropertyId, preselectedPropertyNam
 
       <div className="space-y-1.5">
         <Label htmlFor="title" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Task Title</Label>
-        <Input id="title" name="title" placeholder="Fix boiler pilot light" required className="h-11" value={titleVal} onChange={e => setTitleVal(e.target.value)} />
+        <Input id="title" name="title" placeholder="Fix boiler pilot light" required className="h-11" value={titleVal} onChange={e => handleTitleChange(e.target.value)} />
       </div>
 
       <div className="space-y-1.5">

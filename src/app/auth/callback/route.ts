@@ -24,7 +24,9 @@ export async function GET(request: Request) {
 
   // Password reset / recovery → send to set password page
   if (type === 'recovery' || next === '/login/reset') {
-    return NextResponse.redirect(new URL('/login/reset?setup=1', url.origin))
+    const setup = url.searchParams.get('setup')
+    const resetUrl = setup ? '/login/reset?setup=1' : '/login/reset'
+    return NextResponse.redirect(new URL(resetUrl, url.origin))
   }
 
   return NextResponse.redirect(new URL(next, url.origin))

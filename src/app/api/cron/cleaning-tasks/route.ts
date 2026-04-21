@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyAdmins } from '@/lib/notifications'
+import { CLEANING_CHECKLIST } from '@/lib/cleaning-checklist'
 
 /**
  * GET /api/cron/cleaning-tasks
@@ -89,29 +90,40 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'All cleaning tasks already exist', created: 0 })
   }
 
-  // Create tasks with next check-in info
-  const { error } = await serviceClient.from('tasks').insert(
-    toCreate.map(booking => {
-      const propertyName = (booking.properties as unknown as { name: string } | null)?.name || 'Unknown'
-      const nextCheckIn = nextCheckInMap.get(`${booking.property_id}_${booking.check_out}`)
-      const nextInfo = nextCheckIn
-        ? `\nNext check-in: ${nextCheckIn.guest} on ${nextCheckIn.date}`
-        : '\nNo upcoming check-in scheduled'
+  // Create tasks with checklist
+  let created = 0
 
-      return {
-        property_id: booking.property_id,
-        title: `Turnover clean — ${propertyName}`,
-        description: `Post-checkout cleaning for ${booking.guest_name || 'guest'}. Checkout: ${booking.check_out}${nextInfo}`,
-        status: 'pending',
-        priority: 'high',
-        is_cleaning: true,
-        due_date: booking.check_out,
-        contractor_id: cleaningContractor?.id || null,
-      }
-    })
-  )
+  for (const booking of toCreate) {
+    const propertyName = (booking.properties as unknown as { name: string } | null)?.name || 'Unknown'
+    const nextCheckIn = nextCheckInMap.get(`${booking.property_id}_${booking.check_out}`)
+    const nextInfo = nextCheckIn
+      ? `\nNext check-in: ${nextCheckIn.guest} on ${nextCheckIn.date}`
+      : '\nNo upcoming check-in scheduled'
 
-  const created = error ? 0 : toCreate.length
+    const { data: task, error } = await serviceClient.from('tasks').insert({
+      property_id: booking.property_id,
+      title: `Turnover clean — ${propertyName}`,
+      description: `Post-checkout cleaning for ${booking.guest_name || 'guest'}. Checkout: ${booking.check_out}${nextInfo}`,
+      status: 'pending',
+      priority: 'high',
+      is_cleaning: true,
+      due_date: booking.check_out,
+      contractor_id: cleaningContractor?.id || null,
+    }).select('id').single()
+
+    if (error || !task) continue
+
+    // Attach default cleaning checklist
+    await serviceClient.from('task_checklist_items').insert(
+      CLEANING_CHECKLIST.map((label, index) => ({
+        task_id: task.id,
+        label,
+        sort_order: index,
+      }))
+    )
+
+    created++
+  }
 
   // Notify admin
   if (created > 0) {

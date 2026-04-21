@@ -92,7 +92,7 @@ async function notifyMessageRecipient(
 
   if (!property) return
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://apartmentos.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.marcus-properties.com'
 
   if (senderRole === 'owner') {
     // Owner sent → notify admin (in-app + email)

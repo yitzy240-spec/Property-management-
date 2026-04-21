@@ -1,18 +1,21 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { fetchBillEmails, getGmailAccessToken } from '@/lib/gmail'
-import { geminiGenerate } from '@/lib/gemini'
+import { getGmailAccessToken } from '@/lib/gmail'
+import { parseBillPdf, parseBillHtml } from '@/lib/bill-parser'
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
 
 /**
  * GET /api/cron/parse-bills
  *
- * 1. Fetch bill emails from Gmail (filtered by utility keywords + PDF attachment)
- * 2. Download PDF, upload to storage
- * 3. AI-extract bill data (type, amount, due date, address, account holder name)
- * 4. Match to property: learned mappings first, then owner name fuzzy match
- * 5. Create bill in verification queue (pending_review or flagged if anomaly)
+ * Label-based bill routing:
+ * 1. Load Gmail label → property mapping from app_settings
+ * 2. For each Bill/* label, fetch new emails
+ * 3. Download PDF, upload to storage
+ * 4. AI-extract bill data (Claude Sonnet via OpenRouter, Gemini fallback)
+ * 5. Property is known from the label — no fuzzy matching needed
+ * 6. Account number matching for Hagihon (identical emails, different accounts)
+ * 7. Create bill in verification queue
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
@@ -32,64 +35,138 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'Gmail not connected — skipping', parsed: 0 })
   }
 
-  // Renew Gmail Pub/Sub watch (expires every 7 days, renewing daily is safe)
+  // Load label → property mapping
+  const { data: mappingSetting } = await serviceClient
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'gmail_bill_label_mapping')
+    .single()
+
+  if (!mappingSetting) {
+    return NextResponse.json({ error: 'No Gmail label mapping configured', parsed: 0 }, { status: 500 })
+  }
+
+  const labelToProperty: Record<string, string> = JSON.parse(mappingSetting.value)
+
+  // Load utility accounts for account-number-based routing (Hagihon)
+  const { data: utilityAccounts } = await serviceClient
+    .from('property_utility_accounts')
+    .select('property_id, utility_type, account_number')
+
+  // Renew Gmail Pub/Sub watch
   try {
     const { watchGmail } = await import('@/lib/gmail')
     if (process.env.GMAIL_PUBSUB_TOPIC) {
       await watchGmail()
     }
   } catch {
-    // Watch renewal failed — not critical, Pub/Sub still works until expiry
+    // Not critical
   }
 
-  // Preload data for matching
-  const [
-    { data: properties },
-    { data: owners },
-    { data: senderMappings },
-    { data: utilityAccounts },
-  ] = await Promise.all([
-    serviceClient.from('properties').select('id, name, address, owner_id').eq('is_active', true),
-    serviceClient.from('owners').select('id, full_name'),
-    serviceClient.from('bill_sender_mappings').select('*').eq('confirmed', true),
-    serviceClient.from('property_utility_accounts').select('property_id, utility_type, account_number'),
-  ])
+  const accessToken = await getGmailAccessToken()
 
-  try {
-    // Per-sender targeted queries — 10 emails per sender, ~6 senders
-    const { messages } = await fetchBillEmails(10)
+  // List Gmail labels
+  const labelsRes = await fetch(`${GMAIL_API_BASE}/users/me/labels`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!labelsRes.ok) {
+    return NextResponse.json({ error: 'Failed to fetch Gmail labels' }, { status: 500 })
+  }
+  const labelsData = await labelsRes.json()
+  const allLabels: { id: string; name: string }[] = labelsData.labels || []
 
-    if (messages.length === 0) {
-      return NextResponse.json({ message: 'No new bill emails found', parsed: 0 })
-    }
+  // Filter to Bill/* labels that have a property mapping
+  const billLabels = allLabels.filter(l => labelToProperty[l.name])
 
-    let parsed = 0
+  let parsed = 0
+  let skipped = 0
 
-    for (const msg of messages) {
+  for (const label of billLabels) {
+    const propertyId = labelToProperty[label.name]
+
+    // Fetch recent emails in this label
+    const msgListRes = await fetch(
+      `${GMAIL_API_BASE}/users/me/messages?labelIds=${label.id}&maxResults=20`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    )
+    if (!msgListRes.ok) continue
+    const msgListData = await msgListRes.json()
+    if (!msgListData.messages) continue
+
+    for (const msgRef of msgListData.messages) {
+      // Skip already-processed emails
       const { data: existing } = await serviceClient
         .from('bills')
         .select('id')
-        .eq('gmail_message_id', msg.id)
+        .eq('gmail_message_id', msgRef.id)
         .limit(1)
 
-      if (existing && existing.length > 0) continue
+      if (existing && existing.length > 0) {
+        skipped++
+        continue
+      }
 
-      const accessToken = await getGmailAccessToken()
+      // Fetch full message
+      const msgRes = await fetch(
+        `${GMAIL_API_BASE}/users/me/messages/${msgRef.id}?format=full`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      )
+      if (!msgRes.ok) continue
+      const msg = await msgRes.json()
+
+      const headers = msg.payload?.headers || []
+      const subject = headers.find((h: { name: string }) => h.name === 'Subject')?.value || ''
+      const from = headers.find((h: { name: string }) => h.name === 'From')?.value || ''
+
+      // Find PDF attachment
+      let pdfFilename: string | null = null
+      let attachmentId: string | null = null
+      const findPdf = (parts: { filename?: string; mimeType?: string; body?: { attachmentId?: string }; parts?: unknown[] }[]) => {
+        for (const part of parts) {
+          if (part.filename && (part.mimeType === 'application/pdf' || part.filename.toLowerCase().endsWith('.pdf')) && part.body?.attachmentId) {
+            pdfFilename = part.filename
+            attachmentId = part.body.attachmentId
+            return
+          }
+          if (part.parts) findPdf(part.parts as typeof parts)
+        }
+      }
+      if (msg.payload?.parts) findPdf(msg.payload.parts)
+
+      // Find HTML body
+      let htmlBody: string | null = null
+      const findHtml = (parts: { mimeType?: string; body?: { data?: string }; parts?: unknown[] }[]) => {
+        for (const part of parts) {
+          if (part.mimeType === 'text/html' && part.body?.data) {
+            htmlBody = Buffer.from(part.body.data, 'base64url').toString('utf-8')
+            return
+          }
+          if (part.parts) findHtml(part.parts as typeof parts)
+        }
+      }
+      if (msg.payload?.parts) findHtml(msg.payload.parts)
+      else if (msg.payload?.body?.data && msg.payload?.mimeType === 'text/html') {
+        htmlBody = Buffer.from(msg.payload.body.data, 'base64url').toString('utf-8')
+      }
+
+      // Skip emails with no bill content
+      if (!attachmentId && !htmlBody) continue
+
       let pdfBase64: string | null = null
       let storagePath: string | null = null
 
       // Download PDF if available
-      if (msg.attachmentId && msg.pdfFilename) {
+      if (attachmentId && pdfFilename) {
         try {
           const attachResponse = await fetch(
-            `${GMAIL_API_BASE}/users/me/messages/${msg.id}/attachments/${msg.attachmentId}`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
+            `${GMAIL_API_BASE}/users/me/messages/${msgRef.id}/attachments/${attachmentId}`,
+            { headers: { Authorization: `Bearer ${accessToken}` } },
           )
           if (attachResponse.ok) {
             const attachData = await attachResponse.json()
-            pdfBase64 = attachData.data
-            const pdfBuffer = Buffer.from(pdfBase64 as string, 'base64url')
-            storagePath = `bills/${msg.id}_${msg.pdfFilename}`
+            pdfBase64 = attachData.data.replace(/-/g, '+').replace(/_/g, '/')
+            const pdfBuffer = Buffer.from(attachData.data, 'base64url')
+            storagePath = `bills/${msgRef.id}_${pdfFilename}`
             await serviceClient.storage
               .from('documents')
               .upload(storagePath, pdfBuffer, { contentType: 'application/pdf' })
@@ -99,18 +176,16 @@ export async function GET(request: Request) {
         }
       }
 
-      // AI extraction — use PDF if available, otherwise HTML body
+      // AI extraction
       let aiParsedData = null
-      if (process.env.GEMINI_API_KEY) {
-        try {
-          if (pdfBase64) {
-            aiParsedData = await parseWithAI(pdfBase64, process.env.GEMINI_API_KEY)
-          } else if (msg.htmlBody) {
-            aiParsedData = await parseHtmlWithAI(msg.htmlBody, msg.subject, msg.from, process.env.GEMINI_API_KEY)
-          }
-        } catch {
-          // AI parsing failed — bill created with null data for manual entry
+      try {
+        if (pdfBase64) {
+          aiParsedData = await parseBillPdf(pdfBase64)
+        } else if (htmlBody) {
+          aiParsedData = await parseBillHtml(htmlBody, subject, from)
         }
+      } catch {
+        // AI parsing failed — bill created with null data for manual entry
       }
 
       const billType = aiParsedData?.bill_type || 'other'
@@ -119,76 +194,20 @@ export async function GET(request: Request) {
       const periodStart = aiParsedData?.period_start || null
       const periodEnd = aiParsedData?.period_end || null
 
-      // ── Property matching ──
-      let propertyId: string | null = null
-      let matchMethod: string | null = null
+      // Property routing: label gives us the property, but for Hagihon
+      // we may need to override based on account number
+      let finalPropertyId = propertyId
+      let matchMethod = 'gmail_label'
 
-      // 1. Check learned sender mappings (highest confidence)
-      const senderEmail = msg.from.replace(/.*<(.+)>.*/, '$1').toLowerCase()
-      const learnedMapping = (senderMappings ?? []).find(
-        m => m.sender_email === senderEmail && m.bill_type === billType
-      )
-
-      if (learnedMapping) {
-        propertyId = learnedMapping.property_id
-        matchMethod = 'learned_mapping'
-      }
-
-      // 2. Match by utility account number (highest confidence after sender mapping)
-      if (!propertyId && aiParsedData?.account_number) {
+      if (aiParsedData?.account_number) {
         const accountMatch = (utilityAccounts ?? []).find(
-          ua => ua.utility_type === billType && ua.account_number === aiParsedData.account_number
+          ua => ua.account_number === aiParsedData.account_number,
         )
-        if (accountMatch) {
-          propertyId = accountMatch.property_id
-          matchMethod = 'account_number'
-        }
-      }
-
-      // 3. Match by owner name in subject or AI-extracted account holder
-      if (!propertyId) {
-        const searchText = `${msg.subject} ${aiParsedData?.account_holder || ''}`.toLowerCase()
-
-        for (const owner of (owners ?? [])) {
-          const nameParts = owner.full_name.toLowerCase().split(' ')
-          // Match if ALL parts of the owner name appear in subject/bill
-          const allPartsMatch = nameParts.length >= 2 && nameParts.every(
-            (part: string) => part.length > 2 && searchText.includes(part)
-          )
-
-          if (allPartsMatch) {
-            // Find property belonging to this owner
-            const ownerProperty = (properties ?? []).find(p => p.owner_id === owner.id)
-            if (ownerProperty) {
-              propertyId = ownerProperty.id
-              matchMethod = 'owner_name'
-
-              // Auto-create a mapping for future use (unconfirmed)
-              await serviceClient.from('bill_sender_mappings').upsert({
-                sender_email: senderEmail,
-                sender_name_pattern: msg.from,
-                subject_pattern: owner.full_name,
-                property_id: propertyId,
-                bill_type: billType,
-                confirmed: false,
-              }, { onConflict: 'sender_email,property_id,bill_type' }).select()
-
-              break
-            }
-          }
-        }
-      }
-
-      // 3. Match by address from AI extraction
-      if (!propertyId && aiParsedData?.address) {
-        const billAddress = aiParsedData.address.toLowerCase()
-        const matched = (properties ?? []).find(p =>
-          billAddress.includes(p.address.toLowerCase()) ||
-          p.address.toLowerCase().includes(billAddress)
-        )
-        if (matched) {
-          propertyId = matched.id
-          matchMethod = 'address'
+        if (accountMatch && accountMatch.property_id !== propertyId) {
+          // Account number points to a different property than the label
+          // Trust the account number (more specific)
+          finalPropertyId = accountMatch.property_id
+          matchMethod = 'account_number_override'
         }
       }
 
@@ -196,11 +215,11 @@ export async function GET(request: Request) {
       let isAnomaly = false
       let anomalyNote = null
 
-      if (propertyId && amountAgorot > 0) {
+      if (amountAgorot > 0) {
         const { data: recentBills } = await serviceClient
           .from('bills')
           .select('amount_agorot')
-          .eq('property_id', propertyId)
+          .eq('property_id', finalPropertyId)
           .eq('bill_type', billType)
           .eq('status', 'approved')
           .order('created_at', { ascending: false })
@@ -218,7 +237,7 @@ export async function GET(request: Request) {
       const { error: billError } = await serviceClient
         .from('bills')
         .insert({
-          property_id: propertyId,
+          property_id: finalPropertyId,
           bill_type: billType,
           amount_agorot: amountAgorot,
           due_date: dueDate,
@@ -228,173 +247,24 @@ export async function GET(request: Request) {
           is_anomaly: isAnomaly,
           anomaly_note: anomalyNote,
           pdf_storage_path: storagePath,
-          gmail_message_id: msg.id,
-          ai_parsed_data: { ...aiParsedData, match_method: matchMethod },
+          gmail_message_id: msgRef.id,
+          ai_parsed_data: {
+            ...aiParsedData,
+            match_method: matchMethod,
+            gmail_label: label.name,
+            email_subject: subject,
+            email_from: from,
+          },
         })
 
       if (!billError) parsed++
     }
-
-    return NextResponse.json({ message: `Parsed ${parsed} bills`, parsed })
-  } catch (err) {
-    console.error('Bill parsing error:', err)
-    return NextResponse.json(
-      { error: 'Bill parsing failed', message: err instanceof Error ? err.message : 'Unknown' },
-      { status: 500 }
-    )
   }
-}
 
-/**
- * AI extraction using Gemini 3.1 Flash-Lite (structured PDF extraction)
- */
-async function parseWithAI(
-  pdfBase64: string,
-  apiKey: string
-): Promise<{
-  bill_type: string
-  amount_agorot: number
-  due_date: string | null
-  period_start: string | null
-  period_end: string | null
-  address: string | null
-  account_holder: string | null
-  account_number: string | null
-} | null> {
-  const text = await geminiGenerate('lite', apiKey, [
-    {
-      parts: [
-        {
-          text: `Extract the following from this Israeli utility bill PDF:
-- bill_type: one of "arnona", "iec", "water", "vaad_bayit", "internet", "gas", "other"
-- amount: the total amount due in ILS (as a number, e.g. 842.50)
-- due_date: payment due date in YYYY-MM-DD format
-- period_start: billing period start in YYYY-MM-DD
-- period_end: billing period end in YYYY-MM-DD
-- address: the property address on the bill
-- account_holder: the name of the person/entity the bill is addressed to (שם בעל החשבון)
-- account_number: the utility account/contract/meter number (מספר חשבון/מספר חוזה/מספר מונה)
-
-Return ONLY valid JSON with these fields. If you can't determine a field, use null.`,
-        },
-        {
-          inline_data: {
-            mime_type: 'application/pdf',
-            data: pdfBase64,
-          },
-        },
-      ],
-    },
-  ])
-
-  if (!text) return null
-
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return null
-
-    const parsed = JSON.parse(jsonMatch[0])
-
-    return {
-      bill_type: parsed.bill_type || 'other',
-      amount_agorot: parsed.amount ? Math.round(parsed.amount * 100) : 0,
-      due_date: parsed.due_date || null,
-      period_start: parsed.period_start || null,
-      period_end: parsed.period_end || null,
-      address: parsed.address || null,
-      account_holder: parsed.account_holder || null,
-      account_number: parsed.account_number || null,
-    }
-  } catch {
-    return null
-  }
-}
-
-/**
- * Parse bill data from HTML email body using Gemini
- */
-async function parseHtmlWithAI(
-  htmlBody: string,
-  subject: string,
-  from: string,
-  apiKey: string
-): Promise<{
-  bill_type: string
-  amount_agorot: number
-  due_date: string | null
-  period_start: string | null
-  period_end: string | null
-  address: string | null
-  account_holder: string | null
-  account_number: string | null
-} | null> {
-  // Truncate HTML to avoid token limits
-  const truncatedHtml = htmlBody.substring(0, 10000)
-
-  const response = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `Extract billing information from this Israeli utility bill email.
-
-Email subject: ${subject}
-Email from: ${from}
-
-Email HTML body:
-${truncatedHtml}
-
-Extract:
-- bill_type: one of "arnona", "iec", "water", "vaad_bayit", "internet", "gas", "other"
-- amount: total amount due in ILS (number, e.g. 842.50)
-- due_date: payment due date in YYYY-MM-DD format
-- period_start: billing period start in YYYY-MM-DD
-- period_end: billing period end in YYYY-MM-DD
-- address: property address on the bill
-- account_holder: name of person/entity (שם בעל החשבון)
-- account_number: account/contract number
-
-Return ONLY valid JSON. If you can't determine a field, use null.`,
-              },
-            ],
-          },
-        ],
-      }),
-    }
-  )
-
-  if (!response.ok) return null
-
-  const data = await response.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-
-  if (!text) return null
-
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return null
-
-    const parsed = JSON.parse(jsonMatch[0])
-
-    return {
-      bill_type: parsed.bill_type || 'other',
-      amount_agorot: parsed.amount ? Math.round(parsed.amount * 100) : 0,
-      due_date: parsed.due_date || null,
-      period_start: parsed.period_start || null,
-      period_end: parsed.period_end || null,
-      address: parsed.address || null,
-      account_holder: parsed.account_holder || null,
-      account_number: parsed.account_number || null,
-    }
-  } catch {
-    return null
-  }
+  return NextResponse.json({
+    message: `Parsed ${parsed} bills, skipped ${skipped} already processed`,
+    parsed,
+    skipped,
+    labels_checked: billLabels.length,
+  })
 }

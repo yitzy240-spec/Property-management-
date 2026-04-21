@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
 
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'ApartmentOS <noreply@apartmentos.app>'
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Marcus Properties <noreply@app.marcus-properties.com>'
 
 /** Escape HTML entities to prevent XSS in email templates */
 export function escapeHtml(str: string): string {

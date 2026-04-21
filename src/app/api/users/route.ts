@@ -90,14 +90,14 @@ export async function POST(request: Request) {
   }
 
   // Send password setup email via Resend
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://apartmentos.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.marcus-properties.com'
   const loginPath = role === 'admin' ? '/admin/login' : '/login'
 
   const { data: linkData } = await serviceClient.auth.admin.generateLink({
     type: 'recovery',
     email,
     options: {
-      redirectTo: `${appUrl}/login/reset?setup=1`,
+      redirectTo: `${appUrl}/auth/callback?next=/login/reset&setup=1`,
     },
   })
 

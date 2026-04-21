@@ -50,7 +50,7 @@ export async function sendOwnerMagicLink(formData: FormData): Promise<{ success?
     return { success: true }
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://apartmentos.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.marcus-properties.com'
 
   // Generate magic link via admin API (doesn't send email itself)
   const { data: linkData } = await serviceClient.auth.admin.generateLink({
@@ -87,15 +87,16 @@ export async function resetPassword(formData: FormData) {
     return { error: 'Email is required' }
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://apartmentos.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.marcus-properties.com'
   const serviceClient = createServiceClient()
 
   // Generate reset link via admin API
+  // Route through /auth/callback so PKCE code gets exchanged for a session
   const { data: linkData } = await serviceClient.auth.admin.generateLink({
     type: 'recovery',
     email,
     options: {
-      redirectTo: `${appUrl}/login/reset`,
+      redirectTo: `${appUrl}/auth/callback?next=/login/reset`,
     },
   })
 
@@ -124,7 +125,7 @@ export async function resetPassword(formData: FormData) {
     // Fallback to Supabase's built-in email
     const supabase = createServerSupabaseClient()
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${appUrl}/login/reset`,
+      redirectTo: `${appUrl}/auth/callback?next=/login/reset`,
     })
   }
 
