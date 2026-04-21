@@ -96,7 +96,7 @@ export async function resetPassword(formData: FormData) {
     type: 'recovery',
     email,
     options: {
-      redirectTo: `${appUrl}/auth/callback?next=/login/reset`,
+      redirectTo: `${appUrl}/login/reset`,
     },
   })
 
@@ -125,7 +125,7 @@ export async function resetPassword(formData: FormData) {
     // Fallback to Supabase's built-in email
     const supabase = createServerSupabaseClient()
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${appUrl}/auth/callback?next=/login/reset`,
+      redirectTo: `${appUrl}/login/reset`,
     })
   }
 

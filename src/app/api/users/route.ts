@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     type: 'recovery',
     email,
     options: {
-      redirectTo: `${appUrl}/auth/callback?next=/login/reset&setup=1`,
+      redirectTo: `${appUrl}/login/reset?setup=1`,
     },
   })
 

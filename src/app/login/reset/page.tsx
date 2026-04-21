@@ -1,24 +1,38 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FullScreenLoader } from '@/components/ui/logo-spinner'
 import { createClient } from '@/lib/supabase/client'
-import { updatePassword } from '../actions'
 
 export default function ResetPasswordPage() {
+  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [ready, setReady] = useState(false)
   const isSetup = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('setup') === '1'
 
-  // Initialize Supabase session from URL hash (recovery token)
+  // Supabase implicit flow: session tokens arrive as URL hash fragments.
+  // The browser client auto-detects and establishes the session from the hash.
   useEffect(() => {
     const supabase = createClient()
-    // Supabase client auto-detects hash tokens on init
-    supabase.auth.getSession().then(() => setReady(true))
+
+    // Listen for the SIGNED_IN or PASSWORD_RECOVERY event from hash tokens
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
+        setReady(true)
+      }
+    })
+
+    // Also check if session already exists (e.g. page reload)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setReady(true)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   async function handleSubmit(formData: FormData) {
@@ -34,11 +48,27 @@ export default function ResetPasswordPage() {
       return
     }
 
-    const result = await updatePassword(formData)
-    if (result?.error) {
-      setError(result.error)
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
       setLoading(false)
+      return
     }
+
+    // Update password client-side (session is only in the browser, not on the server)
+    const supabase = createClient()
+    const { error: updateError } = await supabase.auth.updateUser({ password })
+
+    if (updateError) {
+      setError(updateError.message)
+      setLoading(false)
+      return
+    }
+
+    // Get user role to redirect appropriately
+    const { data: { user } } = await supabase.auth.getUser()
+    const role = user?.app_metadata?.role
+
+    router.push(role === 'owner' ? '/owner' : '/dashboard')
   }
 
   if (loading) {

@@ -82,12 +82,13 @@ export async function POST(request: Request) {
   let magicLink: string | null = null
 
   // Generate a recovery/password-setup link
-  // IMPORTANT: Route through /auth/callback so PKCE code gets exchanged for a session
+  // Supabase uses implicit flow — tokens arrive as URL hash fragments,
+  // so redirect directly to the reset page (browser client handles the hash)
   const { data: linkData } = await serviceClient.auth.admin.generateLink({
     type: 'recovery',
     email: owner.email,
     options: {
-      redirectTo: `${appUrl}/auth/callback?next=/login/reset&setup=1`,
+      redirectTo: `${appUrl}/login/reset?setup=1`,
     },
   })
 
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
   const { createServerSupabaseClient: createPublicClient } = await import('@/lib/supabase/server')
   const publicSupabase = createPublicClient()
   await publicSupabase.auth.resetPasswordForEmail(owner.email, {
-    redirectTo: `${appUrl}/auth/callback?next=/login/reset&setup=1`,
+    redirectTo: `${appUrl}/login/reset?setup=1`,
   }).catch(() => {})
 
   const { data: properties } = await serviceClient
