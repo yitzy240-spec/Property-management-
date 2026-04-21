@@ -16,23 +16,41 @@ export default function ResetPasswordPage() {
   const isSetup = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('setup') === '1'
 
   // Supabase implicit flow: session tokens arrive as URL hash fragments.
-  // The browser client auto-detects and establishes the session from the hash.
+  // The @supabase/ssr browser client does NOT auto-parse hash fragments,
+  // so we manually extract the tokens and set the session.
   useEffect(() => {
-    const supabase = createClient()
+    async function initSession() {
+      const supabase = createClient()
 
-    // Listen for the SIGNED_IN or PASSWORD_RECOVERY event from hash tokens
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
-        setReady(true)
+      // Check if hash contains recovery tokens
+      const hash = window.location.hash.substring(1)
+      if (hash) {
+        const params = new URLSearchParams(hash)
+        const accessToken = params.get('access_token')
+        const refreshToken = params.get('refresh_token')
+
+        if (accessToken && refreshToken) {
+          // Manually set the session from hash tokens
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          })
+
+          if (!sessionError) {
+            // Clear the hash from URL (tokens are sensitive)
+            window.history.replaceState(null, '', window.location.pathname + window.location.search)
+            setReady(true)
+            return
+          }
+        }
       }
-    })
 
-    // Also check if session already exists (e.g. page reload)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+      // Fallback: check if session already exists (e.g. page reload)
+      const { data: { session } } = await supabase.auth.getSession()
       if (session) setReady(true)
-    })
+    }
 
-    return () => subscription.unsubscribe()
+    initSession()
   }, [])
 
   async function handleSubmit(formData: FormData) {
