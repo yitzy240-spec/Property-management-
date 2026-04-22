@@ -243,7 +243,8 @@ export async function GET(request: Request) {
           due_date: dueDate,
           billing_period_start: periodStart,
           billing_period_end: periodEnd,
-          status: isAnomaly ? 'flagged' : 'pending_review',
+          // Auto-approve utility bills; only flag anomalies for review
+          status: isAnomaly ? 'flagged' : 'approved',
           is_anomaly: isAnomaly,
           anomaly_note: anomalyNote,
           pdf_storage_path: storagePath,

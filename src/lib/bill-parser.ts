@@ -31,9 +31,11 @@ const EXTRACTION_PROMPT = `Extract the following from this Israeli utility bill.
 
 Rules:
 - bill_type: "iec" for חברת חשמל, "water" for הגיחון, "internet" for בזק, "gas" for פזגז/סופרגז, "vaad_bayit" for ועד בית, "arnona" for עירייה
-- amount: the total amount due in ILS (סה"כ לתשלום). Look for the final total, not subtotals. Must be a number like 842.50
+- amount: CRITICAL — this must be the FINAL TOTAL including VAT (מע"מ). Look for "סה"כ לתשלום כולל מע"מ" or "סה"כ כולל מע"מ" or the largest bold amount. Do NOT use subtotals like "סה"כ צריכה" or line items. For פזגז gas bills, the total is labeled "סה"כ לתשלום כולל מע"מ" and appears at the bottom. Must be a number like 148.74
+- period_start/period_end: Look for "תקופת החשבון" or billing period dates. For gas bills look for meter reading dates (קריאת מונה). Format as YYYY-MM-DD
 - For הגיחון water bills, account_number should be the חשבון חוזה number
 - For IEC bills, account_number should be the מספר חשבון חוזה
+- For פזגז gas bills, account_number should be the מספר צרכן
 - If you cannot determine a field, use null`
 
 function parseAiResponse(text: string): ParsedBill | null {
