@@ -234,6 +234,18 @@ export async function GET(request: Request) {
         }
       }
 
+      // Determine status: flag if low confidence, approve if good
+      let billStatus: 'approved' | 'flagged' = 'approved'
+      if (isAnomaly) {
+        billStatus = 'flagged'
+      } else if (amountAgorot === 0) {
+        billStatus = 'flagged'
+        isAnomaly = true
+        anomalyNote = !storagePath
+          ? 'Email notification only — no PDF attached. Amount needs manual entry.'
+          : 'AI could not extract amount from this document. Needs manual review.'
+      }
+
       const { error: billError } = await serviceClient
         .from('bills')
         .insert({
@@ -243,8 +255,7 @@ export async function GET(request: Request) {
           due_date: dueDate,
           billing_period_start: periodStart,
           billing_period_end: periodEnd,
-          // Auto-approve utility bills; only flag anomalies for review
-          status: isAnomaly ? 'flagged' : 'approved',
+          status: billStatus,
           is_anomaly: isAnomaly,
           anomaly_note: anomalyNote,
           pdf_storage_path: storagePath,
