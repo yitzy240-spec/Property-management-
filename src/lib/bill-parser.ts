@@ -14,29 +14,49 @@ interface ParsedBill {
   address: string | null
   account_holder: string | null
   account_number: string | null
+  is_autopay: boolean
 }
 
-const EXTRACTION_PROMPT = `Extract the following from this Israeli utility bill. Return ONLY valid JSON, no markdown formatting.
+const EXTRACTION_PROMPT = `You are extracting data from an Israeli utility bill PDF. Return ONLY a valid JSON object, no markdown, no explanation.
 
 {
-  "bill_type": "arnona|iec|water|vaad_bayit|internet|gas|other",
-  "amount": 123.45,
+  "bill_type": "iec|water|gas|internet|arnona|vaad_bayit|other",
+  "amount": 148.74,
   "due_date": "YYYY-MM-DD",
   "period_start": "YYYY-MM-DD",
   "period_end": "YYYY-MM-DD",
-  "address": "the property address on the bill",
-  "account_holder": "name of person/entity (שם בעל החשבון)",
-  "account_number": "account/contract number (מספר חשבון חוזה)"
+  "address": "street and city",
+  "account_holder": "name on the bill",
+  "account_number": "account or contract number",
+  "is_autopay": false
 }
 
-Rules:
-- bill_type: "iec" for חברת חשמל, "water" for הגיחון, "internet" for בזק, "gas" for פזגז/סופרגז, "vaad_bayit" for ועד בית, "arnona" for עירייה
-- amount: CRITICAL — this must be the FINAL TOTAL including VAT (מע"מ). Look for "סה"כ לתשלום כולל מע"מ" or "סה"כ כולל מע"מ" or the largest bold amount. Do NOT use subtotals like "סה"כ צריכה" or line items. For פזגז gas bills, the total is labeled "סה"כ לתשלום כולל מע"מ" and appears at the bottom. Must be a number like 148.74
-- period_start/period_end: Look for "תקופת החשבון" or billing period dates. For gas bills look for meter reading dates (קריאת מונה). Format as YYYY-MM-DD
-- For הגיחון water bills, account_number should be the חשבון חוזה number
-- For IEC bills, account_number should be the מספר חשבון חוזה
-- For פזגז gas bills, account_number should be the מספר צרכן
-- If you cannot determine a field, use null`
+CRITICAL RULES FOR AMOUNT:
+- The amount MUST be the FINAL TOTAL the customer needs to pay, INCLUDING VAT (מע"מ)
+- Look for these Hebrew labels (in order of priority):
+  1. "סה"כ לתשלום כולל מע"מ" (total including VAT)
+  2. "סה"כ לתשלום" (total to pay)
+  3. "יתרה לתשלום" (balance to pay)
+  4. The bold/highlighted total amount, usually the largest number on the bill
+- Do NOT use subtotals like "סה"כ צריכה" (consumption total) or individual line items
+- If the bill says "אין לשלם" (do not pay) because it's on autopay (הוראת קבע), STILL extract the total amount but set is_autopay to true. Calculate it from subtotal + 18% VAT if needed.
+- The amount should be in ILS (שקלים), as a decimal number like 148.74
+
+BILL TYPE IDENTIFICATION:
+- "iec" = חברת החשמל / Israel Electric Corporation
+- "water" = הגיחון / Hagihon water company
+- "internet" = בזק / Bezeq telecom
+- "gas" = פזגז / Pazgas or סופרגז / Supergaz
+- "vaad_bayit" = ועד בית / building committee
+- "arnona" = ארנונה / municipal tax
+
+ACCOUNT NUMBER:
+- For הגיחון water: use חשבון חוזה number
+- For IEC electricity: use מספר חשבון חוזה
+- For פזגז gas: use מספר צרכן
+- For בזק internet: use מספר קו / line number
+
+If a field cannot be determined, use null.`
 
 function parseAiResponse(text: string): ParsedBill | null {
   try {
@@ -53,6 +73,7 @@ function parseAiResponse(text: string): ParsedBill | null {
       address: parsed.address || null,
       account_holder: parsed.account_holder || null,
       account_number: parsed.account_number || null,
+      is_autopay: parsed.is_autopay || false,
     }
   } catch {
     return null
