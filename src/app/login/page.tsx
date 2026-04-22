@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FullScreenLoader } from '@/components/ui/logo-spinner'
-import { loginWithEmail, sendOwnerMagicLink } from './actions'
+import { loginWithEmail, sendOwnerMagicLink, resetPassword } from './actions'
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [magicLinkSent, setMagicLinkSent] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [mode, setMode] = useState<'password' | 'magic'>('password')
+  const [mode, setMode] = useState<'password' | 'magic' | 'forgot'>('password')
+  const [resetSent, setResetSent] = useState(false)
   const [hasBiometric, setHasBiometric] = useState(false)
 
   useEffect(() => {
@@ -106,6 +107,20 @@ export default function LoginPage() {
     setLoading(false)
   }
 
+  async function handleForgotPassword(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+    const formData = new FormData(e.currentTarget)
+    const result = await resetPassword(formData)
+    if (result?.error) {
+      setError(result.error)
+    } else {
+      setResetSent(true)
+    }
+    setLoading(false)
+  }
+
   if (loading) {
     return <FullScreenLoader text={mode === 'password' ? 'Signing in...' : 'Sending login link...'} />
   }
@@ -152,113 +167,78 @@ export default function LoginPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                   </svg>
                 </div>
-                <p className="text-sm font-medium text-foreground">
-                  Check your email
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  We sent a login link to your inbox.
-                </p>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  After your first login, you can set a password to sign in directly from the app.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => { setMagicLinkSent(false); setError(null) }}
-                  className="mt-4 text-sm font-medium text-primary hover:underline"
-                >
-                  Try again
-                </button>
+                <p className="text-sm font-medium text-foreground">Check your email</p>
+                <p className="mt-1 text-sm text-muted-foreground">We sent a login link to your inbox.</p>
+                <p className="mt-3 text-xs text-muted-foreground">After your first login, you can set a password to sign in directly from the app.</p>
+                <button type="button" onClick={() => { setMagicLinkSent(false); setError(null) }} className="mt-4 text-sm font-medium text-primary hover:underline">Try again</button>
+              </div>
+            ) : resetSent ? (
+              <div className="py-8 text-center">
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[hsl(152_54%_25%/0.1)]">
+                  <svg className="h-5 w-5 text-financial-income" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-foreground">Check your email</p>
+                <p className="mt-1 text-sm text-muted-foreground">We sent a password reset link to your inbox.</p>
+                <button type="button" onClick={() => { setResetSent(false); setMode('password'); setError(null) }} className="mt-4 text-sm font-medium text-primary hover:underline">Back to sign in</button>
               </div>
             ) : mode === 'password' ? (
               <form onSubmit={handlePasswordLogin} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="your@email.com"
-                    required
-                    className="h-11"
-                  />
+                  <Label htmlFor="email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email</Label>
+                  <Input id="email" name="email" type="email" placeholder="your@email.com" required className="h-11" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="password" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Password
-                  </Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    required
-                    className="h-11"
-                  />
+                  <Label htmlFor="password" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Password</Label>
+                  <Input id="password" name="password" type="password" required className="h-11" />
                 </div>
-
                 {error && (
                   <div className="rounded-md bg-destructive/10 px-3 py-2">
                     <p className="text-sm text-destructive">{error}</p>
                   </div>
                 )}
-
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
-                >
+                <Button type="submit" disabled={loading} className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium">
                   {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</> : 'Sign In'}
                 </Button>
-
-                <button
-                  type="button"
-                  onClick={() => { setMode('magic'); setError(null) }}
-                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
-                >
-                  First time? Sign in with email link instead
-                </button>
+                <div className="flex items-center justify-between">
+                  <button type="button" onClick={() => { setMode('forgot'); setError(null) }} className="text-xs text-muted-foreground hover:text-foreground">Forgot password?</button>
+                  <button type="button" onClick={() => { setMode('magic'); setError(null) }} className="text-xs text-muted-foreground hover:text-foreground">Sign in with email link</button>
+                </div>
               </form>
-            ) : (
+            ) : mode === 'magic' ? (
               <form onSubmit={handleMagicLink} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="magic-email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Email
-                  </Label>
-                  <Input
-                    id="magic-email"
-                    name="email"
-                    type="email"
-                    placeholder="your@email.com"
-                    required
-                    className="h-11"
-                  />
+                  <Label htmlFor="magic-email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email</Label>
+                  <Input id="magic-email" name="email" type="email" placeholder="your@email.com" required className="h-11" />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  We&apos;ll send you a login link — no password needed.
-                </p>
-
+                <p className="text-xs text-muted-foreground">We&apos;ll send you a login link — no password needed.</p>
                 {error && (
                   <div className="rounded-md bg-destructive/10 px-3 py-2">
                     <p className="text-sm text-destructive">{error}</p>
                   </div>
                 )}
-
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
-                >
+                <Button type="submit" disabled={loading} className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium">
                   {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : 'Send Login Link'}
                 </Button>
-
-                <button
-                  type="button"
-                  onClick={() => { setMode('password'); setError(null) }}
-                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Already have a password? Sign in with password
-                </button>
+                <button type="button" onClick={() => { setMode('password'); setError(null) }} className="w-full text-center text-xs text-muted-foreground hover:text-foreground">Already have a password? Sign in with password</button>
+              </form>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="reset-email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email</Label>
+                  <Input id="reset-email" name="email" type="email" placeholder="your@email.com" required className="h-11" />
+                </div>
+                <p className="text-xs text-muted-foreground">We&apos;ll send you a link to reset your password.</p>
+                {error && (
+                  <div className="rounded-md bg-destructive/10 px-3 py-2">
+                    <p className="text-sm text-destructive">{error}</p>
+                  </div>
+                )}
+                <Button type="submit" disabled={loading} className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium">
+                  {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : 'Send Reset Link'}
+                </Button>
+                <button type="button" onClick={() => { setMode('password'); setError(null) }} className="w-full text-center text-xs text-muted-foreground hover:text-foreground">Back to sign in</button>
               </form>
             )}
           </div>
