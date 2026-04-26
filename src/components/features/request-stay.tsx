@@ -69,7 +69,7 @@ export function RequestStay({ properties }: RequestStayProps) {
   return (
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger asChild>
-        <Button variant="outline" className="w-full rounded-[var(--radius-button)]">
+        <Button className="w-full rounded-[var(--radius-button)] bg-accent text-accent-foreground hover:bg-accent/90">
           <Calendar className="mr-1.5 h-4 w-4" />
           Request My Stay
         </Button>
@@ -105,8 +105,7 @@ export function RequestStay({ properties }: RequestStayProps) {
                   type="date"
                   required
                   min={new Date().toISOString().split('T')[0]}
-                  className="flex h-12 w-full rounded-[var(--radius-button)] border border-input bg-background px-3 py-2 text-sm appearance-none"
-                  style={{ WebkitAppearance: 'none' }}
+                  className="flex h-12 w-full rounded-[var(--radius-button)] border border-input bg-background px-3 py-2 text-sm"
                 />
               </div>
               <div className="space-y-1.5">
@@ -117,8 +116,7 @@ export function RequestStay({ properties }: RequestStayProps) {
                   type="date"
                   required
                   min={new Date().toISOString().split('T')[0]}
-                  className="flex h-12 w-full rounded-[var(--radius-button)] border border-input bg-background px-3 py-2 text-sm appearance-none"
-                  style={{ WebkitAppearance: 'none' }}
+                  className="flex h-12 w-full rounded-[var(--radius-button)] border border-input bg-background px-3 py-2 text-sm"
                 />
               </div>
             </div>

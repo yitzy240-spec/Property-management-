@@ -1,19 +1,22 @@
 import { NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
-import { requireAdmin, AuthError } from '@/lib/auth'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 
+/**
+ * POST /api/documents/upload
+ * Upload a document to the vault. Accessible by admins and owners (for their own properties).
+ */
 export async function POST(request: Request) {
-  try {
-    await requireAdmin()
-  } catch (err) {
-    if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
+  const supabase = createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const formData = await request.formData()
   const file = formData.get('file') as File | null
   const title = formData.get('title') as string
-  const category = formData.get('category') as string
+  const category = (formData.get('category') as string) || 'other'
   const propertyId = formData.get('property_id') as string || null
   const expiryDate = formData.get('expiry_date') as string || null
 
@@ -22,6 +25,32 @@ export async function POST(request: Request) {
   }
 
   const serviceClient = createServiceClient()
+  const role = user.app_metadata?.role
+
+  // If not admin, verify the user owns this property
+  if (role !== 'admin' && propertyId) {
+    const { data: owner } = await serviceClient
+      .from('owners')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (!owner) {
+      return NextResponse.json({ error: 'Owner not found' }, { status: 403 })
+    }
+
+    const { data: property } = await serviceClient
+      .from('properties')
+      .select('id')
+      .eq('id', propertyId)
+      .eq('owner_id', owner.id)
+      .single()
+
+    if (!property) {
+      return NextResponse.json({ error: 'Property not found or not owned by you' }, { status: 403 })
+    }
+  }
+
   const filePath = `vault/${Date.now()}_${file.name}`
 
   // Upload to storage
@@ -32,6 +61,17 @@ export async function POST(request: Request) {
 
   if (uploadError) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 })
+  }
+
+  // Create document record in DB
+  if (propertyId) {
+    await serviceClient.from('documents').insert({
+      property_id: propertyId,
+      title,
+      category,
+      storage_path: filePath,
+      expiry_date: expiryDate || null,
+    })
   }
 
   return NextResponse.json({
