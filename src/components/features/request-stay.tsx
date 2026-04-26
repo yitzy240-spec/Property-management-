@@ -99,11 +99,27 @@ export function RequestStay({ properties }: RequestStayProps) {
             <div className="grid gap-4 grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="check_in" className="text-xs font-medium">Check-in</Label>
-                <Input id="check_in" name="check_in" type="date" required className="h-11" />
+                <input
+                  id="check_in"
+                  name="check_in"
+                  type="date"
+                  required
+                  min={new Date().toISOString().split('T')[0]}
+                  className="flex h-12 w-full rounded-[var(--radius-button)] border border-input bg-background px-3 py-2 text-sm appearance-none"
+                  style={{ WebkitAppearance: 'none' }}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="check_out" className="text-xs font-medium">Check-out</Label>
-                <Input id="check_out" name="check_out" type="date" required className="h-11" />
+                <input
+                  id="check_out"
+                  name="check_out"
+                  type="date"
+                  required
+                  min={new Date().toISOString().split('T')[0]}
+                  className="flex h-12 w-full rounded-[var(--radius-button)] border border-input bg-background px-3 py-2 text-sm appearance-none"
+                  style={{ WebkitAppearance: 'none' }}
+                />
               </div>
             </div>
 

@@ -11,6 +11,7 @@ import { RequestStay } from '@/components/features/request-stay'
 import { InvoiceHistory } from '@/components/features/invoice-history'
 import { OwnerStatements } from '@/components/features/billing/owner-statements'
 import { VisitList } from '@/components/features/visit-list'
+import { OwnerDocumentVault } from '@/components/features/owner-document-vault'
 
 export default async function OwnerPortalPage() {
   const supabase = createServerSupabaseClient()
@@ -85,7 +86,13 @@ export default async function OwnerPortalPage() {
   const showBookings = owner.profile === 'investor' || owner.profile === 'hybrid'
   const showMaintenance = owner.profile === 'hybrid' || owner.profile === 'private'
 
-  const totalBills = (bills ?? []).reduce((s, b) => s + b.amount_agorot, 0)
+  // Calendar year total (2026 bills only)
+  const currentYear = new Date().getFullYear()
+  const yearBills = (bills ?? []).filter(b => {
+    const date = b.billing_period_start || b.due_date || b.created_at
+    return date && new Date(date).getFullYear() === currentYear
+  })
+  const totalBills = yearBills.reduce((s, b) => s + b.amount_agorot, 0)
 
   return (
     <div className="mx-auto min-h-screen max-w-2xl bg-[#FAFAFA]">
@@ -133,6 +140,11 @@ export default async function OwnerPortalPage() {
           </div>
         )}
 
+        {/* Request My Stay — prominent at top */}
+        {properties && properties.length > 0 && (
+          <RequestStay properties={properties.map(p => ({ id: p.id, name: p.name }))} />
+        )}
+
         {/* Recent Visits */}
         <section>
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -169,7 +181,7 @@ export default async function OwnerPortalPage() {
                   <p className="font-mono text-lg font-bold">{properties?.length ?? 0}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Recent Bills</p>
+                  <p className="text-xs text-muted-foreground">{currentYear} Bills</p>
                   <CurrencyDisplay agorot={totalBills} variant="expense" className="text-lg font-bold" />
                 </div>
                 <div>
@@ -184,28 +196,45 @@ export default async function OwnerPortalPage() {
                 <div className="border-b border-border px-4 py-2">
                   <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Recent Bills</p>
                 </div>
-                {bills.slice(0, 5).map((bill, i) => (
-                  <div key={bill.id} className={`flex items-center justify-between px-4 py-2.5 ${i > 0 ? 'border-t border-border' : ''}`}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium capitalize">{bill.bill_type.replace('_', ' ')}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {(bill.properties as { name: string } | null)?.name}
-                      </span>
+                {bills.slice(0, 5).map((bill, i) => {
+                  const typeLabels: Record<string, string> = {
+                    iec: 'Electricity',
+                    water: 'Water',
+                    gas: 'Gas',
+                    internet: 'Internet',
+                    arnona: 'Arnona',
+                    vaad_bayit: "Va'ad Bayit",
+                    other: 'Other',
+                  }
+                  const billDate = bill.billing_period_end || bill.due_date || bill.created_at?.split('T')[0]
+                  return (
+                    <div key={bill.id} className={`flex items-center justify-between px-4 py-2.5 ${i > 0 ? 'border-t border-border' : ''}`}>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{typeLabels[bill.bill_type] || bill.bill_type}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {(bill.properties as { name: string } | null)?.name}
+                          </span>
+                        </div>
+                        {billDate && (
+                          <p className="text-xs text-muted-foreground">{billDate}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <CurrencyDisplay agorot={bill.amount_agorot} className="text-sm font-semibold" />
+                        {bill.pdf_storage_path && (
+                          <a
+                            href={`/api/download?path=${encodeURIComponent(bill.pdf_storage_path)}`}
+                            className="rounded-[var(--radius-badge)] bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/20"
+                            download
+                          >
+                            PDF
+                          </a>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <CurrencyDisplay agorot={bill.amount_agorot} className="text-sm font-semibold" />
-                      {bill.pdf_storage_path && (
-                        <a
-                          href={`/api/download?path=${encodeURIComponent(bill.pdf_storage_path)}`}
-                          className="rounded-[var(--radius-badge)] bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/20"
-                          download
-                        >
-                          PDF
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </section>
@@ -296,22 +325,10 @@ export default async function OwnerPortalPage() {
         {/* Document Vault */}
         <section>
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Document Vault</p>
-          {documents && documents.length > 0 ? (
-            <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
-              {documents.map((doc, i) => (
-                <div key={doc.id} className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}>
-                  <div>
-                    <p className="text-sm font-medium">{doc.title}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{doc.category}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-[10px] border border-border bg-card py-6 text-center text-sm text-muted-foreground shadow-sm">
-              No documents uploaded yet.
-            </div>
-          )}
+          <OwnerDocumentVault
+            documents={(documents ?? []).map(d => ({ id: d.id, title: d.title, category: d.category, storage_path: d.storage_path, created_at: d.created_at }))}
+            propertyIds={propertyIds}
+          />
         </section>
 
         {/* Messages */}
@@ -332,12 +349,7 @@ export default async function OwnerPortalPage() {
           </section>
         )}
 
-        {/* Request My Stay */}
-        {properties && properties.length > 0 && (
-          <div className="pb-6">
-            <RequestStay properties={properties.map(p => ({ id: p.id, name: p.name }))} />
-          </div>
-        )}
+        <div className="pb-6" />
       </div>
     </div>
   )
