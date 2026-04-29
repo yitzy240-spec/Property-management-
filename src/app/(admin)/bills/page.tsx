@@ -5,9 +5,10 @@ import { AlertTriangle, FileText, Image as ImageIcon } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
-import { BillActions } from '@/components/features/bill-actions'
 import { BillAddButton } from '@/components/features/bill-add'
+import { BillEditDrawer } from '@/components/features/bill-edit'
 import { cn } from '@/lib/utils'
+import type { Bill } from '@/types'
 
 const billTypeLabels: Record<string, string> = {
   arnona: 'Arnona',
@@ -149,11 +150,9 @@ export default async function BillsPage({
 
               {(bill.status === 'pending_review' || bill.status === 'flagged') && (
                 <div className="mt-3 border-t border-border pt-3">
-                  <BillActions
-                    billId={bill.id}
-                    propertyId={bill.property_id}
+                  <BillEditDrawer
+                    bill={bill as Bill}
                     propertyName={(bill.properties as { name: string } | null)?.name || null}
-                    matchMethod={(bill.ai_parsed_data as Record<string, unknown> | null)?.match_method as string || null}
                   />
                 </div>
               )}
