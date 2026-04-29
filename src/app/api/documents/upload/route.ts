@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
+import { buildStorageKey } from '@/lib/storage'
 
 /**
  * POST /api/documents/upload
@@ -51,7 +52,10 @@ export async function POST(request: Request) {
     }
   }
 
-  const filePath = `vault/${Date.now()}_${file.name}`
+  // Build a safe ASCII storage key (Supabase Storage rejects non-ASCII keys —
+  // file.name may contain Hebrew chars or spaces). The original filename is
+  // persisted on the documents row so downloads can preserve the human name.
+  const { key: filePath } = buildStorageKey('vault', file.name)
 
   // Upload to storage
   const buffer = Buffer.from(await file.arrayBuffer())
@@ -70,6 +74,7 @@ export async function POST(request: Request) {
       title,
       category,
       storage_path: filePath,
+      original_filename: file.name,
       expiry_date: expiryDate || null,
     })
   }

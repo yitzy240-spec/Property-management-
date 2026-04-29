@@ -33,7 +33,11 @@ export async function POST(request: Request) {
   }
 
   const serviceClient = createServiceClient()
-  const ext = file.name.split('.').pop() || 'jpg'
+  // Sanitize extension — file.name may contain non-ASCII chars and the
+  // extension goes into the storage key, which Supabase Storage requires to be
+  // ASCII-only. Lowercase + strip to [a-z0-9], fall back to 'jpg'.
+  const rawExt = (file.name.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const ext = rawExt || 'jpg'
   const storagePath = `${propertyId}/hero.${ext}`
 
   // Delete old image if exists (any extension)

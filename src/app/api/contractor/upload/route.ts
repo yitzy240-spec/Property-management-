@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { verifyMagicLinkToken } from '@/lib/magic-links'
+import { buildStorageKey } from '@/lib/storage'
 
 /**
  * POST /api/contractor/upload
@@ -27,7 +28,8 @@ export async function POST(request: Request) {
 
   const serviceClient = createServiceClient()
   const folder = caption === 'Expense receipt' ? 'receipts' : 'tasks'
-  const filePath = `${folder}/${taskId}/${Date.now()}_${file.name}`
+  // Build a safe ASCII storage key — file.name may be Hebrew or contain spaces.
+  const { key: filePath } = buildStorageKey(`${folder}/${taskId}`, file.name)
 
   const buffer = Buffer.from(await file.arrayBuffer())
   const { error: uploadError } = await serviceClient.storage

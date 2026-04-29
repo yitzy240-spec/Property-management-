@@ -111,7 +111,11 @@ export async function uploadVisitMedia(
   const results: { file_path: string; file_type: string; is_private: boolean }[] = []
 
   for (const f of files) {
-    const ext = f.file.name.split('.').pop() || 'jpg'
+    // Sanitize the extension — Supabase Storage rejects non-ASCII keys, and
+    // a Hebrew/spaced filename would break this. Lowercase, [a-z0-9] only,
+    // fall back to 'jpg' for images we can't infer otherwise.
+    const rawExt = (f.file.name.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+    const ext = rawExt || (f.fileType === 'video' ? 'mp4' : 'jpg')
     const path = `${propertyId}/${visitId}/${f.id}.${ext}`
 
     const { error } = await supabase.storage
