@@ -23,17 +23,18 @@ const LOOKBACK_DAYS = 60
 export const maxDuration = 60
 
 export async function GET(request: Request) {
-  console.log('[parse-bills] phase=enter')
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  console.log('[parse-bills] phase=auth_ok')
+
+  // Optional ?days=N override for one-shot backfills. Default = LOOKBACK_DAYS (60).
+  const url = new URL(request.url)
+  const daysParam = url.searchParams.get('days')
+  const lookbackDays = daysParam ? Math.max(1, Math.min(parseInt(daysParam, 10) || LOOKBACK_DAYS, 730)) : LOOKBACK_DAYS
 
   try {
-    const result = await runParseBills()
-    console.log('[parse-bills] phase=complete')
-    return result
+    return await runParseBills(lookbackDays)
   } catch (err) {
     const e = err as Error
     console.error('[parse-bills] fatal', e?.message, e?.stack)
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
   }
 }
 
-async function runParseBills() {
+async function runParseBills(lookbackDays: number) {
   const serviceClient = createServiceClient()
 
   const { data: tokenSetting } = await serviceClient
@@ -108,7 +109,7 @@ async function runParseBills() {
   let skipped = 0
   let flaggedMismatches = 0
 
-  const afterDate = gmailQueryDate(LOOKBACK_DAYS)
+  const afterDate = gmailQueryDate(lookbackDays)
 
   for (const label of billLabels) {
     const propertyId = labelToProperty[label.name]
