@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { sanitizeExtension } from '@/lib/storage'
 
 /**
  * POST /api/properties/image — Upload property hero image
@@ -33,7 +34,12 @@ export async function POST(request: Request) {
   }
 
   const serviceClient = createServiceClient()
-  const ext = file.name.split('.').pop() || 'jpg'
+  // Sanitize extension — file.name may contain non-ASCII chars and the
+  // extension goes into the storage key, which Supabase Storage requires to be
+  // ASCII-only. sanitizeExtension returns 'bin' on miss; for hero images we
+  // prefer 'jpg' as the fallback.
+  const sanitized = sanitizeExtension(file.name)
+  const ext = sanitized === 'bin' ? 'jpg' : sanitized
   const storagePath = `${propertyId}/hero.${ext}`
 
   // Delete old image if exists (any extension)

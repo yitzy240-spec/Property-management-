@@ -182,7 +182,9 @@ export async function POST(request: Request) {
             const attachData = await attachRes.json()
             pdfBase64 = attachData.data
             const pdfBuffer = Buffer.from(pdfBase64 as string, 'base64url')
-            storagePath = `bills/${messageId}_${pdfFilename}`
+            // Use messageId-only key — pdfFilename can be Hebrew (utility companies),
+            // and Supabase Storage rejects non-ASCII keys.
+            storagePath = `bills/${messageId}.pdf`
             await serviceClient.storage
               .from('documents')
               .upload(storagePath, pdfBuffer, { contentType: 'application/pdf' })
