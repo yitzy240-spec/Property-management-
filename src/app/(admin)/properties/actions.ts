@@ -88,7 +88,21 @@ export async function createTask(data: Record<string, unknown>, checklistItems?:
   return { success: true }
 }
 
-export async function updateBillStatus(billId: string, status: 'approved' | 'rejected', paymentMethod?: string) {
+export interface BillEdits {
+  amount_agorot?: number
+  due_date?: string | null
+  bill_type?: string
+  property_id?: string
+  period_start?: string | null
+  period_end?: string | null
+}
+
+export async function updateBillStatus(
+  billId: string,
+  status: 'approved' | 'rejected',
+  paymentMethod?: string,
+  edits?: BillEdits
+) {
   const supabase = createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
@@ -109,6 +123,18 @@ export async function updateBillStatus(billId: string, status: 'approved' | 'rej
   }
   if (paymentMethod) updateData.payment_method = paymentMethod
 
+  // Merge optional edits into the same UPDATE so {edits + status} commit
+  // atomically. We map the form's `period_start` / `period_end` to the DB
+  // columns `billing_period_start` / `billing_period_end`.
+  if (edits) {
+    if (edits.amount_agorot !== undefined) updateData.amount_agorot = edits.amount_agorot
+    if (edits.due_date !== undefined) updateData.due_date = edits.due_date
+    if (edits.bill_type !== undefined) updateData.bill_type = edits.bill_type
+    if (edits.property_id !== undefined) updateData.property_id = edits.property_id
+    if (edits.period_start !== undefined) updateData.billing_period_start = edits.period_start
+    if (edits.period_end !== undefined) updateData.billing_period_end = edits.period_end
+  }
+
   const { error } = await serviceClient
     .from('bills')
     .update(updateData)
@@ -116,17 +142,21 @@ export async function updateBillStatus(billId: string, status: 'approved' | 'rej
 
   if (error) return { error: error.message }
 
+  // For schedule-prediction below, prefer any newly-edited property_id / bill_type.
+  const effectivePropertyId = (edits?.property_id ?? bill?.property_id) as string | undefined
+  const effectiveBillType = (edits?.bill_type ?? bill?.bill_type) as string | undefined
+
   // On approval: update bill schedule prediction for this property + bill type
-  if (status === 'approved' && bill?.property_id && bill?.bill_type) {
-    const receivedDate = new Date(bill.created_at)
+  if (status === 'approved' && effectivePropertyId && effectiveBillType) {
+    const receivedDate = new Date(bill?.created_at ?? new Date().toISOString())
     const dayOfMonth = receivedDate.getDate()
 
     // Check if we have a previous bill to determine cycle
     const { data: prevBills } = await serviceClient
       .from('bills')
       .select('created_at')
-      .eq('property_id', bill.property_id)
-      .eq('bill_type', bill.bill_type)
+      .eq('property_id', effectivePropertyId)
+      .eq('bill_type', effectiveBillType)
       .eq('status', 'approved')
       .neq('id', billId)
       .order('created_at', { ascending: false })
@@ -147,8 +177,8 @@ export async function updateBillStatus(billId: string, status: 'approved' | 'rej
     await serviceClient
       .from('bill_schedules')
       .upsert({
-        property_id: bill.property_id,
-        bill_type: bill.bill_type,
+        property_id: effectivePropertyId,
+        bill_type: effectiveBillType,
         expected_day_of_month: dayOfMonth,
         cycle_months: cycleMonths,
         last_received_at: receivedDate.toISOString().split('T')[0],

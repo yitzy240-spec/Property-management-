@@ -5,9 +5,6 @@ import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { NativeSelect } from '@/components/ui/native-select'
 import {
   Drawer,
   DrawerContent,
@@ -15,43 +12,49 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer'
-import { createClient } from '@/lib/supabase/client'
-import type { BillType } from '@/types'
+import { BillForm, type BillFormValues } from './bill-form'
 
 export function BillAddButton({ preselectedPropertyId }: { preselectedPropertyId?: string } = {}) {
-  const supabase = createClient()
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([])
-  const [propertyId, setPropertyId] = useState(preselectedPropertyId || '')
-  const [billType, setBillType] = useState<BillType>('other')
+  const [values, setValues] = useState<BillFormValues>({
+    property_id: preselectedPropertyId ?? '',
+    bill_type: 'other',
+    amount_agorot: 0,
+    due_date: null,
+    period_start: null,
+    period_end: null,
+  })
 
   useEffect(() => {
     if (!open) return
     fetch('/api/properties/list')
-      .then(r => r.json())
-      .then(data => setProperties(data.properties ?? []))
+      .then((r) => r.json())
+      .then((data) => setProperties(data.properties ?? []))
       .catch(() => {})
   }, [open])
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
     setSaving(true)
-    if (!propertyId) { toast.error('Select a property'); setSaving(false); return }
-
-    const amountStr = formData.get('amount') as string
-    const amountAgorot = amountStr ? Math.round(parseFloat(amountStr) * 100) : 0
+    if (!values.property_id) {
+      toast.error('Select a property')
+      setSaving(false)
+      return
+    }
 
     const res = await fetch('/api/bills/add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        property_id: propertyId,
-        bill_type: billType,
-        amount_agorot: amountAgorot,
-        due_date: formData.get('due_date') as string || null,
-        billing_period_start: formData.get('period_start') as string || null,
-        billing_period_end: formData.get('period_end') as string || null,
+        property_id: values.property_id,
+        bill_type: values.bill_type,
+        amount_agorot: values.amount_agorot,
+        due_date: values.due_date,
+        billing_period_start: values.period_start,
+        billing_period_end: values.period_end,
         status: 'approved',
         is_anomaly: false,
       }),
@@ -81,50 +84,15 @@ export function BillAddButton({ preselectedPropertyId }: { preselectedPropertyId
           <DrawerTitle>Add Bill Manually</DrawerTitle>
         </DrawerHeader>
         <div className="max-h-[70vh] overflow-y-auto">
-          <form action={handleSubmit} className="space-y-4 p-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Property</Label>
-              <NativeSelect
-                value={propertyId}
-                onChange={(e) => setPropertyId(e.target.value)}
-                placeholder="Select property"
-                options={properties.map(p => ({ value: p.id, label: p.name }))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bill Type</Label>
-              <NativeSelect
-                value={billType}
-                onChange={(e) => setBillType(e.target.value as BillType)}
-                options={[
-                  { value: 'arnona', label: 'Arnona' },
-                  { value: 'iec', label: 'Electricity (IEC)' },
-                  { value: 'water', label: 'Water' },
-                  { value: 'vaad_bayit', label: "Va'ad Bayit" },
-                  { value: 'internet', label: 'Internet' },
-                  { value: 'gas', label: 'Gas' },
-                  { value: 'other', label: 'Other' },
-                ]}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Amount (ILS)</Label>
-              <Input name="amount" type="number" step="0.01" placeholder="842.50" required className="h-11" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Due Date</Label>
-              <Input name="due_date" type="date" className="h-11" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Period Start</Label>
-                <Input name="period_start" type="date" className="h-11" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Period End</Label>
-                <Input name="period_end" type="date" className="h-11" />
-              </div>
-            </div>
+          <form onSubmit={handleSubmit} className="space-y-4 p-4">
+            <BillForm
+              initial={{
+                property_id: preselectedPropertyId ?? '',
+                bill_type: 'other',
+              }}
+              properties={properties}
+              onChange={setValues}
+            />
             <Button type="submit" disabled={saving} className="h-11 w-full bg-accent text-accent-foreground hover:bg-accent/90">
               {saving ? 'Adding...' : 'Add Bill'}
             </Button>
