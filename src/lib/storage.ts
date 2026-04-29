@@ -14,23 +14,22 @@ import { randomUUID } from 'crypto'
  *
  * @param prefix - Folder prefix in the bucket (no trailing slash), e.g. "vault" or "bills"
  * @param originalFilename - The user-supplied filename (may contain Hebrew, spaces, etc.)
- * @returns key (full storage path) and ext (sanitized extension)
+ * @returns the full storage key (path including UUID + sanitized extension)
  */
-export function buildStorageKey(prefix: string, originalFilename: string): {
-  key: string
-  ext: string
-} {
+export function buildStorageKey(prefix: string, originalFilename: string): string {
   const ext = sanitizeExtension(originalFilename)
   const uuid = randomUUID()
-  const key = `${prefix}/${uuid}.${ext}`
-  return { key, ext }
+  return `${prefix}/${uuid}.${ext}`
 }
 
 /**
  * Extract and sanitize the file extension from a filename.
  * Lowercase, strip any non-[a-z0-9] chars, fall back to 'bin' if empty.
+ *
+ * Exported so other upload sites (property images, visit media) can share the
+ * same sanitization rules instead of inlining the regex.
  */
-function sanitizeExtension(filename: string): string {
+export function sanitizeExtension(filename: string): string {
   if (!filename) return 'bin'
   const dotIndex = filename.lastIndexOf('.')
   if (dotIndex < 0 || dotIndex === filename.length - 1) return 'bin'

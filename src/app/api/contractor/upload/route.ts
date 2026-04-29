@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const serviceClient = createServiceClient()
   const folder = caption === 'Expense receipt' ? 'receipts' : 'tasks'
   // Build a safe ASCII storage key — file.name may be Hebrew or contain spaces.
-  const { key: filePath } = buildStorageKey(`${folder}/${taskId}`, file.name)
+  const filePath = buildStorageKey(`${folder}/${taskId}`, file.name)
 
   const buffer = Buffer.from(await file.arrayBuffer())
   const { error: uploadError } = await serviceClient.storage

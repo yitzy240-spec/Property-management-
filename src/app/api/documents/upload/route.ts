@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   // Build a safe ASCII storage key (Supabase Storage rejects non-ASCII keys —
   // file.name may contain Hebrew chars or spaces). The original filename is
   // persisted on the documents row so downloads can preserve the human name.
-  const { key: filePath } = buildStorageKey('vault', file.name)
+  const filePath = buildStorageKey('vault', file.name)
 
   // Upload to storage
   const buffer = Buffer.from(await file.arrayBuffer())

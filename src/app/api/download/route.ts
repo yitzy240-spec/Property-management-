@@ -89,12 +89,14 @@ export async function GET(request: Request) {
   const asciiSafe = finalName.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, "'")
   const contentDisposition = `attachment; filename="${asciiSafe}"; filename*=${encodeContentDispositionFilename(finalName)}`
 
-  const arrayBuffer = await fileBlob.arrayBuffer()
-  return new NextResponse(arrayBuffer, {
+  // Stream the body straight through instead of buffering the whole file in
+  // serverless RAM — important for large scans/videos. Blob.size is known up
+  // front so we can still emit a correct Content-Length.
+  return new NextResponse(fileBlob.stream(), {
     status: 200,
     headers: {
       'Content-Type': fileBlob.type || 'application/octet-stream',
-      'Content-Length': String(arrayBuffer.byteLength),
+      'Content-Length': String(fileBlob.size),
       'Content-Disposition': contentDisposition,
       'Cache-Control': 'private, max-age=0, no-store',
     },

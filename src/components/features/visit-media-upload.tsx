@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { Camera, X, Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { sanitizeExtension } from '@/lib/storage'
 import { toast } from 'sonner'
 
 interface MediaFile {
@@ -112,10 +113,10 @@ export async function uploadVisitMedia(
 
   for (const f of files) {
     // Sanitize the extension — Supabase Storage rejects non-ASCII keys, and
-    // a Hebrew/spaced filename would break this. Lowercase, [a-z0-9] only,
-    // fall back to 'jpg' for images we can't infer otherwise.
-    const rawExt = (f.file.name.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-    const ext = rawExt || (f.fileType === 'video' ? 'mp4' : 'jpg')
+    // a Hebrew/spaced filename would break this. sanitizeExtension returns
+    // 'bin' on miss; for media we prefer 'mp4'/'jpg' based on the kind.
+    const sanitized = sanitizeExtension(f.file.name)
+    const ext = sanitized === 'bin' ? (f.fileType === 'video' ? 'mp4' : 'jpg') : sanitized
     const path = `${propertyId}/${visitId}/${f.id}.${ext}`
 
     const { error } = await supabase.storage
