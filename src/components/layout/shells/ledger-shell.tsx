@@ -29,6 +29,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { signOut } from '@/app/login/actions'
 import { BiometricPrompt } from '@/components/features/biometric-prompt'
 import { NotificationBell } from '@/components/features/notification-bell'
+import { ViewAsOwnerPicker } from '@/components/features/view-as-owner-picker'
 
 /** Primary bottom nav — Ledger's entity-first tabs */
 const bottomTabs = [
@@ -122,6 +123,9 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
                   )
                 })}
                 <div className="mt-4 border-t pt-2">
+                  <div onClick={() => setMenuOpen(false)}>
+                    <ViewAsOwnerPicker />
+                  </div>
                   <form action={signOut}>
                     <button
                       type="submit"
