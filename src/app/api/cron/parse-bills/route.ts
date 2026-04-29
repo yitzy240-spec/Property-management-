@@ -26,6 +26,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  try {
+    return await runParseBills()
+  } catch (err) {
+    const e = err as Error
+    console.error('[parse-bills] fatal', e)
+    return NextResponse.json({
+      error: 'parse-bills failed',
+      message: e.message,
+      stack: e.stack?.split('\n').slice(0, 8).join('\n'),
+    }, { status: 500 })
+  }
+}
+
+async function runParseBills() {
   const serviceClient = createServiceClient()
 
   const { data: tokenSetting } = await serviceClient
