@@ -109,6 +109,7 @@ export function BillForm({ initial, properties, onChange, hideProperty, formIdPr
           name={`${prefix}amount`}
           type="number"
           step="0.01"
+          min="0.01"
           placeholder="842.50"
           required
           className="h-11"

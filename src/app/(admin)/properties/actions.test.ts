@@ -139,6 +139,15 @@ describe('updateBillStatus', () => {
     expect(payload.amount_agorot).toBe(12345)
   })
 
+  it('clears approved_by on rejection (mirrors approved_at)', async () => {
+    const { updateBillStatus } = await import('./actions')
+    await updateBillStatus('bill-1', 'rejected')
+    const payload = mockUpdate.mock.calls[0][0]
+    expect(payload.status).toBe('rejected')
+    expect(payload.approved_at).toBeNull()
+    expect(payload.approved_by).toBeNull()
+  })
+
   it('treats null due_date as a valid edit (clears the date)', async () => {
     const { updateBillStatus } = await import('./actions')
     await updateBillStatus('bill-1', 'approved', 'paid_by_admin', {

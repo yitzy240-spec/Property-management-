@@ -58,8 +58,16 @@ export function BillEditDrawer({ bill, propertyName, trigger }: BillEditDrawerPr
   }, [open, properties.length])
 
   async function submit(status: 'approved' | 'rejected', paymentMethod?: string) {
+    if (loading) return
     if (!values.property_id) {
       toast.error('Select a property')
+      return
+    }
+    if (
+      status === 'approved' &&
+      (values.amount_agorot == null || values.amount_agorot <= 0)
+    ) {
+      toast.error('Amount must be greater than 0')
       return
     }
     setLoading(paymentMethod ?? status)

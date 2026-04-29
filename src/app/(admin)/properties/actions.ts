@@ -119,7 +119,7 @@ export async function updateBillStatus(
   const updateData: Record<string, unknown> = {
     status,
     approved_at: status === 'approved' ? new Date().toISOString() : null,
-    approved_by: user.id,
+    approved_by: status === 'approved' ? user.id : null,
   }
   if (paymentMethod) updateData.payment_method = paymentMethod
 
