@@ -18,7 +18,6 @@
 export type RoutingSignal =
   | 'account_number'
   | 'address_match'
-  | 'holder_match'
   | 'label_only'
 
 export type RoutingConfidence = 'verified' | 'label_only' | 'mismatch'
@@ -146,5 +145,68 @@ export function verifyBillRouting(args: VerifyBillRoutingArgs): RoutingResult {
     confidence: 'label_only',
     signal: 'label_only',
     reason: 'No account number or address verification available — trusting Gmail label only.',
+  }
+}
+
+export interface ResolveBillRoutingWithoutLabelArgs {
+  parsedPdf: ParsedPdf
+  utilityAccounts: UtilityAccountRow[]
+  properties: PropertyRow[]
+}
+
+/**
+ * Routing fallback when there's no pre-match candidate from a Gmail
+ * label, sender mapping, or owner-name match. Tries (1) account number
+ * + utility type, then (2) fuzzy address match against any property.
+ *
+ * Returns `propertyId=null` with `label_only` confidence when neither
+ * signal is available, so the caller can flag the bill for manual
+ * routing.
+ *
+ * Uses the same `normalizeAddress` / `addressFuzzyMatches` helpers as
+ * `verifyBillRouting`, so address comparisons (e.g. trailing periods,
+ * collapsed whitespace) behave identically across both code paths.
+ */
+export function resolveBillRoutingWithoutLabel(
+  args: ResolveBillRoutingWithoutLabelArgs,
+): RoutingResult {
+  const { parsedPdf, utilityAccounts, properties } = args
+
+  if (parsedPdf.account_number && parsedPdf.bill_type) {
+    const acct = utilityAccounts.find(
+      ua =>
+        ua.account_number === parsedPdf.account_number &&
+        ua.utility_type === parsedPdf.bill_type,
+    )
+    if (acct) {
+      return {
+        propertyId: acct.property_id,
+        confidence: 'verified',
+        signal: 'account_number',
+        matchedAccountId: acct.id,
+        reason: `Account number ${parsedPdf.account_number} (${parsedPdf.bill_type}) → property ${acct.property_id}.`,
+      }
+    }
+  }
+
+  if (parsedPdf.address) {
+    const match = properties.find(p =>
+      addressFuzzyMatches(parsedPdf.address as string, p.address),
+    )
+    if (match) {
+      return {
+        propertyId: match.id,
+        confidence: 'verified',
+        signal: 'address_match',
+        reason: `PDF address matches property "${match.address}".`,
+      }
+    }
+  }
+
+  return {
+    propertyId: null,
+    confidence: 'label_only',
+    signal: 'label_only',
+    reason: 'No routing signal — admin needs to assign manually.',
   }
 }

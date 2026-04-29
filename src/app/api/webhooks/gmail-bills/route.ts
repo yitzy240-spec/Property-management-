@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailAccessToken } from '@/lib/gmail'
 import { geminiGenerate } from '@/lib/gemini'
-import { verifyBillRouting } from '@/lib/bill-routing'
+import { verifyBillRouting, resolveBillRoutingWithoutLabel } from '@/lib/bill-routing'
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
 
@@ -254,7 +254,7 @@ export async function POST(request: Request) {
           properties: properties ?? [],
         })
       } else {
-        routingResult = resolveWithoutLabel({
+        routingResult = resolveBillRoutingWithoutLabel({
           parsedPdf: {
             account_number: (aiParsedData?.account_number as string) ?? undefined,
             address: (aiParsedData?.address as string) ?? undefined,
@@ -358,65 +358,6 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error('[Gmail Bills Webhook]', err)
     return NextResponse.json({ ok: true }) // Always ack
-  }
-}
-
-/**
- * Routing fallback when there's no pre-match candidate.
- * Mirrors the helper in /api/cron/parse-bills-dedicated for consistency.
- */
-function resolveWithoutLabel(args: {
-  parsedPdf: { account_number?: string; address?: string; bill_type?: string }
-  utilityAccounts: Array<{ id: string; property_id: string; utility_type: string; account_number: string }>
-  properties: Array<{ id: string; address: string; name: string }>
-}): {
-  propertyId: string | null
-  confidence: 'verified' | 'label_only' | 'mismatch'
-  signal: 'account_number' | 'address_match' | 'label_only'
-  matchedAccountId?: string
-  reason?: string
-} {
-  const { parsedPdf, utilityAccounts, properties } = args
-
-  if (parsedPdf.account_number && parsedPdf.bill_type) {
-    const acct = utilityAccounts.find(
-      ua =>
-        ua.account_number === parsedPdf.account_number &&
-        ua.utility_type === parsedPdf.bill_type,
-    )
-    if (acct) {
-      return {
-        propertyId: acct.property_id,
-        confidence: 'verified',
-        signal: 'account_number',
-        matchedAccountId: acct.id,
-        reason: `Account number ${parsedPdf.account_number} (${parsedPdf.bill_type}) → property ${acct.property_id}.`,
-      }
-    }
-  }
-
-  if (parsedPdf.address) {
-    const addr = parsedPdf.address.toLowerCase().replace(/\s+/g, ' ').trim()
-    const match = properties.find(
-      p =>
-        addr.includes(p.address.toLowerCase()) ||
-        p.address.toLowerCase().includes(addr),
-    )
-    if (match) {
-      return {
-        propertyId: match.id,
-        confidence: 'verified',
-        signal: 'address_match',
-        reason: `PDF address matches property "${match.address}".`,
-      }
-    }
-  }
-
-  return {
-    propertyId: null,
-    confidence: 'label_only',
-    signal: 'label_only',
-    reason: 'No routing signal — admin needs to assign manually.',
   }
 }
 

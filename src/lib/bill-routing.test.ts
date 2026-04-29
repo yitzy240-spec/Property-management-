@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { verifyBillRouting } from './bill-routing'
+import { verifyBillRouting, resolveBillRoutingWithoutLabel } from './bill-routing'
 
 const properties = [
   { id: 'prop-ariel', address: 'Agripas 6', name: 'Agripas' },
@@ -118,5 +118,56 @@ describe('verifyBillRouting', () => {
       properties,
     })
     expect(result.confidence).toBe('label_only')
+  })
+})
+
+describe('resolveBillRoutingWithoutLabel', () => {
+  it('account_number + utility_type match → verified', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { account_number: 'BOB-IEC-1', bill_type: 'iec' },
+      utilityAccounts,
+      properties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.signal).toBe('account_number')
+    expect(result.propertyId).toBe('prop-bobbi')
+    expect(result.matchedAccountId).toBe('ua-4')
+  })
+
+  it('address with trailing punctuation normalizes consistently with verifyBillRouting', () => {
+    // Same fixture as verifyBillRouting's "KING GEORGE  14." test, but
+    // with no label — must still resolve to Bobbi via address_match
+    // because the shared addressFuzzyMatches helper strips the trailing
+    // period. Inline duplicates used a different normalizer that would
+    // miss this.
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'KING GEORGE  14.' },
+      utilityAccounts,
+      properties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.signal).toBe('address_match')
+    expect(result.propertyId).toBe('prop-bobbi')
+  })
+
+  it('no signals → label_only with propertyId=null', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: {},
+      utilityAccounts,
+      properties,
+    })
+    expect(result.confidence).toBe('label_only')
+    expect(result.signal).toBe('label_only')
+    expect(result.propertyId).toBeNull()
+  })
+
+  it('account_number without bill_type → label_only (cannot verify utility_type)', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { account_number: 'AAA111' },
+      utilityAccounts,
+      properties,
+    })
+    expect(result.confidence).toBe('label_only')
+    expect(result.propertyId).toBeNull()
   })
 })
