@@ -203,11 +203,33 @@ export async function GET(request: Request) {
       })
     }
 
+    // Diagnostic: show top-3 score for first 5 bills and aliases-loaded count
+    const debugSample = bills.slice(0, 5).map(bill => {
+      const pdf = (bill.ai_parsed_data ?? {}) as {
+        account_number?: string
+        account_holder?: string
+        address?: string
+      }
+      return {
+        billId: bill.id,
+        currentPropertyId: bill.property_id,
+        billType: bill.bill_type,
+        pdfAddr: pdf.address ?? null,
+        pdfHolder: pdf.account_holder ?? null,
+        pdfAccount: pdf.account_number ?? null,
+      }
+    })
+
     return NextResponse.json({
+      version: 'hebrew-aliases-v2',
       dryRun: true,
       legacyBillsScanned: bills.length,
       proposedReroutes: proposals.length,
+      hebrewAliasCount: Object.keys(HEBREW_ALIASES).length,
+      propertiesLoaded: properties.length,
+      utilityAccountsLoaded: accounts.length,
       proposals,
+      debugSample,
     })
   } catch (err) {
     if (err instanceof AuthError) {
