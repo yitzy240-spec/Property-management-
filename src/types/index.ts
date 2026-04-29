@@ -143,6 +143,7 @@ export interface Bill {
   ai_parsed_data: Record<string, unknown> | null
   approved_by: string | null
   approved_at: string | null
+  routing_confidence?: 'verified' | 'label_only' | 'mismatch'
   created_at: string
   updated_at: string
 }

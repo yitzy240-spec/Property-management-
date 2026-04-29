@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailAccessToken } from '@/lib/gmail'
 import { geminiGenerate } from '@/lib/gemini'
+import { verifyBillRouting, resolveBillRoutingWithoutLabel } from '@/lib/bill-routing'
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
 
@@ -16,7 +17,8 @@ const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
  *
  * Flow:
  * 1. Pub/Sub notification → get new message IDs
- * 2. For each message: extract PDF/HTML → AI parse → match property → create bill
+ * 2. For each message: extract PDF/HTML → AI parse → route via verifyBillRouting → create bill
+ * 3. bill_sender_mappings only auto-learned when routing_confidence='verified'
  */
 export async function POST(request: Request) {
   try {
@@ -100,10 +102,11 @@ export async function POST(request: Request) {
       serviceClient.from('properties').select('id, name, address, owner_id').eq('is_active', true),
       serviceClient.from('owners').select('id, full_name'),
       serviceClient.from('bill_sender_mappings').select('*'),
-      serviceClient.from('property_utility_accounts').select('property_id, utility_type, account_number'),
+      serviceClient.from('property_utility_accounts').select('id, property_id, utility_type, account_number'),
     ])
 
     let bills = 0
+    let flaggedMismatches = 0
     const apiKey = process.env.GEMINI_API_KEY
 
     for (const messageId of newMessageIds) {
@@ -205,32 +208,21 @@ export async function POST(request: Request) {
       const periodStart = (aiParsedData?.period_start as string) || null
       const periodEnd = (aiParsedData?.period_end as string) || null
 
-      // ── Property matching (same logic as main parser) ──
-      let propertyId: string | null = null
-      let matchMethod: string | null = null
+      // ── Property routing ──
+      // Pre-stage: candidate from sender mapping or owner name match.
+      // Then verifyBillRouting cross-checks the PDF payload.
+      let labelPropertyId: string | null = null
+      let preMatchSignal: 'learned_mapping' | 'owner_name' | null = null
 
-      // 1. Learned sender mappings
       const learnedMapping = (senderMappings ?? []).find(
         m => m.sender_email === senderEmail && m.bill_type === billType
       )
       if (learnedMapping) {
-        propertyId = learnedMapping.property_id
-        matchMethod = 'learned_mapping'
+        labelPropertyId = learnedMapping.property_id
+        preMatchSignal = 'learned_mapping'
       }
 
-      // 2. Utility account number match
-      if (!propertyId && aiParsedData?.account_number) {
-        const acctMatch = (utilityAccounts ?? []).find(
-          ua => ua.utility_type === billType && ua.account_number === aiParsedData!.account_number
-        )
-        if (acctMatch) {
-          propertyId = acctMatch.property_id
-          matchMethod = 'account_number'
-        }
-      }
-
-      // 3. Owner name match
-      if (!propertyId) {
+      if (!labelPropertyId) {
         const searchText = `${subject} ${aiParsedData?.account_holder || ''}`.toLowerCase()
         for (const owner of owners ?? []) {
           const nameParts = owner.full_name.toLowerCase().split(' ')
@@ -240,32 +232,63 @@ export async function POST(request: Request) {
           if (allMatch) {
             const prop = (properties ?? []).find(p => p.owner_id === owner.id)
             if (prop) {
-              propertyId = prop.id
-              matchMethod = 'owner_name'
-              // Auto-create mapping
-              await serviceClient.from('bill_sender_mappings').upsert({
-                sender_email: senderEmail,
-                sender_name_pattern: from,
-                subject_pattern: owner.full_name,
-                property_id: propertyId,
-                bill_type: billType,
-                confirmed: false,
-              }, { onConflict: 'sender_email,property_id,bill_type' }).select()
+              labelPropertyId = prop.id
+              preMatchSignal = 'owner_name'
               break
             }
           }
         }
       }
 
-      // 4. Address match
-      if (!propertyId && aiParsedData?.address) {
-        const addr = (aiParsedData.address as string).toLowerCase()
-        const match = (properties ?? []).find(p =>
-          addr.includes(p.address.toLowerCase()) || p.address.toLowerCase().includes(addr)
+      let routingResult: ReturnType<typeof verifyBillRouting>
+      if (labelPropertyId) {
+        routingResult = verifyBillRouting({
+          labelPropertyId,
+          parsedPdf: {
+            account_number: (aiParsedData?.account_number as string) ?? undefined,
+            account_holder: (aiParsedData?.account_holder as string) ?? undefined,
+            address: (aiParsedData?.address as string) ?? undefined,
+            bill_type: billType,
+          },
+          utilityAccounts: utilityAccounts ?? [],
+          properties: properties ?? [],
+        })
+      } else {
+        routingResult = resolveBillRoutingWithoutLabel({
+          parsedPdf: {
+            account_number: (aiParsedData?.account_number as string) ?? undefined,
+            address: (aiParsedData?.address as string) ?? undefined,
+            bill_type: billType,
+          },
+          utilityAccounts: utilityAccounts ?? [],
+          properties: properties ?? [],
+        })
+      }
+
+      const propertyId = routingResult.propertyId
+      if (routingResult.confidence === 'mismatch') flaggedMismatches++
+
+      // Auto-learn bill_sender_mappings only when routing is verified.
+      // Do NOT learn from a bare owner-name match without PDF cross-check —
+      // that's how we got the original misrouting bug.
+      const shouldLearnMapping =
+        routingResult.confidence === 'verified' &&
+        preMatchSignal === 'owner_name' &&
+        propertyId !== null
+
+      if (shouldLearnMapping) {
+        const ownerForProp = (owners ?? []).find(
+          o => (properties ?? []).some(p => p.id === propertyId && p.owner_id === o.id)
         )
-        if (match) {
-          propertyId = match.id
-          matchMethod = 'address'
+        if (ownerForProp) {
+          await serviceClient.from('bill_sender_mappings').upsert({
+            sender_email: senderEmail,
+            sender_name_pattern: from,
+            subject_pattern: ownerForProp.full_name,
+            property_id: propertyId,
+            bill_type: billType,
+            confirmed: false,
+          }, { onConflict: 'sender_email,property_id,bill_type' }).select()
         }
       }
 
@@ -292,6 +315,15 @@ export async function POST(request: Request) {
         }
       }
 
+      let billStatus: 'pending_review' | 'flagged' = 'pending_review'
+      if (routingResult.confidence === 'mismatch') {
+        billStatus = 'flagged'
+        if (!anomalyNote) anomalyNote = routingResult.reason ?? 'Routing mismatch — manual review required.'
+        isAnomaly = true
+      } else if (isAnomaly) {
+        billStatus = 'flagged'
+      }
+
       // Create bill
       const { error: billError } = await serviceClient.from('bills').insert({
         property_id: propertyId,
@@ -300,18 +332,29 @@ export async function POST(request: Request) {
         due_date: dueDate,
         billing_period_start: periodStart,
         billing_period_end: periodEnd,
-        status: isAnomaly ? 'flagged' : 'pending_review',
+        status: billStatus,
         is_anomaly: isAnomaly,
         anomaly_note: anomalyNote,
         pdf_storage_path: storagePath,
         gmail_message_id: messageId,
-        ai_parsed_data: { ...aiParsedData, match_method: matchMethod, source: 'dedicated_inbox' },
+        routing_confidence: routingResult.confidence,
+        ai_parsed_data: {
+          ...aiParsedData,
+          match_method: routingResult.signal,
+          pre_match_signal: preMatchSignal,
+          routing_reason: routingResult.reason,
+          source: 'dedicated_inbox',
+        },
       })
 
       if (!billError) bills++
     }
 
-    return NextResponse.json({ ok: true, bills })
+    console.log(
+      `[gmail-bills-webhook] new_messages=${newMessageIds.size} bills_created=${bills} flagged_mismatches=${flaggedMismatches}`,
+    )
+
+    return NextResponse.json({ ok: true, bills, flagged_mismatches: flaggedMismatches })
   } catch (err) {
     console.error('[Gmail Bills Webhook]', err)
     return NextResponse.json({ ok: true }) // Always ack
