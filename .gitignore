@@ -42,3 +42,6 @@ marcus-lodgify.png
 
 .vercel
 .env.vercel
+
+# worktrees
+.worktrees/
