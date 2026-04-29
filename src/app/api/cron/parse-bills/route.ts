@@ -20,21 +20,27 @@ const LOOKBACK_DAYS = 60
  * 6. Bills flagged with mismatch confidence are queued for manual review
  * 7. Create bill in verification queue
  */
+export const maxDuration = 60
+
 export async function GET(request: Request) {
+  console.log('[parse-bills] phase=enter')
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  console.log('[parse-bills] phase=auth_ok')
 
   try {
-    return await runParseBills()
+    const result = await runParseBills()
+    console.log('[parse-bills] phase=complete')
+    return result
   } catch (err) {
     const e = err as Error
-    console.error('[parse-bills] fatal', e)
+    console.error('[parse-bills] fatal', e?.message, e?.stack)
     return NextResponse.json({
       error: 'parse-bills failed',
-      message: e.message,
-      stack: e.stack?.split('\n').slice(0, 8).join('\n'),
+      message: e?.message ?? String(err),
+      stack: e?.stack?.split('\n').slice(0, 12).join('\n'),
     }, { status: 500 })
   }
 }
