@@ -45,3 +45,7 @@ marcus-lodgify.png
 
 # worktrees
 .worktrees/
+
+# playwright artifacts
+/test-results/
+/playwright-report/
