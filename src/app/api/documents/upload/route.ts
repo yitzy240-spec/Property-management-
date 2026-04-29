@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
+import { assertNotImpersonating } from '@/lib/impersonation'
 
 /**
  * POST /api/documents/upload
@@ -11,6 +13,17 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // While the admin is impersonating an owner, all owner-side mutations
+  // are blocked. Real owners (no cookie) and real admins pass through.
+  try {
+    assertNotImpersonating(cookies())
+  } catch (err) {
+    if (err instanceof Error && (err as Error & { status?: number }).status === 403) {
+      return NextResponse.json({ error: err.message }, { status: 403 })
+    }
+    throw err
   }
 
   const formData = await request.formData()

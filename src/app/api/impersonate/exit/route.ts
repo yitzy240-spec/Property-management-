@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { IMPERSONATE_COWNER_COOKIE } from '@/lib/impersonation'
+import { IMPERSONATE_OWNER_COOKIE } from '@/lib/impersonation'
 
 /**
  * POST or GET /api/impersonate/exit
@@ -10,12 +10,12 @@ import { IMPERSONATE_COWNER_COOKIE } from '@/lib/impersonation'
  * to the admin dashboard without needing client JS.
  */
 export async function POST() {
-  cookies().delete(IMPERSONATE_COWNER_COOKIE)
+  cookies().delete(IMPERSONATE_OWNER_COOKIE)
   return NextResponse.json({ success: true })
 }
 
 export async function GET(request: Request) {
-  cookies().delete(IMPERSONATE_COWNER_COOKIE)
+  cookies().delete(IMPERSONATE_OWNER_COOKIE)
   const url = new URL(request.url)
   const next = url.searchParams.get('next') || '/dashboard'
   return NextResponse.redirect(new URL(next, url.origin))

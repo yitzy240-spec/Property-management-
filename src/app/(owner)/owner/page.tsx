@@ -359,14 +359,16 @@ export default async function OwnerPortalPage() {
           </section>
         )}
 
-        {/* Document Vault */}
-        <section>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Document Vault</p>
-          <OwnerDocumentVault
-            documents={(documents ?? []).map(d => ({ id: d.id, title: d.title, category: d.category, storage_path: d.storage_path, created_at: d.created_at }))}
-            propertyIds={propertyIds}
-          />
-        </section>
+        {/* Document Vault — hidden while impersonating (uploads are mutations) */}
+        {!isImpersonating && (
+          <section>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Document Vault</p>
+            <OwnerDocumentVault
+              documents={(documents ?? []).map(d => ({ id: d.id, title: d.title, category: d.category, storage_path: d.storage_path, created_at: d.created_at }))}
+              propertyIds={propertyIds}
+            />
+          </section>
+        )}
 
         {/* Messages — read-only while impersonating */}
         {properties && properties.length > 0 && !isImpersonating && (

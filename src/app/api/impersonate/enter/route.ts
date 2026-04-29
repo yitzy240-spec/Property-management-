@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
-import { isAdminUser, IMPERSONATE_COWNER_COOKIE } from '@/lib/impersonation'
+import { isAdminUser, IMPERSONATE_OWNER_COOKIE } from '@/lib/impersonation'
 
 /**
  * POST /api/impersonate/enter
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Owner not found' }, { status: 404 })
   }
 
-  cookies().set(IMPERSONATE_COWNER_COOKIE, target.id, {
+  cookies().set(IMPERSONATE_OWNER_COOKIE, target.id, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

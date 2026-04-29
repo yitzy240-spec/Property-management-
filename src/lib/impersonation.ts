@@ -15,7 +15,7 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import type { ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies'
 
-export const IMPERSONATE_COWNER_COOKIE = 'impersonate_owner_id'
+export const IMPERSONATE_OWNER_COOKIE = 'impersonate_owner_id'
 
 /** Result of resolving the effective owner identity for a request. */
 export type EffectiveOwner = {
@@ -74,7 +74,7 @@ export async function getEffectiveOwnerId(
     return { ownerId: null, isImpersonating: false, impersonatedName: null, actualUser: null }
   }
 
-  const cookieValue = cookies.get(IMPERSONATE_COWNER_COOKIE)?.value
+  const cookieValue = cookies.get(IMPERSONATE_OWNER_COOKIE)?.value
   const wantsImpersonate = !!cookieValue
   const userIsAdmin = isAdminUser(user)
 
@@ -130,7 +130,7 @@ export async function getEffectiveOwnerId(
  * strictly read-only.
  */
 export function assertNotImpersonating(cookies: CookieStore): void {
-  if (cookies.get(IMPERSONATE_COWNER_COOKIE)?.value) {
+  if (cookies.get(IMPERSONATE_OWNER_COOKIE)?.value) {
     const err = new Error(
       'Impersonation is read-only — exit "view as owner" to make changes.'
     )

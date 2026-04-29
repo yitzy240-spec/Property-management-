@@ -3,7 +3,7 @@ import {
   getEffectiveOwnerId,
   assertNotImpersonating,
   isAdminUser,
-  IMPERSONATE_COWNER_COOKIE,
+  IMPERSONATE_OWNER_COOKIE,
 } from './impersonation'
 
 type AnyUser = {
@@ -66,7 +66,7 @@ function mockServiceClient(
 function mockCookies(value: string | null) {
   return {
     get: vi.fn((name: string) =>
-      name === IMPERSONATE_COWNER_COOKIE && value ? { value } : undefined
+      name === IMPERSONATE_OWNER_COOKIE && value ? { value } : undefined
     ),
   }
 }
