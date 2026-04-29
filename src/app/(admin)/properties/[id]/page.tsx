@@ -14,7 +14,6 @@ import { TaskCreateDialog } from '@/components/features/task-create-dialog'
 import { BillAddButton } from '@/components/features/bill-add'
 import { LaundryPickupButton } from '@/components/features/laundry-pickup'
 import { WorkLogButton, WorkLogList } from '@/components/features/work-log'
-import { IecConnect } from '@/components/features/iec-connect'
 import { UtilityAccountsSection } from '@/components/features/utility-accounts'
 import { BookingList } from '@/components/features/booking-list'
 import { VisitList } from '@/components/features/visit-list'
@@ -175,14 +174,6 @@ export default async function PropertyDetailPage({
           }))}
           viewAllHref={`/visits?property=${params.id}`}
         />
-      </section>
-
-      {/* IEC Electricity */}
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">IEC Electricity</p>
-          <IecConnect propertyId={params.id} />
-        </div>
       </section>
 
       {/* Utility Accounts */}
