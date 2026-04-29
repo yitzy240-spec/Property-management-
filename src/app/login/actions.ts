@@ -2,7 +2,9 @@
 
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { sendOwnerLoginLink } from '@/lib/email'
+import { IMPERSONATE_OWNER_COOKIE } from '@/lib/impersonation'
 
 export async function loginWithEmail(formData: FormData) {
   const supabase = createServerSupabaseClient()
@@ -154,5 +156,7 @@ export async function updatePassword(formData: FormData) {
 export async function signOut() {
   const supabase = createServerSupabaseClient()
   await supabase.auth.signOut()
+  // Clear any lingering impersonation cookie so the next session starts clean.
+  cookies().delete(IMPERSONATE_OWNER_COOKIE)
   redirect('/login')
 }

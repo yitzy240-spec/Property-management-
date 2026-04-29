@@ -1,7 +1,9 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
+import { getEffectiveOwnerId } from '@/lib/impersonation'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
@@ -12,22 +14,34 @@ import { InvoiceHistory } from '@/components/features/invoice-history'
 import { OwnerStatements } from '@/components/features/billing/owner-statements'
 import { VisitList } from '@/components/features/visit-list'
 import { OwnerDocumentVault } from '@/components/features/owner-document-vault'
+import { ImpersonationBanner } from '@/components/features/impersonation-banner'
 
 export default async function OwnerPortalPage() {
   const supabase = createServerSupabaseClient()
+  const serviceClient = createServiceClient()
+  const cookieStore = cookies()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  // Resolve which owner_id to fetch data for. When the admin is impersonating,
+  // this returns the impersonated owner's id (auth-verified). Otherwise it
+  // returns the actual user's owner row id.
+  const { ownerId, isImpersonating, impersonatedName, actualUser } = await getEffectiveOwnerId(
+    supabase,
+    serviceClient,
+    cookieStore
+  )
 
-  const { data: owner } = await supabase
-    .from('owners')
-    .select('*')
-    .eq('auth_user_id', user.id)
-    .single()
+  if (!actualUser) redirect('/login')
 
-  if (!owner) {
-    // If user is an admin, redirect to dashboard instead of showing error
-    const isAdmin = user.app_metadata?.role === 'admin' || user.email === process.env.ADMIN_EMAIL
+  // Stale impersonation cookie → bounce admin back to dashboard so they can
+  // re-pick. (The "Exit impersonation" link clears the cookie en route.)
+  if (isImpersonating && !ownerId) {
+    redirect('/api/impersonate/exit?next=/dashboard')
+  }
+
+  if (!ownerId) {
+    // Real user has no owner record. If they're admin, send them to the
+    // admin dashboard; otherwise show the not-found state.
+    const isAdmin = actualUser.app_metadata?.role === 'admin' || actualUser.email === process.env.ADMIN_EMAIL
     if (isAdmin) redirect('/dashboard')
 
     return (
@@ -42,7 +56,27 @@ export default async function OwnerPortalPage() {
     )
   }
 
-  const { data: properties } = await supabase
+  // CRITICAL: When impersonating, the admin's auth session would scope RLS to
+  // the admin user, NOT the impersonated owner. Use the service-role client
+  // (which bypasses RLS) and explicitly filter by ownerId. Admin role was
+  // already verified inside getEffectiveOwnerId before the cookie was honored.
+  // For non-impersonated reads we keep using the auth client so RLS still
+  // protects against any accidental over-fetch.
+  const dataClient = isImpersonating ? serviceClient : supabase
+
+  const { data: owner } = await dataClient
+    .from('owners')
+    .select('*')
+    .eq('id', ownerId)
+    .single()
+
+  if (!owner) {
+    // Edge case: ownerId resolved but row vanished between calls.
+    if (isImpersonating) redirect('/api/impersonate/exit?next=/dashboard')
+    redirect('/login')
+  }
+
+  const { data: properties } = await dataClient
     .from('properties')
     .select('*')
     .eq('owner_id', owner.id)
@@ -59,22 +93,22 @@ export default async function OwnerPortalPage() {
     { data: ownerVisits },
   ] = await Promise.all([
     propertyIds.length > 0
-      ? supabase.from('bookings').select('*').in('property_id', propertyIds).gte('check_in', new Date().toISOString().split('T')[0]).order('check_in').limit(5)
+      ? dataClient.from('bookings').select('*').in('property_id', propertyIds).gte('check_in', new Date().toISOString().split('T')[0]).order('check_in').limit(5)
       : Promise.resolve({ data: [] }),
     propertyIds.length > 0
-      ? supabase.from('bills').select('*, properties(name)').in('property_id', propertyIds).eq('status', 'approved').order('created_at', { ascending: false }).limit(10)
+      ? dataClient.from('bills').select('*, properties(name)').in('property_id', propertyIds).eq('status', 'approved').order('created_at', { ascending: false }).limit(10)
       : Promise.resolve({ data: [] }),
     propertyIds.length > 0
-      ? supabase.from('tasks').select('*, properties(name)').in('property_id', propertyIds).order('created_at', { ascending: false }).limit(10)
+      ? dataClient.from('tasks').select('*, properties(name)').in('property_id', propertyIds).order('created_at', { ascending: false }).limit(10)
       : Promise.resolve({ data: [] }),
     propertyIds.length > 0
-      ? supabase.from('documents').select('*').in('property_id', propertyIds).order('created_at', { ascending: false })
+      ? dataClient.from('documents').select('*').in('property_id', propertyIds).order('created_at', { ascending: false })
       : Promise.resolve({ data: [] }),
     propertyIds.length > 0
-      ? supabase.from('task_media').select('*, tasks(title, is_cleaning, property_id, properties(name))').eq('uploaded_by', 'contractor').order('created_at', { ascending: false }).limit(20)
+      ? dataClient.from('task_media').select('*, tasks(title, is_cleaning, property_id, properties(name))').eq('uploaded_by', 'contractor').order('created_at', { ascending: false }).limit(20)
       : Promise.resolve({ data: [] }),
     propertyIds.length > 0
-      ? supabase.from('visits').select('id, property_id, visited_at, checklist, note, created_at, properties(name)').in('property_id', propertyIds).order('visited_at', { ascending: false }).limit(10)
+      ? dataClient.from('visits').select('id, property_id, visited_at, checklist, note, created_at, properties(name)').in('property_id', propertyIds).order('visited_at', { ascending: false }).limit(10)
       : Promise.resolve({ data: [] }),
   ])
 
@@ -96,6 +130,7 @@ export default async function OwnerPortalPage() {
 
   return (
     <div className="mx-auto min-h-screen max-w-2xl bg-[#FAFAFA]">
+      {isImpersonating && <ImpersonationBanner ownerName={impersonatedName ?? owner.full_name} />}
       {/* Header — sticky for scroll context */}
       <div className="sticky top-0 z-30 border-b border-border bg-card px-4 py-5">
         <div className="flex items-center justify-between">
@@ -112,11 +147,13 @@ export default async function OwnerPortalPage() {
               label={owner.profile}
               size="sm"
             />
-            <form action={signOut}>
-              <button type="submit" className="text-xs font-medium text-muted-foreground hover:text-foreground">
-                Sign Out
-              </button>
-            </form>
+            {!isImpersonating && (
+              <form action={signOut}>
+                <button type="submit" className="text-xs font-medium text-muted-foreground hover:text-foreground">
+                  Sign Out
+                </button>
+              </form>
+            )}
           </div>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -140,8 +177,8 @@ export default async function OwnerPortalPage() {
           </div>
         )}
 
-        {/* Request My Stay — prominent at top */}
-        {properties && properties.length > 0 && (
+        {/* Request My Stay — prominent at top (read-only while impersonating) */}
+        {properties && properties.length > 0 && !isImpersonating && (
           <RequestStay properties={properties.map(p => ({ id: p.id, name: p.name }))} />
         )}
 
@@ -322,17 +359,19 @@ export default async function OwnerPortalPage() {
           </section>
         )}
 
-        {/* Document Vault */}
-        <section>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Document Vault</p>
-          <OwnerDocumentVault
-            documents={(documents ?? []).map(d => ({ id: d.id, title: d.title, category: d.category, storage_path: d.storage_path, created_at: d.created_at }))}
-            propertyIds={propertyIds}
-          />
-        </section>
+        {/* Document Vault — hidden while impersonating (uploads are mutations) */}
+        {!isImpersonating && (
+          <section>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Document Vault</p>
+            <OwnerDocumentVault
+              documents={(documents ?? []).map(d => ({ id: d.id, title: d.title, category: d.category, storage_path: d.storage_path, created_at: d.created_at }))}
+              propertyIds={propertyIds}
+            />
+          </section>
+        )}
 
-        {/* Messages */}
-        {properties && properties.length > 0 && (
+        {/* Messages — read-only while impersonating */}
+        {properties && properties.length > 0 && !isImpersonating && (
           <section>
             <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Messages</p>
             <p className="mb-3 text-xs text-muted-foreground">Send notes to your property manager</p>

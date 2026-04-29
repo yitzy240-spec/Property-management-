@@ -2,8 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 /**
  * Tests for /api/messages
- * Validates: auth guard, input validation, message creation
+ * Validates: auth guard, input validation, message creation, impersonation gate
  */
+
+// Mock next/headers cookies() — let each test toggle the impersonation cookie.
+let mockCookieValue: string | null = null
+vi.mock('next/headers', () => ({
+  cookies: () => ({
+    get: (name: string) =>
+      name === 'impersonate_owner_id' && mockCookieValue
+        ? { value: mockCookieValue }
+        : undefined,
+  }),
+}))
 
 const mockInsert = vi.fn().mockReturnValue({
   select: () => ({
@@ -54,6 +65,7 @@ vi.mock('@/lib/auth', () => ({
 describe('/api/messages', () => {
   beforeEach(() => {
     mockUser = { id: 'user-1', app_metadata: { role: 'admin' } }
+    mockCookieValue = null
   })
 
   it('GET requires property_id parameter', async () => {
@@ -82,5 +94,22 @@ describe('/api/messages', () => {
     })
     const res = await POST(req)
     expect(res.status).toBe(401)
+  })
+
+  it('POST returns 403 when admin is impersonating an owner', async () => {
+    // Admin authenticated, but impersonation cookie present → mutation blocked.
+    // Without this gate, an admin in "view as owner" mode could curl the
+    // endpoint and write a message attributed to the impersonated owner.
+    mockUser = { id: 'admin-1', app_metadata: { role: 'admin' } }
+    mockCookieValue = 'owner-target-1'
+    const { POST } = await import('../messages/route')
+    const req = new Request('http://localhost/api/messages', {
+      method: 'POST',
+      body: JSON.stringify({ property_id: 'prop-1', body: 'hello', sender_role: 'owner' }),
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(403)
+    const json = await res.json()
+    expect(json.error).toMatch(/read-only|impersonation/i)
   })
 })

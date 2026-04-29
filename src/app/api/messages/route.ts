@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAuth, AuthError } from '@/lib/auth'
 import { sendEmail, escapeHtml } from '@/lib/email'
 import { createNotification, notifyAdmins } from '@/lib/notifications'
+import { assertNotImpersonating } from '@/lib/impersonation'
 
 /**
  * GET /api/messages?property_id=xxx — Get messages for a property
@@ -36,8 +38,16 @@ export async function POST(request: Request) {
   let user
   try {
     user = await requireAuth()
+    // While the admin is impersonating an owner, all owner-side mutations
+    // are blocked. Real owners and real admins (no cookie) pass through.
+    // Without this gate, an admin in impersonation mode could POST a message
+    // attributed to the impersonated owner via the client-supplied sender_role.
+    assertNotImpersonating(cookies())
   } catch (err) {
     if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
+    if (err instanceof Error && (err as Error & { status?: number }).status === 403) {
+      return NextResponse.json({ error: err.message }, { status: 403 })
+    }
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
