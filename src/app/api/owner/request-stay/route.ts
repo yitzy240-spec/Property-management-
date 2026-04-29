@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
 import { blockDates } from '@/lib/lodgify'
 import { requireAuth, AuthError } from '@/lib/auth'
 import { notifyAdmins } from '@/lib/notifications'
+import { assertNotImpersonating } from '@/lib/impersonation'
 
 /**
  * POST /api/owner/request-stay
@@ -13,8 +15,14 @@ import { notifyAdmins } from '@/lib/notifications'
 export async function POST(request: Request) {
   try {
     await requireAuth()
+    // While the admin is impersonating an owner, all owner-side mutations
+    // are blocked. Real owners (no cookie) pass through unchanged.
+    assertNotImpersonating(cookies())
   } catch (err) {
     if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
+    if (err instanceof Error && (err as Error & { status?: number }).status === 403) {
+      return NextResponse.json({ error: err.message }, { status: 403 })
+    }
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
