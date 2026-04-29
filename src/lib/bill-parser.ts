@@ -8,7 +8,13 @@
  * rather than trying to visually read numbers from a PDF image.
  */
 
-import pdfParse from 'pdf-parse'
+// Import the implementation file directly. The default `pdf-parse` index file
+// runs a debug self-test on module load that reads a fixture PDF from disk —
+// fine in Node but throws ENOENT in serverless bundles. See
+// https://gitlab.com/autokent/pdf-parse/-/issues/24
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — no types for the inner path
+import pdfParse from 'pdf-parse/lib/pdf-parse.js'
 
 interface ParsedBill {
   bill_type: 'arnona' | 'iec' | 'water' | 'vaad_bayit' | 'internet' | 'gas' | 'other'
