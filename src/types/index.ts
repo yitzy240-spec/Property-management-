@@ -258,6 +258,8 @@ export interface Document {
   category: DocumentCategory
   title: string
   storage_path: string
+  /** Original (possibly Hebrew/Unicode) filename, preserved for download. NULL on pre-migration rows. */
+  original_filename?: string | null
   file_size: number | null
   uploaded_by: 'admin' | 'owner'
   expiry_date: string | null
