@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye } from 'lucide-react'
+import { Eye, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -135,21 +135,27 @@ export function ViewAsOwnerPicker({ onSelected }: { onSelected?: () => void } = 
               <ul className="divide-y divide-border rounded-[10px] border border-border bg-card">
                 {filtered.map((owner) => (
                   <li key={owner.id}>
+                    {/* Bigger touch target (min-h-14) + active feedback so taps
+                        feel responsive on mobile, where hover styles don't apply.
+                        Chevron makes the row obviously tappable, not just a hover label. */}
                     <button
                       type="button"
                       onClick={() => viewAs(owner)}
                       disabled={submitting !== null}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted disabled:opacity-60"
+                      className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted active:bg-muted disabled:opacity-60"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{owner.full_name}</p>
+                        <p className="truncate text-base font-medium">{owner.full_name}</p>
                         {owner.email && (
                           <p className="truncate text-xs text-muted-foreground">{owner.email}</p>
                         )}
                       </div>
-                      <span className="shrink-0 text-xs font-medium text-primary">
-                        {submitting === owner.id ? 'Loading…' : 'View →'}
-                      </span>
+                      <div className="flex shrink-0 items-center gap-1.5 text-primary">
+                        <span className="text-xs font-medium">
+                          {submitting === owner.id ? 'Loading…' : 'View'}
+                        </span>
+                        <ChevronRight className="h-4 w-4" />
+                      </div>
                     </button>
                   </li>
                 ))}
