@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { BillAddButton } from '@/components/features/bill-add'
 import { BillEditDrawer } from '@/components/features/bill-edit'
+import { BillDeleteButton } from '@/components/features/bill-delete-button'
 import { cn } from '@/lib/utils'
 import type { Bill } from '@/types'
 
@@ -114,10 +115,14 @@ export default async function BillsPage({
                     </p>
                   )}
                 </div>
-                <div className="shrink-0 text-right">
+                <div className="flex shrink-0 flex-col items-end gap-1">
                   <CurrencyDisplay agorot={bill.amount_agorot} className="text-lg font-bold" />
-                  <div className="mt-1">
+                  <div className="flex items-center gap-1">
                     <StatusBadge status={bill.status} size="sm" />
+                    <BillDeleteButton
+                      billId={bill.id}
+                      label={`${billTypeLabels[bill.bill_type] || bill.bill_type}${bill.due_date ? ` · ${bill.due_date}` : ''}`}
+                    />
                   </div>
                 </div>
               </div>

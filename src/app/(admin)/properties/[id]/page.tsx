@@ -242,9 +242,9 @@ export default async function PropertyDetailPage({
                 <div className="flex items-center gap-2">
                   <StatusBadge status={bill.status} size="sm" />
                   <CurrencyDisplay agorot={bill.amount_agorot} className="text-sm font-semibold" />
-                  {bill.storage_path && (
+                  {bill.pdf_storage_path && (
                     <a
-                      href={`/api/download?path=${encodeURIComponent(bill.storage_path as string)}&bucket=documents`}
+                      href={`/api/download?path=${encodeURIComponent(bill.pdf_storage_path as string)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="rounded bg-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground hover:bg-muted/80"
