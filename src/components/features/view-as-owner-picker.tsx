@@ -32,7 +32,7 @@ interface OwnerOption {
  * role server-side, so this trigger is harmless to non-admins (they'll
  * just get a 403 if they try).
  */
-export function ViewAsOwnerPicker() {
+export function ViewAsOwnerPicker({ onSelected }: { onSelected?: () => void } = {}) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [owners, setOwners] = useState<OwnerOption[] | null>(null)
@@ -85,6 +85,7 @@ export function ViewAsOwnerPicker() {
         throw new Error(body.error || 'Failed to enter impersonation')
       }
       setOpen(false)
+      onSelected?.()
       router.push('/owner')
       router.refresh()
     } catch (err) {

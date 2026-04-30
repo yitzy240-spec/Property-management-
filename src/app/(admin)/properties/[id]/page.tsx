@@ -17,6 +17,7 @@ import { WorkLogButton, WorkLogList } from '@/components/features/work-log'
 import { UtilityAccountsSection } from '@/components/features/utility-accounts'
 import { BookingList } from '@/components/features/booking-list'
 import { VisitList } from '@/components/features/visit-list'
+import { billTypeLabel } from '@/lib/bill-types'
 
 export default async function PropertyDetailPage({
   params,
@@ -42,7 +43,16 @@ export default async function PropertyDetailPage({
     { data: visitRows },
   ] = await Promise.all([
     serviceClient.from('bookings').select('*').eq('property_id', params.id).gte('check_out', new Date().toISOString().split('T')[0]).order('check_in', { ascending: true }).limit(20),
-    serviceClient.from('bills').select('*').eq('property_id', params.id).order('created_at', { ascending: false }).limit(10),
+    // Hide rejected bills from the property view by default — they stay
+    // in the DB so the cron's gmail_message_id dedup keeps working, but
+    // they're not noise in the admin queue. Active statuses only.
+    serviceClient
+      .from('bills')
+      .select('*')
+      .eq('property_id', params.id)
+      .neq('status', 'rejected')
+      .order('created_at', { ascending: false })
+      .limit(10),
     serviceClient.from('tasks').select('*, contractors(name)').eq('property_id', params.id).order('created_at', { ascending: false }).limit(10),
     serviceClient.from('documents').select('*').eq('property_id', params.id).order('created_at', { ascending: false }),
     serviceClient.from('visits').select('*').eq('property_id', params.id).order('visited_at', { ascending: false }).limit(5),
@@ -222,20 +232,29 @@ export default async function PropertyDetailPage({
         {bills && bills.length > 0 ? (
           <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
             {bills.map((bill, i) => (
-              <Link key={bill.id} href={`/bills?highlight=${bill.id}`} className="block">
-                <div className={`flex items-center justify-between px-4 py-3 transition-colors hover:bg-muted/40 ${i > 0 ? 'border-t border-border' : ''}`}>
-                  <div>
-                    <p className="text-sm font-medium capitalize">{bill.bill_type.replace('_', ' ')}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {bill.due_date ? `Due ${bill.due_date}` : 'No due date'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={bill.status} size="sm" />
-                    <CurrencyDisplay agorot={bill.amount_agorot} className="text-sm font-semibold" />
-                  </div>
+              <div key={bill.id} className={`flex items-center justify-between px-4 py-3 transition-colors hover:bg-muted/40 ${i > 0 ? 'border-t border-border' : ''}`}>
+                <Link href={`/bills?highlight=${bill.id}`} className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{billTypeLabel(bill.bill_type)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {bill.due_date ? `Due ${bill.due_date}` : 'No due date'}
+                  </p>
+                </Link>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={bill.status} size="sm" />
+                  <CurrencyDisplay agorot={bill.amount_agorot} className="text-sm font-semibold" />
+                  {bill.storage_path && (
+                    <a
+                      href={`/api/download?path=${encodeURIComponent(bill.storage_path as string)}&bucket=documents`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded bg-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground hover:bg-muted/80"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      PDF
+                    </a>
+                  )}
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         ) : (
