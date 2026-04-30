@@ -275,7 +275,6 @@ async function renderPropertyPage(params: { id: string }) {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="rounded bg-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground hover:bg-muted/80"
-                      onClick={(e) => e.stopPropagation()}
                     >
                       PDF
                     </a>
