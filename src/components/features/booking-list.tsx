@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, MessageSquare, DollarSign } from 'lucide-react'
+import { ChevronDown, MessageSquare, DollarSign, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -102,6 +102,25 @@ function BookingAccordionRow({
     if (!error) router.refresh()
   }
 
+  async function handleDelete() {
+    const label = booking.guest_name || `${booking.check_in} → ${booking.check_out}`
+    if (!confirm(`Delete booking "${label}"?\n\nFor iCal-synced bookings (Airbnb, Booking.com), it will reappear on the next sync. Owner stays and manual entries are removed permanently.`)) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/bookings/${booking.id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Delete failed')
+      }
+      toast.success('Booking deleted')
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Delete failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className={hasBorder ? 'border-t border-border' : ''}>
       {/* Collapsed row */}
@@ -196,6 +215,19 @@ function BookingAccordionRow({
               {booking.gross_rental_agorot && ` (rate used for ILS conversion)`}
             </p>
           )}
+
+          {/* Delete (admin) — useful for cleaning up test stays / wrong owner_stay entries */}
+          <div className="flex justify-end pt-1">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={saving}
+              className="flex items-center gap-1 rounded-[var(--radius-badge)] px-2 py-1 text-xs font-medium text-status-danger hover:bg-status-danger/10 disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3" />
+              Delete booking
+            </button>
+          </div>
         </div>
       )}
     </div>
