@@ -172,5 +172,15 @@ export async function GET(
     if (v) new Date(v).toLocaleDateString('en-US', { timeZone: 'Asia/Jerusalem' })
   })
 
+  // ACTUALLY render the page server-side and capture the throw
+  await tryAsync('renderToString PropertyDetailPage', async () => {
+    const { default: PropertyDetailPage } = await import('@/app/(admin)/properties/[id]/page')
+    const ReactDOMServer = await import('react-dom/server')
+    const element = await PropertyDetailPage({ params: { id: params.id } })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const html = ReactDOMServer.renderToString(element as any)
+    return { length: html.length }
+  })
+
   return NextResponse.json(report)
 }
