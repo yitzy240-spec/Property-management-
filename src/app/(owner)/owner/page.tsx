@@ -96,7 +96,7 @@ export default async function OwnerPortalPage() {
       ? dataClient.from('bookings').select('*').in('property_id', propertyIds).gte('check_in', new Date().toISOString().split('T')[0]).order('check_in').limit(5)
       : Promise.resolve({ data: [] }),
     propertyIds.length > 0
-      ? dataClient.from('bills').select('*, properties(name)').in('property_id', propertyIds).eq('status', 'approved').order('created_at', { ascending: false }).limit(10)
+      ? dataClient.from('bills').select('*, properties(name)').in('property_id', propertyIds).eq('status', 'approved').order('created_at', { ascending: false }).limit(50)
       : Promise.resolve({ data: [] }),
     propertyIds.length > 0
       ? dataClient.from('tasks').select('*, properties(name)').in('property_id', propertyIds).order('created_at', { ascending: false }).limit(10)
@@ -233,7 +233,7 @@ export default async function OwnerPortalPage() {
                 <div className="border-b border-border px-4 py-2">
                   <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Recent Bills</p>
                 </div>
-                {bills.slice(0, 5).map((bill, i) => {
+                {bills.map((bill, i) => {
                   const typeLabels: Record<string, string> = {
                     iec: 'Electricity',
                     water: 'Water',
