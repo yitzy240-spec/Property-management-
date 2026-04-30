@@ -1,12 +1,73 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Calendar } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
+
+/**
+ * On mobile (especially Android Chrome and iOS Safari ≥16), tapping the
+ * native calendar-icon affordance inside <input type="date"> doesn't reliably
+ * open the date picker — only tapping into the text area does. Calling
+ * `input.showPicker()` programmatically opens it cross-browser. We wrap the
+ * input in a clickable container that delegates to showPicker() so taps
+ * anywhere inside (including the icon) open the picker.
+ */
+function DateField({
+  id,
+  name,
+  label,
+  required,
+  min,
+}: {
+  id: string
+  name: string
+  label: string
+  required?: boolean
+  min?: string
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  function openPicker() {
+    const el = ref.current
+    if (!el) return
+    try {
+      el.showPicker?.()
+      el.focus()
+    } catch {
+      el.focus()
+    }
+  }
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-xs font-medium">{label}</Label>
+      <div
+        className="relative flex h-12 cursor-pointer items-center rounded-[var(--radius-button)] border border-input bg-background"
+        onClick={openPicker}
+      >
+        <input
+          ref={ref}
+          id={id}
+          name={name}
+          type="date"
+          required={required}
+          min={min}
+          onClick={(e) => {
+            e.stopPropagation()
+            openPicker()
+          }}
+          className="h-full w-full bg-transparent px-3 text-base outline-none [color-scheme:light] dark:[color-scheme:dark]"
+          // 16px font-size prevents iOS Safari from zooming when the picker
+          // opens (which can also cause the picker to never visually appear).
+          style={{ fontSize: '16px' }}
+        />
+        <Calendar className="pointer-events-none absolute right-3 h-4 w-4 text-muted-foreground" />
+      </div>
+    </div>
+  )
+}
 import {
   Drawer,
   DrawerClose,
@@ -97,28 +158,20 @@ export function RequestStay({ properties }: RequestStayProps) {
             )}
 
             <div className="grid gap-4 grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="check_in" className="text-xs font-medium">Check-in</Label>
-                <input
-                  id="check_in"
-                  name="check_in"
-                  type="date"
-                  required
-                  min={new Date().toISOString().split('T')[0]}
-                  className="flex h-12 w-full rounded-[var(--radius-button)] border border-input bg-background px-3 py-2 text-sm"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="check_out" className="text-xs font-medium">Check-out</Label>
-                <input
-                  id="check_out"
-                  name="check_out"
-                  type="date"
-                  required
-                  min={new Date().toISOString().split('T')[0]}
-                  className="flex h-12 w-full rounded-[var(--radius-button)] border border-input bg-background px-3 py-2 text-sm"
-                />
-              </div>
+              <DateField
+                id="check_in"
+                name="check_in"
+                label="Check-in"
+                required
+                min={new Date().toISOString().split('T')[0]}
+              />
+              <DateField
+                id="check_out"
+                name="check_out"
+                label="Check-out"
+                required
+                min={new Date().toISOString().split('T')[0]}
+              />
             </div>
 
             <div className="space-y-1.5">
