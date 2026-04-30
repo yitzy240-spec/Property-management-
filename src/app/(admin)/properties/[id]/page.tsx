@@ -24,6 +24,33 @@ export default async function PropertyDetailPage({
 }: {
   params: { id: string }
 }) {
+  // Diagnostic: catch every step inside the page so we can show a real
+  // error in production. Next.js sanitizes error.message even in scoped
+  // error.tsx so the only way to surface the actual message is to handle
+  // the error here and render JSX ourselves.
+  try {
+    return await renderPropertyPage(params)
+  } catch (err) {
+    const e = err as Error
+    return (
+      <div className="space-y-3 p-4">
+        <a href="/properties" className="text-xs text-muted-foreground">← Back to properties</a>
+        <div className="rounded-[10px] border border-status-danger/30 bg-status-danger/5 p-4">
+          <h1 className="text-sm font-semibold text-status-danger">Property page threw (diagnostic)</h1>
+          <p className="mt-2 break-words font-mono text-xs">type: {e?.name ?? '(no name)'}</p>
+          <p className="mt-1 break-words font-mono text-xs">message: {e?.message ?? '(no message)'}</p>
+          {e?.stack && (
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-background p-2 text-[10px] text-muted-foreground">
+              {e.stack.split('\n').slice(0, 12).join('\n')}
+            </pre>
+          )}
+        </div>
+      </div>
+    )
+  }
+}
+
+async function renderPropertyPage(params: { id: string }) {
   const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
 
