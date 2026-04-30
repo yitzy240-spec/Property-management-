@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Upload, FileText, Download } from 'lucide-react'
+import { Upload, FileText, Download, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 
@@ -54,20 +54,44 @@ export function OwnerDocumentVault({ documents, propertyIds }: { documents: Docu
         <>
           {documents.map((doc, i) => (
             <div key={doc.id} className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}>
-              <div className="flex items-center gap-2.5">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">{doc.title}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{doc.category.replace('_', ' ')}</p>
+              <div className="flex min-w-0 items-center gap-2.5">
+                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{doc.title}</p>
+                  <p className="truncate text-xs text-muted-foreground capitalize">{doc.category.replace('_', ' ')}</p>
                 </div>
               </div>
-              <a
-                href={`/api/download?path=${encodeURIComponent(doc.storage_path)}`}
-                className="rounded-[var(--radius-badge)] bg-primary/10 p-1.5 text-primary hover:bg-primary/20"
-                download
-              >
-                <Download className="h-4 w-4" />
-              </a>
+              <div className="flex shrink-0 items-center gap-1">
+                <a
+                  href={`/api/download?path=${encodeURIComponent(doc.storage_path)}`}
+                  className="rounded-[var(--radius-badge)] bg-primary/10 p-1.5 text-primary hover:bg-primary/20"
+                  download
+                  aria-label={`Download ${doc.title}`}
+                >
+                  <Download className="h-4 w-4" />
+                </a>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!confirm(`Delete "${doc.title}"?\n\nThis removes the file. Cannot be undone.`)) return
+                    try {
+                      const res = await fetch(`/api/documents/${doc.id}`, { method: 'DELETE' })
+                      if (!res.ok) {
+                        const body = await res.json().catch(() => ({}))
+                        throw new Error(body.error || 'Delete failed')
+                      }
+                      toast.success('Deleted')
+                      window.location.reload()
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Delete failed')
+                    }
+                  }}
+                  className="rounded-[var(--radius-badge)] p-1.5 text-muted-foreground hover:bg-status-danger/10 hover:text-status-danger"
+                  aria-label={`Delete ${doc.title}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ))}
           <div className="border-t border-border px-4 py-3">

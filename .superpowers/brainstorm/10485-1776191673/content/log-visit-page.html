@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log Visit Page</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --background: #FAFAFA;
+    --foreground: #111827;
+    --card: #FFFFFF;
+    --border: #E2E8F0;
+    --muted-fg: #6B7280;
+    --accent: #E8734A;
+    --primary: #1E3A5F;
+    --status-safe: #15803D;
+    --radius-card: 10px;
+    --radius-badge: 4px;
+    --radius-button: 6px;
+    --shadow-sm: 0 1px 3px 0 rgba(15,23,42,0.08), 0 1px 2px -1px rgba(15,23,42,0.06);
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  body { background: var(--background); color: var(--foreground); font-family: var(--font-sans); overflow-y: auto; }
+  .page { max-width: 500px; margin: 0 auto; padding: 0 0 40px; }
+
+  /* Header with back arrow */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 16px 16px;
+  }
+  .back-btn {
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px;
+    border: none; background: none; cursor: pointer;
+    font-size: 18px; color: var(--foreground);
+  }
+  .back-btn:hover { background: #F1F5F9; }
+  .header-text h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .header-text p { font-size: 12px; color: var(--muted-fg); margin-top: 1px; }
+
+  /* Section label */
+  .section-label {
+    padding: 0 16px;
+    margin: 20px 0 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted-fg);
+  }
+
+  /* Card */
+  .card {
+    margin: 0 16px;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  /* Date picker row */
+  .date-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+  }
+  .date-row label { font-size: 14px; font-weight: 500; }
+  .date-input {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-button);
+    background: var(--background);
+    color: var(--foreground);
+  }
+
+  /* Checklist */
+  .checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+  .checklist-item + .checklist-item {
+    border-top: 1px solid var(--border);
+  }
+  .checkbox {
+    width: 20px; height: 20px;
+    border-radius: 4px;
+    border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .checkbox.checked {
+    background: var(--status-safe);
+    border-color: var(--status-safe);
+  }
+  .checkbox.checked::after {
+    content: '✓';
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .checklist-label {
+    font-size: 13px;
+    color: var(--foreground);
+  }
+
+  /* Upload area */
+  .upload-area {
+    margin: 0 16px;
+    border-radius: var(--radius-card);
+    border: 2px dashed var(--border);
+    background: var(--card);
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .upload-area:hover { border-color: var(--accent); }
+  .upload-icon { font-size: 24px; color: var(--muted-fg); }
+  .upload-text { font-size: 13px; color: var(--muted-fg); margin-top: 6px; }
+  .upload-hint { font-size: 11px; color: var(--muted-fg); margin-top: 2px; opacity: 0.7; }
+
+  /* Uploaded thumbnails */
+  .thumbs {
+    margin: 8px 16px 0;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .thumb {
+    width: 64px; height: 64px;
+    border-radius: 8px;
+    background: #E2E8F0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--muted-fg);
+    position: relative;
+    overflow: hidden;
+  }
+  .thumb .private-badge {
+    position: absolute;
+    top: 2px; right: 2px;
+    background: var(--primary);
+    color: white;
+    font-size: 8px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+
+  /* Text areas */
+  .textarea-wrap {
+    margin: 0 16px;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .textarea-header {
+    padding: 12px 16px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+  .textarea-hint {
+    padding: 2px 16px 0;
+    font-size: 11px;
+    color: var(--muted-fg);
+  }
+  textarea {
+    width: 100%;
+    border: none;
+    padding: 8px 16px 12px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    color: var(--foreground);
+    resize: none;
+    outline: none;
+    background: transparent;
+  }
+
+  /* Private note styling */
+  .private-card {
+    border-color: var(--primary);
+    border-style: dashed;
+  }
+  .private-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--primary);
+    background: #EFF6FF;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  /* Submit button */
+  .submit-wrap {
+    margin: 24px 16px;
+  }
+  .btn-submit {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: var(--radius-button);
+    background: var(--accent);
+    color: white;
+    font-family: var(--font-sans);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-submit:hover { opacity: 0.9; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <button class="back-btn">←</button>
+    <div class="header-text">
+      <h1>Log Visit</h1>
+      <p>Keren Hayesod 4/12</p>
+    </div>
+  </div>
+
+  <!-- Date -->
+  <div class="section-label">Visit Date</div>
+  <div class="card">
+    <div class="date-row">
+      <label>Date</label>
+      <input type="text" class="date-input" value="Apr 14, 2026" readonly>
+    </div>
+  </div>
+
+  <!-- Checklist -->
+  <div class="section-label">Checklist</div>
+  <div class="card">
+    <div class="checklist-item">
+      <div class="checkbox checked"></div>
+      <span class="checklist-label">Electricity working</span>
+    </div>
+    <div class="checklist-item">
+      <div class="checkbox checked"></div>
+      <span class="checklist-label">Run sinks</span>
+    </div>
+    <div class="checklist-item">
+      <div class="checkbox checked"></div>
+      <span class="checklist-label">Run showers</span>
+    </div>
+    <div class="checklist-item">
+      <div class="checkbox checked"></div>
+      <span class="checklist-label">Flush toilets</span>
+    </div>
+    <div class="checklist-item">
+      <div class="checkbox"></div>
+      <span class="checklist-label">Refrigerator and Freezer working</span>
+    </div>
+    <div class="checklist-item">
+      <div class="checkbox checked"></div>
+      <span class="checklist-label">Soap / toilet paper / etc in stock</span>
+    </div>
+    <div class="checklist-item">
+      <div class="checkbox checked"></div>
+      <span class="checklist-label">Make sure boiler is off</span>
+    </div>
+    <div class="checklist-item">
+      <div class="checkbox"></div>
+      <span class="checklist-label">Check washer door is open</span>
+    </div>
+    <div class="checklist-item">
+      <div class="checkbox checked"></div>
+      <span class="checklist-label">Check dryer lint</span>
+    </div>
+    <div class="checklist-item">
+      <div class="checkbox checked"></div>
+      <span class="checklist-label">Bedrooms no mold or leaking on walls</span>
+    </div>
+    <div class="checklist-item">
+      <div class="checkbox checked"></div>
+      <span class="checklist-label">Check mailbox</span>
+    </div>
+  </div>
+
+  <!-- Photos / Videos -->
+  <div class="section-label">Photos &amp; Videos</div>
+  <div class="upload-area">
+    <div class="upload-icon">📷</div>
+    <div class="upload-text">Tap to add photos or videos</div>
+    <div class="upload-hint">Each can be marked public or private</div>
+  </div>
+  <div class="thumbs">
+    <div class="thumb">IMG_01</div>
+    <div class="thumb">IMG_02 <div class="private-badge">PRIVATE</div></div>
+    <div class="thumb">VID_01</div>
+  </div>
+
+  <!-- Note (visible to owner) -->
+  <div class="section-label">Note for Owner</div>
+  <div class="textarea-wrap">
+    <div class="textarea-header">Visit Note <span style="font-weight:400;font-size:11px;color:var(--muted-fg);">· visible to owner</span></div>
+    <textarea rows="3" placeholder="Everything looks great. Replaced light bulb in kitchen..."></textarea>
+  </div>
+
+  <!-- Private note (admin only) -->
+  <div class="section-label">Private Note</div>
+  <div class="textarea-wrap private-card">
+    <div class="textarea-header">Admin Note <span class="private-tag">ADMIN ONLY</span></div>
+    <div class="textarea-hint">Only you can see this — reminders for next visit</div>
+    <textarea rows="2" placeholder="Next time: bring screwdriver to tighten chairs..."></textarea>
+  </div>
+
+  <!-- Submit -->
+  <div class="submit-wrap">
+    <button class="btn-submit">Save Visit</button>
+  </div>
+
+</div>
+</body>
+</html>

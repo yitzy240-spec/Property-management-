@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visits Page Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0F172A; color: #E2E8F0; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; overflow-y: auto; }
+
+  .page { max-width: 500px; margin: 0 auto; padding-bottom: 40px; }
+
+  .top-bar { padding: 16px 20px; border-bottom: 1px solid #1E293B; }
+  .top-bar h1 { font-size: 18px; font-weight: 700; color: #F8FAFC; }
+  .top-bar p { font-size: 12px; color: #94A3B8; margin-top: 2px; }
+
+  .section-header { padding: 20px 20px 8px; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+  .section-header.urgent { color: #F97316; }
+  .section-header.later { color: #22C55E; }
+  .section-header.occupied { color: #64748B; }
+
+  .row { margin: 0 12px 8px; padding: 14px 16px; background: #1E293B; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .row.overdue { border-left: 3px solid #EF4444; }
+  .row.due-soon { border-left: 3px solid #F59E0B; }
+  .row.occ { opacity: 0.7; }
+
+  .row-info h3 { font-size: 14px; font-weight: 600; color: #F8FAFC; }
+  .row-info p { font-size: 12px; color: #94A3B8; margin-top: 2px; }
+  .row-info .overdue-text { color: #EF4444; font-weight: 600; }
+  .row-info .resume-text { color: #64748B; }
+
+  .btn-log { background: #E8734A; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .btn-log-outline { background: transparent; color: #94A3B8; border: 1px solid #334155; padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .badge-occ { background: #334155; color: #94A3B8; padding: 6px 12px; border-radius: 8px; font-size: 11px; white-space: nowrap; }
+
+  .label { display: block; margin: 30px 20px 10px; font-size: 11px; color: #64748B; text-transform: uppercase; letter-spacing: 1px; }
+  .note { margin: 0 20px; padding: 12px 16px; background: #1E293B; border-radius: 8px; font-size: 13px; color: #94A3B8; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top-bar">
+    <h1>Visits</h1>
+    <p>12 properties &middot; 3 need attention</p>
+  </div>
+
+  <!-- THIS WEEK -->
+  <div class="section-header urgent">This Week</div>
+
+  <div class="row overdue">
+    <div class="row-info">
+      <h3>Keren Hayesod 4/12</h3>
+      <p>Last visit: Mar 28 &middot; <span class="overdue-text">3 days overdue</span></p>
+    </div>
+    <button class="btn-log">Log Visit</button>
+  </div>
+
+  <div class="row due-soon">
+    <div class="row-info">
+      <h3>Emek Refaim 22/3</h3>
+      <p>Last visit: Apr 3 &middot; Due in 3 days</p>
+    </div>
+    <button class="btn-log">Log Visit</button>
+  </div>
+
+  <div class="row due-soon">
+    <div class="row-info">
+      <h3>King David 15/2</h3>
+      <p>Last visit: Apr 5 &middot; Due in 5 days</p>
+    </div>
+    <button class="btn-log">Log Visit</button>
+  </div>
+
+  <!-- LATER -->
+  <div class="section-header later">Later</div>
+
+  <div class="row">
+    <div class="row-info">
+      <h3>Ben Yehuda 8/5</h3>
+      <p>Last visit: Apr 10 &middot; Due in 10 days</p>
+    </div>
+    <button class="btn-log-outline">Log Visit</button>
+  </div>
+
+  <div class="row">
+    <div class="row-info">
+      <h3>Azza 31/7</h3>
+      <p>Last visit: Apr 12 &middot; Due in 12 days</p>
+    </div>
+    <button class="btn-log-outline">Log Visit</button>
+  </div>
+
+  <div class="row">
+    <div class="row-info">
+      <h3>Rehavia Gardens 5/1</h3>
+      <p>Last visit: Apr 13 &middot; Due in 13 days</p>
+    </div>
+    <button class="btn-log-outline">Log Visit</button>
+  </div>
+
+  <!-- OCCUPIED -->
+  <div class="section-header occupied">Occupied</div>
+
+  <div class="row occ">
+    <div class="row-info">
+      <h3>Derech Beit Lechem 44/1</h3>
+      <p>Guest checkout: Apr 22 &middot; <span class="resume-text">Visits resume May 6</span></p>
+    </div>
+    <span class="badge-occ">Occupied</span>
+  </div>
+
+  <div class="row occ">
+    <div class="row-info">
+      <h3>Jaffa Gate 2/8</h3>
+      <p>Owner stay until: May 15 &middot; <span class="resume-text">Visits resume May 29</span></p>
+    </div>
+    <span class="badge-occ">Occupied</span>
+  </div>
+
+  <!-- Design notes -->
+  <div class="label">Design Decisions</div>
+  <div class="note">
+    <strong>A.</strong> Red left border + text for overdue properties<br><br>
+    <strong>B.</strong> "Visits resume [date]" shown for occupied (checkout + 14 days)<br><br>
+    <strong>C.</strong> Inline "Log Visit" button on each row — one tap to log
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visits Page — Ledger Theme</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --background: #FAFAFA;
+    --foreground: #111827;
+    --card: #FFFFFF;
+    --border: #E2E8F0;
+    --muted-fg: #6B7280;
+    --accent: #E8734A;
+    --primary: #1E3A5F;
+    --status-safe: #15803D;
+    --status-warning: #EAB308;
+    --status-danger: #DC2626;
+    --status-info: #1E3A5F;
+    --radius-card: 10px;
+    --radius-badge: 4px;
+    --radius-button: 6px;
+    --shadow-sm: 0 1px 3px 0 rgba(15,23,42,0.08), 0 1px 2px -1px rgba(15,23,42,0.06);
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    overflow-y: auto;
+  }
+
+  .page { max-width: 500px; margin: 0 auto; padding: 0 0 40px; }
+
+  /* Page header — matches tasks page pattern */
+  .page-header {
+    padding: 24px 16px 16px;
+  }
+  .page-header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--foreground);
+  }
+  .page-header .subtitle {
+    font-size: 12px;
+    color: var(--muted-fg);
+    margin-top: 2px;
+  }
+
+  /* Summary bar — matches tasks page 3-col grid */
+  .summary {
+    margin: 0 16px 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    background: var(--border);
+  }
+  .summary-cell {
+    background: var(--card);
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .summary-cell .num {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .summary-cell .num.urgent { color: var(--status-danger); }
+  .summary-cell .num.soon { color: #EAB308; }
+  .summary-cell .num.ok { color: var(--status-safe); }
+  .summary-cell .label {
+    font-size: 11px;
+    color: var(--muted-fg);
+    margin-top: 2px;
+  }
+
+  /* Section headers — matches "text-xs font-semibold uppercase tracking-widest text-muted-foreground" */
+  .section-header {
+    padding: 0 16px;
+    margin-bottom: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted-fg);
+  }
+
+  /* Card container — matches "rounded-[10px] border border-border bg-card shadow-sm" */
+  .card-group {
+    margin: 0 16px 24px;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  /* Row — matches task row pattern "px-4 py-3.5 border-t" */
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+  }
+  .row + .row {
+    border-top: 1px solid var(--border);
+  }
+  .row.overdue {
+    border-left: 3px solid var(--status-danger);
+  }
+  .row.due-soon {
+    border-left: 3px solid var(--status-warning);
+  }
+  .row.occupied {
+    opacity: 0.6;
+  }
+
+  .row-info h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+  .row-info p {
+    font-size: 12px;
+    color: var(--muted-fg);
+    margin-top: 2px;
+  }
+  .overdue-text { color: var(--status-danger); font-weight: 600; }
+
+  /* Buttons — matches app button styles */
+  .btn-accent {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 7px 14px;
+    border-radius: var(--radius-button);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--muted-fg);
+    border: 1px solid var(--border);
+    padding: 7px 14px;
+    border-radius: var(--radius-button);
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .badge-occupied {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted-fg);
+    background: var(--background);
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+    border-radius: var(--radius-badge);
+    white-space: nowrap;
+  }
+
+  /* Admin note indicator */
+  .admin-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--accent);
+  }
+  .admin-note::before {
+    content: '📌';
+    font-size: 10px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Page header -->
+  <div class="page-header">
+    <h1>Visits</h1>
+    <p class="subtitle">12 properties · 3 need attention</p>
+  </div>
+
+  <!-- Summary bar -->
+  <div class="summary">
+    <div class="summary-cell">
+      <div class="num urgent">1</div>
+      <div class="label">Overdue</div>
+    </div>
+    <div class="summary-cell">
+      <div class="num soon">2</div>
+      <div class="label">This Week</div>
+    </div>
+    <div class="summary-cell">
+      <div class="num ok">7</div>
+      <div class="label">On Track</div>
+    </div>
+  </div>
+
+  <!-- THIS WEEK -->
+  <div class="section-header">This Week (3)</div>
+  <div class="card-group">
+    <div class="row overdue">
+      <div class="row-info">
+        <h3>Keren Hayesod 4/12</h3>
+        <p>Last visit: Mar 28 · <span class="overdue-text">3 days overdue</span></p>
+        <div class="admin-note">Bring screwdriver for chairs</div>
+      </div>
+      <button class="btn-accent">Log Visit</button>
+    </div>
+    <div class="row due-soon">
+      <div class="row-info">
+        <h3>Emek Refaim 22/3</h3>
+        <p>Last visit: Apr 3 · Due in 3 days</p>
+      </div>
+      <button class="btn-accent">Log Visit</button>
+    </div>
+    <div class="row due-soon">
+      <div class="row-info">
+        <h3>King David 15/2</h3>
+        <p>Last visit: Apr 5 · Due in 5 days</p>
+      </div>
+      <button class="btn-accent">Log Visit</button>
+    </div>
+  </div>
+
+  <!-- LATER -->
+  <div class="section-header">Later (4)</div>
+  <div class="card-group">
+    <div class="row">
+      <div class="row-info">
+        <h3>Ben Yehuda 8/5</h3>
+        <p>Last visit: Apr 10 · Due in 10 days</p>
+      </div>
+      <button class="btn-outline">Log Visit</button>
+    </div>
+    <div class="row">
+      <div class="row-info">
+        <h3>Azza 31/7</h3>
+        <p>Last visit: Apr 12 · Due in 12 days</p>
+      </div>
+      <button class="btn-outline">Log Visit</button>
+    </div>
+    <div class="row">
+      <div class="row-info">
+        <h3>Rehavia Gardens 5/1</h3>
+        <p>Last visit: Apr 13 · Due in 13 days</p>
+        <div class="admin-note">Check ceiling patch from last time</div>
+      </div>
+      <button class="btn-outline">Log Visit</button>
+    </div>
+    <div class="row">
+      <div class="row-info">
+        <h3>Baka Courtyard 9/2</h3>
+        <p>Last visit: Apr 14 · Due in 14 days</p>
+      </div>
+      <button class="btn-outline">Log Visit</button>
+    </div>
+  </div>
+
+  <!-- OCCUPIED -->
+  <div class="section-header">Occupied (2)</div>
+  <div class="card-group">
+    <div class="row occupied">
+      <div class="row-info">
+        <h3>Derech Beit Lechem 44/1</h3>
+        <p>Guest checkout: Apr 22 · Visits resume May 6</p>
+      </div>
+      <span class="badge-occupied">Occupied</span>
+    </div>
+    <div class="row occupied">
+      <div class="row-info">
+        <h3>Jaffa Gate 2/8</h3>
+        <p>Owner stay until: May 15 · Visits resume May 29</p>
+      </div>
+      <span class="badge-occupied">Occupied</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
