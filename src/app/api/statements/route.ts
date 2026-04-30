@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { createServiceClient, createServerSupabaseClient } from '@/lib/supabase/server'
+import { IMPERSONATE_OWNER_COOKIE } from '@/lib/impersonation'
 
 /**
  * GET /api/statements?month=2026-04-01&owner_id=xxx
- * List statements — admin sees all, owners see their own
+ *
+ * Admin sees everything. Owners see only sent/approved statements (no
+ * drafts or pending_approval). When admin is impersonating an owner, we
+ * apply the owner-level filter — otherwise the View-as-Owner view leaks
+ * drafts that real owners would never see.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -18,17 +24,27 @@ export async function GET(request: Request) {
   }
 
   const isAdmin = user.app_metadata?.role === 'admin' || user.email === process.env.ADMIN_EMAIL
+  const isImpersonating = !!cookies().get(IMPERSONATE_OWNER_COOKIE)?.value
 
-  // Admin uses service client (bypasses RLS), owners use regular client
-  const client = isAdmin ? createServiceClient() : supabase
+  // Treat impersonating admins as owners for visibility — they should see
+  // exactly what the impersonated owner sees, including the draft hide.
+  const treatAsOwner = !isAdmin || isImpersonating
+
+  // Admin (not impersonating) uses service client to bypass RLS. Owners and
+  // impersonating admins go through the regular client / service client with
+  // explicit owner_id scoping (RLS for the real owner, owner_id filter for
+  // the impersonating admin).
+  const client = !treatAsOwner ? createServiceClient() :
+                 isImpersonating ? createServiceClient() :
+                 supabase
 
   let query = client
     .from('monthly_statements')
     .select('*, owners(full_name, email)')
     .order('billing_month', { ascending: false })
 
-  // Owners should not see draft or pending_approval statements
-  if (!isAdmin) {
+  // Hide draft and pending_approval from anyone seeing the owner-side view.
+  if (treatAsOwner) {
     query = query.not('status', 'in', '("draft","pending_approval")')
   }
 
