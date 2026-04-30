@@ -172,14 +172,16 @@ export async function GET(
     if (v) new Date(v).toLocaleDateString('en-US', { timeZone: 'Asia/Jerusalem' })
   })
 
-  // ACTUALLY render the page server-side and capture the throw
-  await tryAsync('renderToString PropertyDetailPage', async () => {
-    const { default: PropertyDetailPage } = await import('@/app/(admin)/properties/[id]/page')
-    const ReactDOMServer = await import('react-dom/server')
-    const element = await PropertyDetailPage({ params: { id: params.id } })
+  // Call the page function and let the await throw if anything inside does.
+  // This catches data-layer errors and any sync throw in the JSX evaluation.
+  // Doesn't catch errors that happen during React's actual element rendering
+  // (those need ReactDOMServer, which doesn't behave well in API routes).
+  await tryAsync('call PropertyDetailPage()', async () => {
+    const mod = await import('@/app/(admin)/properties/[id]/page')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const html = ReactDOMServer.renderToString(element as any)
-    return { length: html.length }
+    const PropertyDetailPage = mod.default as (props: { params: { id: string } }) => Promise<unknown>
+    const _result = await PropertyDetailPage({ params: { id: params.id } })
+    return { resultType: typeof _result }
   })
 
   return NextResponse.json(report)
