@@ -33,6 +33,10 @@ export async function POST(request: Request) {
   const category = (formData.get('category') as string) || 'other'
   const propertyId = formData.get('property_id') as string || null
   const expiryDate = formData.get('expiry_date') as string || null
+  // Admin's DocumentUpload component creates the row separately via
+  // /api/documents/add (so it can attach AI-classification data). Owner
+  // uploads have no second step, so the row must be inserted here.
+  const skipInsert = formData.get('skip_insert') === 'true'
 
   if (!file || !title) {
     return NextResponse.json({ error: 'file and title required' }, { status: 400 })
@@ -80,16 +84,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 })
   }
 
-  // Create document record in DB
-  if (propertyId) {
-    await serviceClient.from('documents').insert({
+  // Create document record in DB. The `uploaded_by` column is NOT NULL —
+  // setting it ('admin' or 'owner') was the bug that caused vault uploads to
+  // silently disappear (storage write succeeded, DB insert failed without
+  // surfacing the error). Also resolve owner_id when uploading as an owner
+  // so personal documents (no property_id) are still findable.
+  let ownerId: string | null = null
+  if (role !== 'admin') {
+    const { data: ownerRow } = await serviceClient
+      .from('owners')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .single()
+    ownerId = ownerRow?.id ?? null
+  }
+
+  if (!skipInsert) {
+    const { error: insertError } = await serviceClient.from('documents').insert({
       property_id: propertyId,
+      owner_id: ownerId,
       title,
       category,
       storage_path: filePath,
+      file_size: file.size,
       original_filename: file.name,
+      uploaded_by: role === 'admin' ? 'admin' : 'owner',
       expiry_date: expiryDate || null,
     })
+
+    if (insertError) {
+      // Storage write already succeeded — surface the DB error so it doesn't
+      // silently produce an orphan storage object the user can't find.
+      return NextResponse.json(
+        { error: `Document record failed: ${insertError.message}` },
+        { status: 500 },
+      )
+    }
   }
 
   return NextResponse.json({

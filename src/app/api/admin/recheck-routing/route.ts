@@ -11,10 +11,29 @@ export const maxDuration = 60
  * collisions across properties.
  */
 const HEBREW_ALIASES: Record<string, string[]> = {
-  // Agripas 6, Apt 7
-  '22222222-aaaa-0000-0000-000000000002': ['אגריפס 6', 'אגריפס 7', 'אג"פ 6', 'אג"פ 7'],
-  // Agripas 8, Apt 40
-  '22222222-aaaa-0000-0000-000000000003': ['אגריפס 8'],
+  // Agripas 6, Apt 7 — utility companies sometimes mislabel this as
+  // "Agripas 8 apt 7" (per Ariel: "the IEC is annoying. Water company
+  // as well"). Discriminator vs Agripas 8 is the APT number (7 vs 40).
+  '22222222-aaaa-0000-0000-000000000002': [
+    'אגריפס 6',
+    'אגריפס 6/7',
+    'אגריפס 7/6',
+    'אגריפס 8 ד 7',
+    'אגריפס 8 דירה 7',
+    'אגריפס 8/7',
+    'אג"פ 6',
+    'אג"פ 6/7',
+  ],
+  // Agripas 8, Apt 40 — MUST include apt-40 in the alias so the bare
+  // "אגריפס 8" doesn't grab the apt-7 mislabels (those are Agripas 6).
+  '22222222-aaaa-0000-0000-000000000003': [
+    'אגריפס 8 ד 40',
+    'אגריפס 8 דירה 40',
+    'אגריפס 8/40',
+    'אגריפס 8ב ד 40',
+    'אגריפס 8 ב 40',
+    'אגריפס 8ב',
+  ],
   // Jerusalem Skyline (Jaffa 105, JTower)
   'dace8043-80ad-4e9d-a530-7e3c3ba0efec': ['יפו 105', 'ג\'אפא 105', 'ג\'יי טאואר', 'jtower'],
   // Keren Hayesod 5, Apt 26

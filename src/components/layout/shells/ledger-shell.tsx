@@ -123,9 +123,10 @@ export function LedgerShell({ children }: { children: React.ReactNode }) {
                   )
                 })}
                 <div className="mt-4 border-t pt-2">
-                  <div onClick={() => setMenuOpen(false)}>
-                    <ViewAsOwnerPicker />
-                  </div>
+                  {/* ViewAsOwnerPicker MUST NOT be wrapped in an onClick that closes the
+                      sidebar Sheet — doing so unmounts the picker before its inner Drawer
+                      can open, so clicking the trigger appears to do nothing. */}
+                  <ViewAsOwnerPicker onSelected={() => setMenuOpen(false)} />
                   <form action={signOut}>
                     <button
                       type="submit"

@@ -1,8 +1,9 @@
 export const dynamic = 'force-dynamic'
 
-import { FileText } from 'lucide-react'
+import { FileText, Download } from 'lucide-react'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { DocumentUpload } from '@/components/features/document-upload'
+import { VaultDeleteButton } from '@/components/features/vault-delete-button'
 
 const categoryLabels: Record<string, string> = {
   tabu: 'Tabu',
@@ -54,20 +55,34 @@ export default async function VaultPage() {
               {docs?.map((doc, i) => (
                 <div
                   key={doc.id}
-                  className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}
+                  className={`flex items-center justify-between gap-3 px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <FileText className="h-4 w-4 shrink-0 text-muted-foreground/50" />
-                    <div>
-                      <p className="text-sm font-medium">{doc.title}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{doc.title}</p>
+                      <p className="truncate text-xs text-muted-foreground">
                         {(doc.properties as { name: string } | null)?.name ||
                          (doc.owners as { full_name: string } | null)?.full_name || 'General'}
                         {doc.expiry_date && ` · Expires ${doc.expiry_date}`}
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs text-muted-foreground">{doc.uploaded_by}</span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="text-xs text-muted-foreground">{doc.uploaded_by}</span>
+                    {doc.storage_path && (
+                      <a
+                        href={`/api/download?path=${encodeURIComponent(doc.storage_path as string)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Download ${doc.title}`}
+                        className="rounded-[var(--radius-badge)] p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <Download className="h-4 w-4" />
+                      </a>
+                    )}
+                    <VaultDeleteButton documentId={doc.id} title={doc.title} />
+                  </div>
                 </div>
               ))}
             </div>

@@ -50,11 +50,15 @@ export function DocumentUpload() {
       return
     }
 
-    // Upload file via API (uses service client for storage)
+    // Upload file via API (uses service client for storage). We pass
+    // skip_insert=true because we'll insert the documents row separately
+    // via /api/documents/add below — that path lets us include AI
+    // classification metadata captured between upload and insert.
     const uploadForm = new FormData()
     uploadForm.append('file', file)
     uploadForm.append('title', titleVal)
     uploadForm.append('category', category)
+    uploadForm.append('skip_insert', 'true')
     if (selectedPropertyId) uploadForm.append('property_id', selectedPropertyId)
 
     const uploadRes = await fetch('/api/documents/upload', { method: 'POST', body: uploadForm })
