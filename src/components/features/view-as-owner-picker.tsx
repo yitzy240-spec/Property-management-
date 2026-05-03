@@ -115,14 +115,16 @@ export function ViewAsOwnerPicker({ onSelected }: { onSelected?: () => void } = 
             logged in as admin.
           </DrawerDescription>
         </DrawerHeader>
-        <div className="flex max-h-[70vh] flex-col gap-3 px-4 pb-4">
+        {/* dvh (not vh) so the drawer shrinks with the mobile keyboard instead
+            of being clipped behind it. autoFocus removed: opening the keyboard
+            immediately hid the owner list before the user could see it. */}
+        <div className="flex max-h-[70dvh] flex-col gap-3 px-4 pb-4">
           <input
             type="search"
             placeholder="Search owners..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="h-10 w-full rounded-[var(--radius-button)] border border-input bg-background px-3 text-sm"
-            autoFocus
           />
           <div className="flex-1 overflow-y-auto">
             {loading ? (

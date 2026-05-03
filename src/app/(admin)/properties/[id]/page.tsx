@@ -12,6 +12,7 @@ import { MagicLinkGenerator } from '@/components/features/magic-link-generator'
 import { BookingAddButton } from '@/components/features/booking-add'
 import { TaskCreateDialog } from '@/components/features/task-create-dialog'
 import { BillAddButton } from '@/components/features/bill-add'
+import { BillDeleteButton } from '@/components/features/bill-delete-button'
 import { LaundryPickupButton } from '@/components/features/laundry-pickup'
 import { WorkLogButton, WorkLogList } from '@/components/features/work-log'
 import { UtilityAccountsSection } from '@/components/features/utility-accounts'
@@ -279,6 +280,10 @@ async function renderPropertyPage(params: { id: string }) {
                       PDF
                     </a>
                   )}
+                  <BillDeleteButton
+                    billId={bill.id}
+                    label={`${billTypeLabel(bill.bill_type)}${bill.due_date ? ` · ${bill.due_date}` : ''}`}
+                  />
                 </div>
               </div>
             ))}
