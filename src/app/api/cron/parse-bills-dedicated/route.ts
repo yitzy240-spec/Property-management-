@@ -4,6 +4,8 @@ import { getGmailAccessToken } from '@/lib/gmail'
 import { geminiGenerate } from '@/lib/gemini'
 import { verifyBillRouting, resolveBillRoutingWithoutLabel, withHebrewAliases } from '@/lib/bill-routing'
 
+export const maxDuration = 60
+
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
 const PAGE_SIZE = 100
 const LOOKBACK_DAYS = 60
@@ -11,12 +13,19 @@ const LOOKBACK_DAYS = 60
 /**
  * GET /api/cron/parse-bills-dedicated
  *
- * Batch processor for dedicated bills-only Gmail inbox.
- * Paginates emails (last 60 days), skips already-processed ones,
- * AI-extracts bill data, then routes via verifyBillRouting.
+ * Active scraper. Paginates every email in the bills inbox over the
+ * last 60 days, skips already-processed message IDs, extracts via AI,
+ * then routes via verifyBillRouting / resolveBillRoutingWithoutLabel
+ * (with Hebrew alias support). No Gmail labels required, no
+ * "is this a bill?" classifier gate — content-routing handles
+ * everything.
  *
- * Activate by changing the cron job to point here instead of /api/cron/parse-bills
- * once the dedicated Gmail is set up.
+ * Why this and not /api/cron/parse-bills (label-based):
+ * the label-based cron and the Pub/Sub webhook were silently
+ * dropping Bezeq internet bills (no auto-label rule + classifier
+ * Hebrew flake), so internet ingestion stalled in late April. This
+ * route processes every email regardless and trusts PDF content for
+ * routing.
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')

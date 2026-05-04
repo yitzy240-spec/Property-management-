@@ -6,7 +6,12 @@ import { verifyBillRouting, withHebrewAliases } from '@/lib/bill-routing'
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
 const PAGE_SIZE = 100
-const LOOKBACK_DAYS = 60
+// Daily cron lookback window. Kept tight (7d) so 7 labels × per-message
+// AI extraction fit inside the 60s function budget. The cron runs every
+// day, so anything older is already in the DB. For one-shot backfills
+// (e.g. recovering a missed bill from weeks ago), pass `?days=N` — the
+// cap is 730 days.
+const LOOKBACK_DAYS = 7
 
 /**
  * GET /api/cron/parse-bills
