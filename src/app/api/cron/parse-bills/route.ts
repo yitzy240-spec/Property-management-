@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailAccessToken } from '@/lib/gmail'
 import { parseBillPdf, parseBillHtml } from '@/lib/bill-parser'
-import { verifyBillRouting } from '@/lib/bill-routing'
+import { verifyBillRouting, withHebrewAliases } from '@/lib/bill-routing'
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
 const PAGE_SIZE = 100
@@ -73,12 +73,16 @@ async function runParseBills(lookbackDays: number) {
   const labelToProperty: Record<string, string> = JSON.parse(mappingSetting.value)
 
   // Load utility accounts (with id) and properties for routing verification
-  const [{ data: utilityAccounts }, { data: properties }] = await Promise.all([
+  const [{ data: utilityAccounts }, { data: rawProperties }] = await Promise.all([
     serviceClient
       .from('property_utility_accounts')
       .select('id, property_id, utility_type, account_number'),
     serviceClient.from('properties').select('id, address, name'),
   ])
+
+  // Stamp Hebrew aliases so PDFs in Hebrew can match against properties
+  // whose `address` field is stored as English transliteration.
+  const properties = rawProperties ? withHebrewAliases(rawProperties) : []
 
   // Renew Gmail Pub/Sub watch
   try {

@@ -61,6 +61,12 @@ vi.mock('@/lib/supabase/server', () => ({
   }),
 }))
 
+// `revalidatePath` requires Next's static-generation store, which doesn't
+// exist outside a request — stub it so the action can run in unit tests.
+vi.mock('next/cache', () => ({
+  revalidatePath: vi.fn(),
+}))
+
 describe('updateBillStatus', () => {
   beforeEach(() => {
     mockUpdate.mockReset()

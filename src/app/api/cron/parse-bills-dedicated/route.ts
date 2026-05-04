@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailAccessToken } from '@/lib/gmail'
 import { geminiGenerate } from '@/lib/gemini'
-import { verifyBillRouting, resolveBillRoutingWithoutLabel } from '@/lib/bill-routing'
+import { verifyBillRouting, resolveBillRoutingWithoutLabel, withHebrewAliases } from '@/lib/bill-routing'
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
 const PAGE_SIZE = 100
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 
   // Preload matching data
   const [
-    { data: properties },
+    { data: rawProperties },
     { data: owners },
     { data: senderMappings },
     { data: utilityAccounts },
@@ -56,6 +56,10 @@ export async function GET(request: Request) {
     serviceClient.from('bill_sender_mappings').select('*'),
     serviceClient.from('property_utility_accounts').select('id, property_id, utility_type, account_number'),
   ])
+
+  // Stamp Hebrew address aliases onto every property row so the routing
+  // helpers can match Hebrew-only PDFs against English-stored addresses.
+  const properties = rawProperties ? withHebrewAliases(rawProperties) : []
 
   try {
     const accessToken = await getGmailAccessToken()

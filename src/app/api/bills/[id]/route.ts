@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
 
@@ -51,6 +52,9 @@ export async function DELETE(
   if (deleteError) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 })
   }
+
+  revalidatePath('/dashboard')
+  revalidatePath('/bills')
 
   return NextResponse.json({ success: true, pdfStoragePath: bill.pdf_storage_path })
 }

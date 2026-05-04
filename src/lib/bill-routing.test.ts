@@ -171,3 +171,89 @@ describe('resolveBillRoutingWithoutLabel', () => {
     expect(result.propertyId).toBeNull()
   })
 })
+
+// Hebrew alias coverage. Real-world failure mode: utility / vaad-bayit
+// PDFs are in Hebrew but property.address is stored as English
+// transliteration, so plain fuzzy match always fails. The aliases
+// dictionary is what bridges the scripts.
+const hebrewProperties = [
+  {
+    id: 'prop-mesila',
+    address: 'Mesila, Floor 1, Apartment 4',
+    name: 'Mesila',
+    hebrewAliases: ['מסילה', 'דרך הרכבת', 'הרכבת ', 'בניין המסילה'],
+  },
+  {
+    id: 'prop-agripas-6',
+    address: 'Agripas 6, Apt 7',
+    name: 'Agripas 6',
+    hebrewAliases: ['אגריפס 6', 'אגריפס 6/7'],
+  },
+  {
+    id: 'prop-agripas-8',
+    address: 'Agripas 8, Apt 40',
+    name: 'Agripas 8',
+    hebrewAliases: ['אגריפס 8 ד 40', 'אגריפס 8/40'],
+  },
+]
+
+describe('verifyBillRouting — Hebrew aliases', () => {
+  it('label property has matching Hebrew alias → verified', () => {
+    const result = verifyBillRouting({
+      labelPropertyId: 'prop-mesila',
+      parsedPdf: { address: 'בניין המסילה, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.signal).toBe('address_match')
+    expect(result.propertyId).toBe('prop-mesila')
+  })
+
+  it('different property\'s Hebrew alias matches → mismatch (label is wrong)', () => {
+    const result = verifyBillRouting({
+      labelPropertyId: 'prop-mesila',
+      parsedPdf: { address: 'אגריפס 8 ד 40, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('mismatch')
+    expect(result.propertyId).toBeNull()
+  })
+})
+
+describe('resolveBillRoutingWithoutLabel — Hebrew aliases', () => {
+  it('Hebrew alias resolves vaad bill from same-management-company sender', () => {
+    // Vaad-bayit case: management company sends multiple properties from
+    // one email; no sender mapping; no account number. Address alias is
+    // the only thing that disambiguates.
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 6/7, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.signal).toBe('address_match')
+    expect(result.propertyId).toBe('prop-agripas-6')
+  })
+
+  it('Mesila vaad bill routes correctly via Hebrew alias', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'הרכבת 20, המסילה, המושבה הגרמנית, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.propertyId).toBe('prop-mesila')
+  })
+
+  it('Hebrew alias does not falsely match unrelated address', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'רחוב אחר 10, תל אביב' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('label_only')
+    expect(result.propertyId).toBeNull()
+  })
+})

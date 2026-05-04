@@ -32,6 +32,7 @@ export default async function BillsPage({
   const { data: bills } = await serviceClient
     .from('bills')
     .select('*, properties(name)')
+    .order('due_date', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
 
   const pending = bills?.filter((b) => b.status === 'pending_review') ?? []

@@ -1,50 +1,9 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { HEBREW_ALIASES } from '@/lib/bill-routing'
 
 export const maxDuration = 60
-
-/**
- * Hebrew address aliases per property. Hardcoded because property.address is
- * stored in English transliteration but utility-bill PDFs are in Hebrew.
- * Substring match (case-insensitive) — must be specific enough to avoid
- * collisions across properties.
- */
-const HEBREW_ALIASES: Record<string, string[]> = {
-  // Agripas 6, Apt 7 — utility companies sometimes mislabel this as
-  // "Agripas 8 apt 7" (per Ariel: "the IEC is annoying. Water company
-  // as well"). Discriminator vs Agripas 8 is the APT number (7 vs 40).
-  '22222222-aaaa-0000-0000-000000000002': [
-    'אגריפס 6',
-    'אגריפס 6/7',
-    'אגריפס 7/6',
-    'אגריפס 8 ד 7',
-    'אגריפס 8 דירה 7',
-    'אגריפס 8/7',
-    'אג"פ 6',
-    'אג"פ 6/7',
-  ],
-  // Agripas 8, Apt 40 — MUST include apt-40 in the alias so the bare
-  // "אגריפס 8" doesn't grab the apt-7 mislabels (those are Agripas 6).
-  '22222222-aaaa-0000-0000-000000000003': [
-    'אגריפס 8 ד 40',
-    'אגריפס 8 דירה 40',
-    'אגריפס 8/40',
-    'אגריפס 8ב ד 40',
-    'אגריפס 8 ב 40',
-    'אגריפס 8ב',
-  ],
-  // Jerusalem Skyline (Jaffa 105, JTower)
-  'dace8043-80ad-4e9d-a530-7e3c3ba0efec': ['יפו 105', 'ג\'אפא 105', 'ג\'יי טאואר', 'jtower'],
-  // Keren Hayesod 5, Apt 26
-  'b26a5f8a-cb28-4174-9a87-62938eea066b': ['קרן היסוד 5/26', 'קרן היסוד 5 ד 26', 'קרן היסוד 26'],
-  // Keren Hayesod 5, Apt 3
-  '22222222-aaaa-0000-0000-000000000005': ['קרן היסוד 5/3', 'קרן היסוד 5 ד 3', 'קרן היסוד 3'],
-  // Mesila (HaRakevet 20/3)
-  'cb5a733b-24b6-4e3a-bf1d-972dcec63e3a': ['מסילה', 'דרך הרכבת', 'הרכבת ', 'בניין המסילה'],
-  // Savyon View (Raul Wallenberg 3, Apt 33)
-  '22222222-aaaa-0000-0000-000000000004': ['ראול ולנברג', 'סביון'],
-}
 
 /**
  * POST /api/admin/recheck-routing  (admin OR cron-secret)

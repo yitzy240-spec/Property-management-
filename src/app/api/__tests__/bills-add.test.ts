@@ -13,6 +13,12 @@ vi.mock('@/lib/supabase/server', () => ({
   }),
 }))
 
+// `revalidatePath` needs Next's request-scoped store, which doesn't
+// exist in unit tests — stub it.
+vi.mock('next/cache', () => ({
+  revalidatePath: vi.fn(),
+}))
+
 let mockAuthError = false
 vi.mock('@/lib/auth', () => ({
   requireAdmin: async () => {

@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 
 export async function createProperty(data: Record<string, unknown>) {
@@ -185,6 +186,12 @@ export async function updateBillStatus(
         next_expected_at: nextExpected.toISOString().split('T')[0],
       }, { onConflict: 'property_id,bill_type' })
   }
+
+  // Pages that surface the pending-bills count cache between client navigations,
+  // so updating a bill must invalidate them or the dashboard banner stays stale.
+  revalidatePath('/dashboard')
+  revalidatePath('/bills')
+  if (effectivePropertyId) revalidatePath(`/properties/${effectivePropertyId}`)
 
   return { success: true }
 }
