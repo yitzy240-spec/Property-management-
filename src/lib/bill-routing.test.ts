@@ -195,6 +195,17 @@ const hebrewProperties = [
     name: 'Agripas 8',
     hebrewAliases: ['אגריפס 8 ד 40', 'אגריפס 8/40'],
   },
+  {
+    id: 'prop-keren-26',
+    address: 'Keren Hayesod 5, Apt 26',
+    name: 'Keren Hayesod 5, Apt 26',
+    hebrewAliases: [
+      'קרן היסוד 5/26',
+      'קרן היסוד 5 ד 26',
+      'קרן היסוד 5 דירה 26',
+      'קרן היסוד 26',
+    ],
+  },
 ]
 
 describe('verifyBillRouting — Hebrew aliases', () => {
@@ -255,5 +266,18 @@ describe('resolveBillRoutingWithoutLabel — Hebrew aliases', () => {
     })
     expect(result.confidence).toBe('label_only')
     expect(result.propertyId).toBeNull()
+  })
+
+  it('Bezeq full-word "דירה 26" form routes to Keren Hayesod Apt 26', () => {
+    // Real-world string from Bezeq invoice 244610217 (Ariel Marcus,
+    // Apr 2026). Earlier alias dictionary only had the abbreviated
+    // "ד 26" form, so this would silently fall through to label_only.
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'קרן היסוד 5 דירה 26 ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.propertyId).toBe('prop-keren-26')
   })
 })

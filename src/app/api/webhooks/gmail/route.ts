@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailAccessToken } from '@/lib/gmail'
+import { withHebrewAliases } from '@/lib/bill-routing'
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
 
@@ -214,22 +215,34 @@ export async function POST(request: Request) {
       const searchText = `${subject} ${aiParsedData?.account_holder || ''}`.toLowerCase()
 
       const { data: owners } = await serviceClient.from('owners').select('id, full_name')
-      const { data: properties } = await serviceClient.from('properties').select('id, owner_id, address').eq('is_active', true)
+      const { data: rawProperties } = await serviceClient.from('properties').select('id, owner_id, address, name').eq('is_active', true)
+      // Stamp Hebrew aliases so PDFs in Hebrew (e.g. Bezeq's
+      // "קרן היסוד 5 דירה 26") match against properties whose addresses
+      // are stored as English transliteration.
+      const properties = rawProperties ? withHebrewAliases(rawProperties) : []
 
       for (const owner of owners ?? []) {
         const nameParts = owner.full_name.toLowerCase().split(' ')
         const allMatch = nameParts.length >= 2 && nameParts.every((p: string) => p.length > 2 && searchText.includes(p))
         if (allMatch) {
-          const prop = (properties ?? []).find(p => p.owner_id === owner.id)
+          const prop = properties.find(p => p.owner_id === owner.id)
           if (prop) { propertyId = prop.id; break }
         }
       }
 
-      // Address matching fallback
+      // Address matching fallback — try English fuzzy first, then
+      // Hebrew aliases (catches Bezeq / Hagihon / vaad PDFs).
       if (!propertyId && aiParsedData?.address) {
-        const addr = aiParsedData.address.toLowerCase()
-        const match = (properties ?? []).find(p => addr.includes(p.address.toLowerCase()) || p.address.toLowerCase().includes(addr))
-        if (match) propertyId = match.id
+        const addr = (aiParsedData.address as string).toLowerCase()
+        const englishMatch = properties.find(p => addr.includes(p.address.toLowerCase()) || p.address.toLowerCase().includes(addr))
+        if (englishMatch) {
+          propertyId = englishMatch.id
+        } else {
+          const aliasMatch = properties.find(p =>
+            (p.hebrewAliases ?? []).some(alias => addr.includes(alias.toLowerCase())),
+          )
+          if (aliasMatch) propertyId = aliasMatch.id
+        }
       }
 
       // Create bill

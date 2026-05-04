@@ -89,10 +89,22 @@ export const HEBREW_ALIASES: Record<string, string[]> = {
   ],
   // Jerusalem Skyline (Jaffa 105, JTower)
   'dace8043-80ad-4e9d-a530-7e3c3ba0efec': ['יפו 105', 'ג\'אפא 105', 'ג\'יי טאואר', 'jtower'],
-  // Keren Hayesod 5, Apt 26
-  'b26a5f8a-cb28-4174-9a87-62938eea066b': ['קרן היסוד 5/26', 'קרן היסוד 5 ד 26', 'קרן היסוד 26'],
+  // Keren Hayesod 5, Apt 26 — Bezeq prints "קרן היסוד 5 דירה 26" (full
+  // word דירה), Hagihon uses "ד" abbreviation, others use "5/26" slash
+  // form. Cover all three.
+  'b26a5f8a-cb28-4174-9a87-62938eea066b': [
+    'קרן היסוד 5/26',
+    'קרן היסוד 5 ד 26',
+    'קרן היסוד 5 דירה 26',
+    'קרן היסוד 26',
+  ],
   // Keren Hayesod 5, Apt 3
-  '22222222-aaaa-0000-0000-000000000005': ['קרן היסוד 5/3', 'קרן היסוד 5 ד 3', 'קרן היסוד 3'],
+  '22222222-aaaa-0000-0000-000000000005': [
+    'קרן היסוד 5/3',
+    'קרן היסוד 5 ד 3',
+    'קרן היסוד 5 דירה 3',
+    'קרן היסוד 3',
+  ],
   // Mesila (HaRakevet 20/3) — vaad bills come addressed to "המסילה" /
   // "דרך הרכבת". Per Ariel, the same management company sends Mesila +
   // Agripas vaad bills, so the alias is what disambiguates them.
