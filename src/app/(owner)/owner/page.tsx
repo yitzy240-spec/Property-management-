@@ -16,7 +16,15 @@ import { VisitList } from '@/components/features/visit-list'
 import { OwnerDocumentVault } from '@/components/features/owner-document-vault'
 import { ImpersonationBanner } from '@/components/features/impersonation-banner'
 
-export default async function OwnerPortalPage() {
+const BILLS_PAGE_SIZE = 10
+
+export default async function OwnerPortalPage({
+  searchParams,
+}: {
+  searchParams?: { bills_page?: string }
+}) {
+  const billsPage = Math.max(1, parseInt(searchParams?.bills_page ?? '1', 10) || 1)
+  const billsOffset = (billsPage - 1) * BILLS_PAGE_SIZE
   const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
   const cookieStore = cookies()
@@ -86,7 +94,7 @@ export default async function OwnerPortalPage() {
 
   const [
     { data: bookings },
-    { data: bills },
+    billsResult,
     { data: tasks },
     { data: documents },
     { data: taskMedia },
@@ -95,9 +103,13 @@ export default async function OwnerPortalPage() {
     propertyIds.length > 0
       ? dataClient.from('bookings').select('*').in('property_id', propertyIds).gte('check_in', new Date().toISOString().split('T')[0]).order('check_in').limit(5)
       : Promise.resolve({ data: [] }),
+    // Sort by due_date desc so the most-recent due date shows first;
+    // null due_dates fall to the bottom. Paginate at 10 per page so
+    // owners with long history can flip through, not just see the top
+    // chunk.
     propertyIds.length > 0
-      ? dataClient.from('bills').select('*, properties(name)').in('property_id', propertyIds).eq('status', 'approved').order('created_at', { ascending: false }).limit(50)
-      : Promise.resolve({ data: [] }),
+      ? dataClient.from('bills').select('*, properties(name)', { count: 'exact' }).in('property_id', propertyIds).eq('status', 'approved').order('due_date', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).range(billsOffset, billsOffset + BILLS_PAGE_SIZE - 1)
+      : Promise.resolve({ data: [], count: 0 }),
     propertyIds.length > 0
       ? dataClient.from('tasks').select('*, properties(name)').in('property_id', propertyIds).order('created_at', { ascending: false }).limit(10)
       : Promise.resolve({ data: [] }),
@@ -112,6 +124,10 @@ export default async function OwnerPortalPage() {
       : Promise.resolve({ data: [] }),
   ])
 
+  const bills = billsResult.data
+  const billsTotal = (billsResult as { count?: number }).count ?? 0
+  const billsTotalPages = Math.max(1, Math.ceil(billsTotal / BILLS_PAGE_SIZE))
+
   const stagingPhotos = ((taskMedia as unknown[]) ?? []).filter((m: any) =>
     m.tasks?.is_cleaning && propertyIds.includes(m.tasks?.property_id)
   )
@@ -120,13 +136,47 @@ export default async function OwnerPortalPage() {
   const showBookings = owner.profile === 'investor' || owner.profile === 'hybrid'
   const showMaintenance = owner.profile === 'hybrid' || owner.profile === 'private'
 
-  // Calendar year total (2026 bills only)
+  // Calendar-year total. Computed across ALL approved bills for the
+  // owner's properties this year — independent of bills_page so the
+  // top-line number doesn't shift while the user paginates the list.
+  // We can't filter by year on a single column at the DB level because
+  // bills can have billing_period_start, due_date, or only created_at
+  // — and we want whichever is the most accurate "this is when the
+  // bill was for". Fetch all amount+date columns and bucket in JS.
   const currentYear = new Date().getFullYear()
-  const yearBills = (bills ?? []).filter(b => {
+  const { data: allYearBills } = propertyIds.length > 0
+    ? await dataClient
+        .from('bills')
+        .select('amount_agorot, billing_period_start, due_date, created_at')
+        .in('property_id', propertyIds)
+        .eq('status', 'approved')
+    : { data: [] }
+  const totalBills = (allYearBills ?? []).reduce((s, b) => {
     const date = b.billing_period_start || b.due_date || b.created_at
-    return date && new Date(date).getFullYear() === currentYear
-  })
-  const totalBills = yearBills.reduce((s, b) => s + b.amount_agorot, 0)
+    if (date && new Date(date as string).getFullYear() === currentYear) {
+      return s + (b.amount_agorot ?? 0)
+    }
+    return s
+  }, 0)
+
+  // YTD booking income for owner's properties — mirrors how the admin
+  // dashboard computes its YTD revenue. Lodgify-synced bookings carry
+  // a non-null gross_rental_agorot; airbnb/admin-entered ones may not.
+  const ytdStart = `${currentYear}-01-01`
+  const ytdEnd = `${currentYear}-12-31`
+  const { data: ytdBookingsRaw } = propertyIds.length > 0
+    ? await dataClient
+        .from('bookings')
+        .select('gross_rental_agorot')
+        .in('property_id', propertyIds)
+        .gte('check_in', ytdStart)
+        .lte('check_in', ytdEnd)
+        .not('gross_rental_agorot', 'is', null)
+    : { data: [] }
+  const ytdBookingIncome = (ytdBookingsRaw ?? []).reduce(
+    (s, b) => s + (b.gross_rental_agorot ?? 0),
+    0,
+  )
 
   return (
     <div className="mx-auto min-h-screen max-w-2xl bg-[#FAFAFA]">
@@ -214,16 +264,16 @@ export default async function OwnerPortalPage() {
             <div className="rounded-[10px] border border-border bg-card p-5 shadow-sm">
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <p className="text-xs text-muted-foreground">Properties</p>
-                  <p className="font-mono text-lg font-bold">{properties?.length ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">{currentYear} Income</p>
+                  <CurrencyDisplay agorot={ytdBookingIncome} variant="income" className="text-lg font-bold" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">{currentYear} Bills</p>
                   <CurrencyDisplay agorot={totalBills} variant="expense" className="text-lg font-bold" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Bookings</p>
-                  <p className="font-mono text-lg font-bold">{bookings?.length ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">Properties</p>
+                  <p className="font-mono text-lg font-bold">{properties?.length ?? 0}</p>
                 </div>
               </div>
             </div>
@@ -272,6 +322,32 @@ export default async function OwnerPortalPage() {
                     </div>
                   )
                 })}
+              </div>
+            )}
+
+            {billsTotalPages > 1 && (
+              <div className="mt-3 flex items-center justify-between text-xs">
+                {billsPage > 1 ? (
+                  <a
+                    href={`/owner?bills_page=${billsPage - 1}`}
+                    className="rounded-[var(--radius-button)] border border-border bg-card px-3 py-1.5 font-medium text-foreground hover:bg-muted"
+                  >
+                    ← Previous
+                  </a>
+                ) : (
+                  <span />
+                )}
+                <p className="text-muted-foreground">Page {billsPage} of {billsTotalPages}</p>
+                {billsPage < billsTotalPages ? (
+                  <a
+                    href={`/owner?bills_page=${billsPage + 1}`}
+                    className="rounded-[var(--radius-button)] border border-border bg-card px-3 py-1.5 font-medium text-foreground hover:bg-muted"
+                  >
+                    Next →
+                  </a>
+                ) : (
+                  <span />
+                )}
               </div>
             )}
           </section>

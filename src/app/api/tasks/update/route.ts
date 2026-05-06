@@ -26,6 +26,7 @@ export async function POST(request: Request) {
     const { error } = await serviceClient.from('tasks').delete().eq('id', taskId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     revalidatePath('/tasks')
+    revalidatePath('/dashboard')
     return NextResponse.json({ success: true })
   }
 
@@ -38,9 +39,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Bust the Next.js cache for task pages so detail view shows fresh data
+  // Bust the Next.js cache for task pages so detail view shows fresh data,
+  // plus the dashboard so its "Open Tasks" banner reflects new status.
   revalidatePath('/tasks')
   revalidatePath(`/tasks/${taskId}`)
+  revalidatePath('/dashboard')
 
   return NextResponse.json({ success: true })
 }

@@ -22,15 +22,17 @@ import { billTypeLabel } from '@/lib/bill-types'
 
 export default async function PropertyDetailPage({
   params,
+  searchParams,
 }: {
   params: { id: string }
+  searchParams: { bills_page?: string }
 }) {
   // Diagnostic: catch every step inside the page so we can show a real
   // error in production. Next.js sanitizes error.message even in scoped
   // error.tsx so the only way to surface the actual message is to handle
   // the error here and render JSX ourselves.
   try {
-    return await renderPropertyPage(params)
+    return await renderPropertyPage(params, searchParams)
   } catch (err) {
     const e = err as Error
     return (
@@ -51,7 +53,12 @@ export default async function PropertyDetailPage({
   }
 }
 
-async function renderPropertyPage(params: { id: string }) {
+const BILLS_PAGE_SIZE = 10
+
+async function renderPropertyPage(
+  params: { id: string },
+  searchParams: { bills_page?: string },
+) {
   const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
 
@@ -63,9 +70,12 @@ async function renderPropertyPage(params: { id: string }) {
 
   if (!property) notFound()
 
+  const billsPage = Math.max(1, parseInt(searchParams.bills_page ?? '1', 10) || 1)
+  const billsOffset = (billsPage - 1) * BILLS_PAGE_SIZE
+
   const [
     { data: bookings },
-    { data: bills },
+    billsResult,
     { data: tasks },
     { data: documents },
     { data: visitRows },
@@ -74,17 +84,25 @@ async function renderPropertyPage(params: { id: string }) {
     // Hide rejected bills from the property view by default — they stay
     // in the DB so the cron's gmail_message_id dedup keeps working, but
     // they're not noise in the admin queue. Active statuses only.
+    // Sort by due_date desc so the most recent due date shows first;
+    // bills missing a due_date fall to the bottom of the list. Tied
+    // due dates break by created_at desc.
     serviceClient
       .from('bills')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('property_id', params.id)
       .neq('status', 'rejected')
+      .order('due_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
-      .limit(10),
+      .range(billsOffset, billsOffset + BILLS_PAGE_SIZE - 1),
     serviceClient.from('tasks').select('*, contractors(name)').eq('property_id', params.id).order('created_at', { ascending: false }).limit(10),
     serviceClient.from('documents').select('*').eq('property_id', params.id).order('created_at', { ascending: false }),
     serviceClient.from('visits').select('*').eq('property_id', params.id).order('visited_at', { ascending: false }).limit(5),
   ])
+
+  const bills = billsResult.data
+  const billsTotal = billsResult.count ?? 0
+  const billsTotalPages = Math.max(1, Math.ceil(billsTotal / BILLS_PAGE_SIZE))
 
   const owner = property.owners as { full_name: string; email: string; profile: string } | null
 
@@ -253,7 +271,7 @@ async function renderPropertyPage(params: { id: string }) {
       <section>
         <div className="mb-3 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Bills ({bills?.length ?? 0})
+            Bills ({billsTotal})
           </p>
           <BillAddButton preselectedPropertyId={params.id} />
         </div>
@@ -289,7 +307,39 @@ async function renderPropertyPage(params: { id: string }) {
             ))}
           </div>
         ) : (
-          <div className="rounded-[10px] border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">No bills yet</div>
+          <div className="rounded-[10px] border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">
+            {billsPage > 1 ? 'No more bills on this page.' : 'No bills yet'}
+          </div>
+        )}
+
+        {billsTotalPages > 1 && (
+          <div className="mt-3 flex items-center justify-between text-xs">
+            {billsPage > 1 ? (
+              <Link
+                href={`/properties/${params.id}?bills_page=${billsPage - 1}`}
+                className="rounded-[var(--radius-button)] border border-border bg-card px-3 py-1.5 font-medium text-foreground hover:bg-muted"
+                scroll={false}
+              >
+                ← Previous
+              </Link>
+            ) : (
+              <span />
+            )}
+            <p className="text-muted-foreground">
+              Page {billsPage} of {billsTotalPages}
+            </p>
+            {billsPage < billsTotalPages ? (
+              <Link
+                href={`/properties/${params.id}?bills_page=${billsPage + 1}`}
+                className="rounded-[var(--radius-button)] border border-border bg-card px-3 py-1.5 font-medium text-foreground hover:bg-muted"
+                scroll={false}
+              >
+                Next →
+              </Link>
+            ) : (
+              <span />
+            )}
+          </div>
         )}
       </section>
 
