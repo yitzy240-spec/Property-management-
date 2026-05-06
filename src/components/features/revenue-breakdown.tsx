@@ -72,15 +72,33 @@ export function RevenueBreakdown() {
     setLoading(false)
   }
 
-  const total = bookings.reduce((s, b) => s + (b.gross_rental_agorot || 0), 0)
-
-  // Group by property
-  const byProperty: Record<string, { total: number; count: number; currency: string }> = {}
+  // gross_rental_agorot is stored in the booking's original currency's
+  // smallest unit (USD-cents for Airbnb USD bookings, agorot for ILS),
+  // so we MUST group by currency. Summing across currencies is broken
+  // accounting — that's why "$34,791" was including some ILS bookings
+  // before this fix.
+  const totalsByCurrency: Record<string, number> = {}
   for (const b of bookings) {
-    if (!byProperty[b.property_name]) byProperty[b.property_name] = { total: 0, count: 0, currency: b.currency }
-    byProperty[b.property_name].total += b.gross_rental_agorot || 0
-    byProperty[b.property_name].count++
+    const c = b.currency || 'ILS'
+    totalsByCurrency[c] = (totalsByCurrency[c] || 0) + (b.gross_rental_agorot || 0)
   }
+
+  // Per-property breakdown, also split by currency so each card shows
+  // one currency at a time. A property with mixed-currency bookings
+  // produces multiple cards (e.g. "Agripas 6 — USD" + "Agripas 6 — ILS").
+  const byPropertyCurrency: Record<string, { property_name: string; currency: string; total: number; count: number }> = {}
+  for (const b of bookings) {
+    const c = b.currency || 'ILS'
+    const key = `${b.property_name}__${c}`
+    if (!byPropertyCurrency[key]) {
+      byPropertyCurrency[key] = { property_name: b.property_name, currency: c, total: 0, count: 0 }
+    }
+    byPropertyCurrency[key].total += b.gross_rental_agorot || 0
+    byPropertyCurrency[key].count++
+  }
+  const propertyCurrencyEntries = Object.values(byPropertyCurrency).sort((a, b) =>
+    a.property_name.localeCompare(b.property_name) || a.currency.localeCompare(b.currency)
+  )
 
   return (
     <div className="space-y-4">
@@ -115,21 +133,31 @@ export function RevenueBreakdown() {
         </div>
       </div>
 
-      {/* Per-property summary */}
+      {/* Per-property summary — one card per (property, currency) pair */}
       <div className="grid grid-cols-2 gap-2">
-        {Object.entries(byProperty).map(([name, data]) => (
-          <div key={name} className="rounded-lg border border-border bg-card p-3">
-            <p className="text-xs font-medium truncate">{name}</p>
-            <CurrencyDisplay agorot={data.total} currency={data.currency} className="text-sm font-bold" />
-            <p className="text-[10px] text-muted-foreground">{data.count} bookings</p>
+        {propertyCurrencyEntries.map(entry => (
+          <div key={`${entry.property_name}__${entry.currency}`} className="rounded-lg border border-border bg-card p-3">
+            <p className="text-xs font-medium truncate">{entry.property_name}</p>
+            <CurrencyDisplay agorot={entry.total} currency={entry.currency} className="text-sm font-bold" />
+            <p className="text-[10px] text-muted-foreground">
+              {entry.count} {entry.count === 1 ? 'booking' : 'bookings'} · {entry.currency}
+            </p>
           </div>
         ))}
       </div>
 
-      {/* Total */}
-      <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
+      {/* Total — one row per currency since they can't be summed */}
+      <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Total</p>
-        <CurrencyDisplay agorot={total} className="text-lg font-bold" />
+        {Object.entries(totalsByCurrency).sort().map(([currency, amount]) => (
+          <div key={currency} className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">{currency}</span>
+            <CurrencyDisplay agorot={amount} currency={currency} className="text-lg font-bold" />
+          </div>
+        ))}
+        {Object.keys(totalsByCurrency).length === 0 && (
+          <p className="text-sm text-muted-foreground">—</p>
+        )}
       </div>
 
       {/* Booking list */}
