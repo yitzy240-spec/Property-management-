@@ -25,7 +25,11 @@ const LOOKBACK_DAYS = 7
  * 6. Bills flagged with mismatch confidence are queued for manual review
  * 7. Create bill in verification queue
  */
-export const maxDuration = 60
+// Vercel Pro lets crons run up to 300s. The label-iteration design
+// makes per-run progress proportional to wall time, so giving the
+// function the full 300s drastically reduces how many invocations
+// we need to reach the alphabetically-late Bill/* labels.
+export const maxDuration = 300
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
