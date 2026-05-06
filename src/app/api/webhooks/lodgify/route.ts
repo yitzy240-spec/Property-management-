@@ -34,6 +34,19 @@ export async function POST(request: Request) {
 
         if (!lodgifyBookingId || !propertyId) break
 
+        // Lodgify may include status on the payload even for these
+        // events. If so, treat declined / cancelled as a soft-cancel
+        // instead of upserting active. (The API uses both "declined"
+        // and "cancelled" depending on channel.)
+        const incomingStatus = (bookingData.status || '').toLowerCase()
+        if (incomingStatus === 'declined' || incomingStatus === 'cancelled' || incomingStatus === 'canceled') {
+          await serviceClient
+            .from('bookings')
+            .update({ is_cancelled: true, cancelled_at: new Date().toISOString() })
+            .eq('external_id', `lodgify_${lodgifyBookingId}`)
+          break
+        }
+
         // Find our property
         const { data: property } = await serviceClient
           .from('properties')
@@ -57,18 +70,26 @@ export async function POST(request: Request) {
             check_out: bookingData.departure || bookingData.check_out,
             gross_rental_agorot: grossAgorot,
             synced_at: new Date().toISOString(),
+            // Reactivate if a previously-cancelled booking comes back.
+            is_cancelled: false,
+            cancelled_at: null,
           }, { onConflict: 'property_id,external_id' })
 
         break
       }
 
-      case 'booking_status_change_declined': {
-        // Booking cancelled — mark in our DB
+      case 'booking_status_change_declined':
+      case 'booking_status_change_tentative':
+      case 'booking_status_change_open': {
+        // Booking cancelled / dropped out of "booked" state — soft-cancel
+        // in our DB instead of overwriting `platform` with a sentinel
+        // string (the previous code's hack broke filtering and channel
+        // analytics). Active reads filter is_cancelled=false everywhere.
         const lodgifyBookingId = body.data?.id || body.booking_id
         if (lodgifyBookingId) {
           await serviceClient
             .from('bookings')
-            .update({ platform: 'cancelled' })
+            .update({ is_cancelled: true, cancelled_at: new Date().toISOString() })
             .eq('external_id', `lodgify_${lodgifyBookingId}`)
         }
         break
