@@ -363,26 +363,52 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
     return result
   }
 
+  // Track which Lodgify booking IDs we saw this run so we can mark
+  // anything we DIDN'T see as cancelled (Lodgify drops cancelled
+  // bookings from the list response, mirroring Airbnb's silent-removal
+  // pattern). Also track which we positively confirmed as cancelled
+  // by status, so the reconcile step doesn't double-count them.
+  const seenLodgifyIds = new Set<string>()
+
   for (const lb of lodgifyBookings) {
-    // Skip cancelled, declined, and tentative bookings
-    const status = (lb.status || '').toLowerCase()
-    if (status === 'declined' || status === 'cancelled' || status === 'canceled' || status === 'tentative' || status === 'inquiry' || status === 'open') {
-      result.skipped++
-      continue
-    }
+    seenLodgifyIds.add(`lodgify_${lb.id}`)
 
     const property = propertyMap.get(String(lb.property_id))
-    if (!property) {
+    const platform = mapSourceToPlatform(lb.source)
+    const guestNameRaw = lb.guest?.name || ''
+
+    // Status-based cancel: Lodgify says it's cancelled / declined.
+    // Update our DB row to reflect that instead of skipping silently.
+    const status = (lb.status || '').toLowerCase()
+    const isCancelledByStatus =
+      status === 'declined' || status === 'cancelled' || status === 'canceled'
+    // Airbnb-flavoured cancel: name is wiped after cancellation, but
+    // Lodgify may still echo the row back without flipping its status.
+    const isCancelledByAirbnbName =
+      platform === 'airbnb' && (!guestNameRaw || guestNameRaw === 'N/A' || guestNameRaw.toLowerCase().includes('n/a'))
+
+    if (isCancelledByStatus || isCancelledByAirbnbName) {
+      // If we already have a row, soft-cancel it. If we don't, skip
+      // entirely — no point inserting a cancelled record.
+      if (property) {
+        await supabase
+          .from('bookings')
+          .update({ is_cancelled: true, cancelled_at: new Date().toISOString() })
+          .eq('property_id', property.id)
+          .eq('external_id', `lodgify_${lb.id}`)
+      }
       result.skipped++
       continue
     }
 
-    const platform = mapSourceToPlatform(lb.source)
+    // Tentative / inquiry / open are not bookings yet — skip without
+    // touching the DB.
+    if (status === 'tentative' || status === 'inquiry' || status === 'open') {
+      result.skipped++
+      continue
+    }
 
-    // Airbnb bookings with no guest name are likely cancelled —
-    // Airbnb hides the name after cancellation but Lodgify may still return the booking
-    const guestNameRaw = lb.guest?.name || ''
-    if (platform === 'airbnb' && (!guestNameRaw || guestNameRaw === 'N/A' || guestNameRaw.toLowerCase().includes('n/a'))) {
+    if (!property) {
       result.skipped++
       continue
     }
@@ -415,6 +441,10 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
         channel_fees_agorot: channelFeesAgorot,
         currency,
         synced_at: new Date().toISOString(),
+        // Always clear cancellation flag for active bookings — handles
+        // reactivation if a previously-cancelled booking is reinstated.
+        is_cancelled: false,
+        cancelled_at: null,
       }
 
       if (existing) {
@@ -456,6 +486,29 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
       result.synced++
     } catch (err) {
       result.errors.push(`Booking ${lb.id}: ${err instanceof Error ? err.message : 'Unknown'}`)
+    }
+  }
+
+  // Reconcile silent removals: anything in our DB with a lodgify_*
+  // external_id that we DIDN'T see in this pull is presumed cancelled.
+  // Lodgify drops cancelled bookings from its list response, mirroring
+  // Airbnb's silent-removal pattern. Only run when the fetch actually
+  // succeeded (we'd have early-returned on failure above), so a transient
+  // API error can't wipe out the booking list.
+  if (seenLodgifyIds.size > 0) {
+    const seenList = Array.from(seenLodgifyIds)
+    const { data: missingRows } = await supabase
+      .from('bookings')
+      .select('id')
+      .like('external_id', 'lodgify_%')
+      .eq('is_cancelled', false)
+      .not('external_id', 'in', `(${seenList.map(id => `"${id}"`).join(',')})`)
+
+    if (missingRows && missingRows.length > 0) {
+      await supabase
+        .from('bookings')
+        .update({ is_cancelled: true, cancelled_at: new Date().toISOString() })
+        .in('id', missingRows.map(r => r.id))
     }
   }
 
