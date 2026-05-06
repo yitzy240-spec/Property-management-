@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, MapPin, Play, Lock, KeyRound } from 'lucide-react'
+import { Clock, MapPin, Play, Lock, KeyRound, BookOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface GuestCheckInProps {
@@ -73,15 +73,28 @@ export function GuestCheckIn({ property, booking, guideText }: GuestCheckInProps
       </div>
 
       <div className="space-y-4 p-4">
-        {/* Canva Design Embed */}
+        {/* Apartment guide (Canva design link). The field stores a sharing
+            URL, not an image — render as a tappable card matching the
+            Video Guide pattern below so it opens in a new tab. */}
         {property.canva_design_url && (
-          <div className="overflow-hidden rounded-[10px] border border-border shadow-sm">
-            <img
-              src={property.canva_design_url}
-              alt={`${property.name} guide`}
-              className="w-full"
-            />
-          </div>
+          <a
+            href={property.canva_design_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block"
+          >
+            <div className="flex items-center gap-4 rounded-[10px] border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[hsl(var(--accent)/0.12)]">
+                <BookOpen className="h-5 w-5 text-accent" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">{property.name} Guide</p>
+                <p className="text-xs text-muted-foreground">
+                  Wifi, appliances, neighborhood tips
+                </p>
+              </div>
+            </div>
+          </a>
         )}
 
         {/* Entry Code — Time-Gated */}
