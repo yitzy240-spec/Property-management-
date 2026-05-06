@@ -51,6 +51,7 @@ export function RevenueBreakdown() {
       .gte('check_in', startDate)
       .lte('check_in', endDate)
       .not('gross_rental_agorot', 'is', null)
+      .eq('is_cancelled', false)
       .order('check_in', { ascending: false })
 
     if (propertyId !== ALL_PROPERTIES) {

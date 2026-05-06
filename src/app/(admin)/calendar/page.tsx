@@ -19,6 +19,7 @@ export default async function CalendarPage() {
       .select('id, guest_name, check_in, check_out, platform, properties(name)')
       .or(`check_in.gte.${startStr},check_out.gte.${startStr}`)
       .lte('check_in', endStr)
+      .eq('is_cancelled', false)
       .order('check_in'),
     serviceClient
       .from('tasks')

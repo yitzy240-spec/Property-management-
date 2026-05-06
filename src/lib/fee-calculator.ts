@@ -41,11 +41,13 @@ export async function calculatePropertyFees(
   const startStr = monthStart.toISOString().split('T')[0]
   const endStr = monthEnd.toISOString().split('T')[0]
 
-  // Get bookings that checked out this month (commission basis)
+  // Get bookings that checked out this month (commission basis).
+  // Skip cancelled bookings — commission only applies to actual stays.
   const { data: bookings } = await serviceClient
     .from('bookings')
     .select('id, guest_name, gross_rental_agorot, channel_fees_agorot')
     .eq('property_id', propertyId)
+    .eq('is_cancelled', false)
     .gte('check_out', startStr)
     .lt('check_out', endStr)
 

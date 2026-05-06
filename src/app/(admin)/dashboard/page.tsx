@@ -24,10 +24,10 @@ export default async function DashboardPage() {
     supabase.from('properties').select('*, owners(full_name), lodgify_data').eq('is_active', true).order('name'),
     supabase.from('tasks').select('*', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
     supabase.from('bills').select('*', { count: 'exact', head: true }).eq('status', 'pending_review'),
-    supabase.from('bookings').select('gross_rental_agorot').gte('check_in', `${currentYear}-01-01`).lte('check_in', `${currentYear}-12-31`).not('gross_rental_agorot', 'is', null),
-    supabase.from('bookings').select('*, properties(name)').gte('check_in', today).order('check_in').limit(5),
+    supabase.from('bookings').select('gross_rental_agorot').gte('check_in', `${currentYear}-01-01`).lte('check_in', `${currentYear}-12-31`).not('gross_rental_agorot', 'is', null).eq('is_cancelled', false),
+    supabase.from('bookings').select('*, properties(name)').gte('check_in', today).order('check_in').eq('is_cancelled', false).limit(5),
     // Per-property: current/next booking and open tasks
-    supabase.from('bookings').select('property_id, guest_name, check_in, check_out').gte('check_out', today).order('check_in'),
+    supabase.from('bookings').select('property_id, guest_name, check_in, check_out').gte('check_out', today).order('check_in').eq('is_cancelled', false),
     supabase.from('tasks').select('property_id').in('status', ['pending', 'in_progress']),
   ])
 

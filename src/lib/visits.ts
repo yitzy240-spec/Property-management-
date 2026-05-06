@@ -41,6 +41,7 @@ export async function getPropertyVisitStatuses(
     .from('bookings')
     .select('property_id, check_out, platform')
     .in('property_id', propertyIds)
+    .eq('is_cancelled', false)
     .lte('check_in', today)
     .gt('check_out', today)
 
@@ -48,6 +49,7 @@ export async function getPropertyVisitStatuses(
     .from('bookings')
     .select('property_id, check_out')
     .in('property_id', propertyIds)
+    .eq('is_cancelled', false)
     .lte('check_out', today)
     .order('check_out', { ascending: false })
 

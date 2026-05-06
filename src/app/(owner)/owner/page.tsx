@@ -101,7 +101,7 @@ export default async function OwnerPortalPage({
     { data: ownerVisits },
   ] = await Promise.all([
     propertyIds.length > 0
-      ? dataClient.from('bookings').select('*').in('property_id', propertyIds).gte('check_in', new Date().toISOString().split('T')[0]).order('check_in').limit(5)
+      ? dataClient.from('bookings').select('*').in('property_id', propertyIds).gte('check_in', new Date().toISOString().split('T')[0]).eq('is_cancelled', false).order('check_in').limit(5)
       : Promise.resolve({ data: [] }),
     // Sort by due_date desc so the most-recent due date shows first;
     // null due_dates fall to the bottom. Paginate at 10 per page so
@@ -172,6 +172,7 @@ export default async function OwnerPortalPage({
         .gte('check_in', ytdStart)
         .lte('check_in', ytdEnd)
         .not('gross_rental_agorot', 'is', null)
+        .eq('is_cancelled', false)
     : { data: [] }
   const ytdBookingIncome = (ytdBookingsRaw ?? []).reduce(
     (s, b) => s + (b.gross_rental_agorot ?? 0),

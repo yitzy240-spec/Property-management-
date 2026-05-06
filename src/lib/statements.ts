@@ -97,6 +97,7 @@ export async function calculateMonthlyStatements(
   const { data: bookings, error: bookErr } = await supabase
     .from('bookings')
     .select('id, property_id, platform, gross_rental_agorot, guest_name, check_in, check_out')
+    .eq('is_cancelled', false)
     .gte('check_out', start)
     .lte('check_out', end)
 

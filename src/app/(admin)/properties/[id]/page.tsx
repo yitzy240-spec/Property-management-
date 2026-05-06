@@ -80,7 +80,7 @@ async function renderPropertyPage(
     { data: documents },
     { data: visitRows },
   ] = await Promise.all([
-    serviceClient.from('bookings').select('*').eq('property_id', params.id).gte('check_out', new Date().toISOString().split('T')[0]).order('check_in', { ascending: true }).limit(20),
+    serviceClient.from('bookings').select('*').eq('property_id', params.id).eq('is_cancelled', false).gte('check_out', new Date().toISOString().split('T')[0]).order('check_in', { ascending: true }).limit(20),
     // Hide rejected bills from the property view by default — they stay
     // in the DB so the cron's gmail_message_id dedup keeps working, but
     // they're not noise in the admin queue. Active statuses only.
