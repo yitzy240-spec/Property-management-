@@ -15,27 +15,49 @@ interface BookingRevenue {
   property_name: string
 }
 
+const ALL_PROPERTIES = 'all'
+
 export function RevenueBreakdown() {
   const supabase = createClient()
   const currentYear = new Date().getFullYear()
   const [startDate, setStartDate] = useState(`${currentYear}-01-01`)
   const [endDate, setEndDate] = useState(`${currentYear}-12-31`)
+  const [propertyId, setPropertyId] = useState<string>(ALL_PROPERTIES)
+  const [properties, setProperties] = useState<{ id: string; name: string }[]>([])
   const [bookings, setBookings] = useState<BookingRevenue[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Load property list once for the filter dropdown.
+  useEffect(() => {
+    supabase
+      .from('properties')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => setProperties(data ?? []))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     loadBookings()
-  }, [startDate, endDate])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, propertyId])
 
   async function loadBookings() {
     setLoading(true)
-    const { data } = await supabase
+    let query = supabase
       .from('bookings')
       .select('id, guest_name, platform, check_in, check_out, gross_rental_agorot, currency, properties(name)')
       .gte('check_in', startDate)
       .lte('check_in', endDate)
       .not('gross_rental_agorot', 'is', null)
       .order('check_in', { ascending: false })
+
+    if (propertyId !== ALL_PROPERTIES) {
+      query = query.eq('property_id', propertyId)
+    }
+
+    const { data } = await query
 
     setBookings((data ?? []).map(b => ({
       id: b.id,
@@ -62,11 +84,21 @@ export function RevenueBreakdown() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           Revenue Breakdown
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={propertyId}
+            onChange={e => setPropertyId(e.target.value)}
+            className="h-8 rounded-lg border border-border bg-background px-2 text-xs"
+          >
+            <option value={ALL_PROPERTIES}>All properties</option>
+            {properties.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
           <input
             type="date"
             value={startDate}
