@@ -284,7 +284,15 @@ async function runParseBills(lookbackDays: number, labelFilter: string | null = 
           properties: properties ?? [],
         })
 
-        const finalPropertyId = routing.propertyId
+        // bills.property_id is NOT NULL in the schema. verifyBillRouting
+        // returns null on mismatch (PDF says property X, Gmail label says
+        // property Y), which would silently fail the insert and lose the
+        // bill. When that happens, fall back to the label's property and
+        // mark the bill flagged so admin reviews it — the label was an
+        // explicit user action, so it's the authoritative tiebreaker.
+        const finalPropertyId =
+          routing.propertyId ??
+          (routing.confidence === 'mismatch' ? propertyId : null)
         if (routing.confidence === 'mismatch') flaggedMismatches++
 
         // Anomaly detection (only when we have a property to compare against)

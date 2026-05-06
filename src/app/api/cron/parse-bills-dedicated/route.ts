@@ -278,7 +278,12 @@ export async function GET(request: Request) {
           })
         }
 
-        const propertyId = routingResult.propertyId
+        // bills.property_id is NOT NULL — when routing returns mismatch
+        // (propertyId=null), fall back to the pre-match candidate so the
+        // bill isn't silently lost on insert. Status will be flagged below.
+        const propertyId =
+          routingResult.propertyId ??
+          (routingResult.confidence === 'mismatch' ? labelPropertyId : null)
         if (routingResult.confidence === 'mismatch') flaggedMismatches++
 
         // Decide whether to auto-learn the sender mapping. Only do so on
