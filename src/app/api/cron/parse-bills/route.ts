@@ -41,9 +41,14 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const daysParam = url.searchParams.get('days')
   const lookbackDays = daysParam ? Math.max(1, Math.min(parseInt(daysParam, 10) || LOOKBACK_DAYS, 730)) : LOOKBACK_DAYS
+  // Optional ?label=Bill/Foo restricts iteration to one Gmail label —
+  // useful for targeted backfills when one apartment has a long
+  // unprocessed history and the alphabetical-ish iteration isn't
+  // reaching it within the function budget.
+  const labelFilter = url.searchParams.get('label')
 
   try {
-    return await runParseBills(lookbackDays)
+    return await runParseBills(lookbackDays, labelFilter)
   } catch (err) {
     const e = err as Error
     console.error('[parse-bills] fatal', e?.message, e?.stack)
@@ -55,7 +60,7 @@ export async function GET(request: Request) {
   }
 }
 
-async function runParseBills(lookbackDays: number) {
+async function runParseBills(lookbackDays: number, labelFilter: string | null = null) {
   const serviceClient = createServiceClient()
 
   const { data: tokenSetting } = await serviceClient
@@ -115,8 +120,12 @@ async function runParseBills(lookbackDays: number) {
   const labelsData = await labelsRes.json()
   const allLabels: { id: string; name: string }[] = labelsData.labels || []
 
-  // Filter to Bill/* labels that have a property mapping
-  const billLabels = allLabels.filter(l => labelToProperty[l.name])
+  // Filter to Bill/* labels that have a property mapping. If the caller
+  // passed ?label=..., restrict to that single label so all the time
+  // budget goes to one apartment.
+  const billLabels = allLabels.filter(
+    l => labelToProperty[l.name] && (!labelFilter || l.name === labelFilter),
+  )
 
   let parsed = 0
   let skipped = 0
