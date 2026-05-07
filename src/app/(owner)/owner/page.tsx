@@ -167,15 +167,17 @@ export default async function OwnerPortalPage({
   const { data: ytdBookingsRaw } = propertyIds.length > 0
     ? await dataClient
         .from('bookings')
-        .select('gross_rental_agorot')
+        .select('gross_rental_agorot, channel_fees_agorot')
         .in('property_id', propertyIds)
         .gte('check_in', ytdStart)
         .lte('check_in', ytdEnd)
         .not('gross_rental_agorot', 'is', null)
         .eq('is_cancelled', false)
     : { data: [] }
+  // Net of platform fees so owners see what hits the bank, not what
+  // the guest paid the platform. Airbnb / Booking.com take ~15%.
   const ytdBookingIncome = (ytdBookingsRaw ?? []).reduce(
-    (s, b) => s + (b.gross_rental_agorot ?? 0),
+    (s, b) => s + ((b.gross_rental_agorot ?? 0) - ((b as { channel_fees_agorot?: number | null }).channel_fees_agorot ?? 0)),
     0,
   )
 

@@ -529,14 +529,30 @@ function mapSourceToPlatform(source: string | null): string {
   return 'other'
 }
 
+/**
+ * Channel fee rates by platform. The booking row stores
+ * gross_rental_agorot as what the guest paid the platform; the
+ * platform takes its cut before settling with the host. Subtracting
+ * channel_fees_agorot from gross_rental_agorot gives the host's
+ * actual receipt — which is what every revenue / commission /
+ * statement number should be based on.
+ *
+ * Per Ariel: Airbnb's host service fee + payment processing eats
+ * roughly 15% of the gross. Direct bookings have no platform cut.
+ */
+const CHANNEL_FEE_RATES: Record<string, number> = {
+  airbnb: 0.15,
+  booking_com: 0.15,
+  vrbo: 0.05,
+  expedia: 0.15,
+  direct: 0,
+  other: 0,
+}
+
+export function channelFeeRate(platform: string): number {
+  return CHANNEL_FEE_RATES[platform] ?? 0
+}
+
 function estimateChannelFees(grossAgorot: number, platform: string): number {
-  const rates: Record<string, number> = {
-    airbnb: 0.03,
-    booking_com: 0.15,
-    vrbo: 0.05,
-    expedia: 0.15,
-    direct: 0,
-    other: 0,
-  }
-  return Math.round(grossAgorot * (rates[platform] ?? 0))
+  return Math.round(grossAgorot * channelFeeRate(platform))
 }

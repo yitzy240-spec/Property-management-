@@ -11,8 +11,17 @@ interface BookingRevenue {
   check_in: string
   check_out: string
   gross_rental_agorot: number | null
+  channel_fees_agorot: number | null
   currency: string
   property_name: string
+}
+
+/** Amount the host actually receives after the booking platform's
+ * cut. Airbnb takes ~15%, Booking.com ~15%, direct = full gross. */
+function netAgorot(b: { gross_rental_agorot: number | null; channel_fees_agorot: number | null }): number {
+  const gross = b.gross_rental_agorot ?? 0
+  const fees = b.channel_fees_agorot ?? 0
+  return gross - fees
 }
 
 const ALL_PROPERTIES = 'all'
@@ -47,12 +56,12 @@ export function RevenueBreakdown() {
     setLoading(true)
     let query = supabase
       .from('bookings')
-      .select('id, guest_name, platform, check_in, check_out, gross_rental_agorot, currency, properties(name)')
+      .select('id, guest_name, platform, check_in, check_out, gross_rental_agorot, channel_fees_agorot, currency, properties(name)')
       .gte('check_in', startDate)
       .lte('check_in', endDate)
       .not('gross_rental_agorot', 'is', null)
       .eq('is_cancelled', false)
-      .order('check_in', { ascending: false })
+      .order('check_in', { ascending: true })
 
     if (propertyId !== ALL_PROPERTIES) {
       query = query.eq('property_id', propertyId)
@@ -67,6 +76,7 @@ export function RevenueBreakdown() {
       check_in: b.check_in,
       check_out: b.check_out,
       gross_rental_agorot: b.gross_rental_agorot,
+      channel_fees_agorot: (b as Record<string, unknown>).channel_fees_agorot as number | null,
       currency: (b as Record<string, unknown>).currency as string || 'ILS',
       property_name: (b.properties as unknown as { name: string } | null)?.name || 'Unknown',
     })))
@@ -76,12 +86,16 @@ export function RevenueBreakdown() {
   // gross_rental_agorot is stored in the booking's original currency's
   // smallest unit (USD-cents for Airbnb USD bookings, agorot for ILS),
   // so we MUST group by currency. Summing across currencies is broken
-  // accounting — that's why "$34,791" was including some ILS bookings
-  // before this fix.
+  // accounting.
+  //
+  // We also subtract channel_fees_agorot to show the host's actual
+  // receipt — Airbnb / Booking.com take ~15% off the gross before
+  // settling with the host, which the gross alone hides. Direct
+  // bookings have channel_fees_agorot = 0 so they show the full amount.
   const totalsByCurrency: Record<string, number> = {}
   for (const b of bookings) {
     const c = b.currency || 'ILS'
-    totalsByCurrency[c] = (totalsByCurrency[c] || 0) + (b.gross_rental_agorot || 0)
+    totalsByCurrency[c] = (totalsByCurrency[c] || 0) + netAgorot(b)
   }
 
   // Per-property breakdown, also split by currency so each card shows
@@ -94,7 +108,7 @@ export function RevenueBreakdown() {
     if (!byPropertyCurrency[key]) {
       byPropertyCurrency[key] = { property_name: b.property_name, currency: c, total: 0, count: 0 }
     }
-    byPropertyCurrency[key].total += b.gross_rental_agorot || 0
+    byPropertyCurrency[key].total += netAgorot(b)
     byPropertyCurrency[key].count++
   }
   const propertyCurrencyEntries = Object.values(byPropertyCurrency).sort((a, b) =>
@@ -104,9 +118,14 @@ export function RevenueBreakdown() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Revenue Breakdown
-        </p>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Revenue Breakdown
+          </p>
+          <p className="text-[10px] text-muted-foreground">
+            Net of platform fees (Airbnb / Booking.com take ~15%)
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={propertyId}
@@ -181,7 +200,7 @@ export function RevenueBreakdown() {
                   {b.platform && ` · ${b.platform}`}
                 </p>
               </div>
-              <CurrencyDisplay agorot={b.gross_rental_agorot || 0} currency={b.currency} className="shrink-0 text-sm font-semibold" />
+              <CurrencyDisplay agorot={netAgorot(b)} currency={b.currency} className="shrink-0 text-sm font-semibold" />
             </div>
           ))}
         </div>
