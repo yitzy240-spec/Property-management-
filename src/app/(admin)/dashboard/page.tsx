@@ -24,7 +24,7 @@ export default async function DashboardPage() {
     supabase.from('properties').select('*, owners(full_name), lodgify_data').eq('is_active', true).order('name'),
     supabase.from('tasks').select('*', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
     supabase.from('bills').select('*', { count: 'exact', head: true }).eq('status', 'pending_review'),
-    supabase.from('bookings').select('gross_rental_agorot, channel_fees_agorot').gte('check_in', `${currentYear}-01-01`).lte('check_in', `${currentYear}-12-31`).not('gross_rental_agorot', 'is', null).eq('is_cancelled', false),
+    supabase.from('bookings').select('gross_rental_agorot, channel_fees_agorot, currency, properties(commission_rate)').gte('check_in', `${currentYear}-01-01`).lte('check_in', `${currentYear}-12-31`).not('gross_rental_agorot', 'is', null).eq('is_cancelled', false),
     supabase.from('bookings').select('*, properties(name)').gte('check_in', today).order('check_in').eq('is_cancelled', false).limit(5),
     // Per-property: current/next booking and open tasks
     supabase.from('bookings').select('property_id, guest_name, check_in, check_out').gte('check_out', today).order('check_in').eq('is_cancelled', false),
@@ -44,14 +44,26 @@ export default async function DashboardPage() {
     propertyTaskCount[t.property_id] = (propertyTaskCount[t.property_id] || 0) + 1
   }
 
-  // Net of channel fees — Airbnb/Booking.com take ~15%, so the host's
-  // actual receipt (and the basis for VAT threshold tracking) is
-  // gross - channel_fees.
-  const ytdRevenue = revenueData?.reduce(
-    (sum, r) => sum + ((r.gross_rental_agorot || 0) - ((r as { channel_fees_agorot?: number | null }).channel_fees_agorot || 0)),
-    0,
-  ) ?? 0
-  const vatPercent = Math.round((ytdRevenue / VAT_THRESHOLD_AGOROT) * 100)
+  // YTD revenue on the manager dashboard = Marcus Properties' OWN
+  // income (commission), NOT what passes through to owners. Per
+  // booking: (gross - channel_fees) × property.commission_rate.
+  // Grouped by currency so a USD Airbnb stay and an ILS direct
+  // booking don't get summed as if they share a unit — display
+  // shows one line per currency, no conversion.
+  const ytdCommissionByCurrency: Record<string, number> = {}
+  for (const b of revenueData ?? []) {
+    const gross = b.gross_rental_agorot ?? 0
+    const fees = (b as { channel_fees_agorot?: number | null }).channel_fees_agorot ?? 0
+    const net = gross - fees
+    const rate = ((b as { properties?: { commission_rate?: number } | null }).properties?.commission_rate) ?? 0
+    const commission = Math.round(net * rate)
+    const c = (b as { currency?: string }).currency || 'ILS'
+    ytdCommissionByCurrency[c] = (ytdCommissionByCurrency[c] || 0) + commission
+  }
+  // VAT threshold is an Israeli tax obligation on Marcus Properties'
+  // ILS revenue — track only the ILS slice.
+  const ytdCommissionILS = ytdCommissionByCurrency['ILS'] ?? 0
+  const vatPercent = Math.round((ytdCommissionILS / VAT_THRESHOLD_AGOROT) * 100)
   const isVatWarning = vatPercent >= VAT_WARNING_PERCENT * 100
 
   return (
@@ -65,13 +77,32 @@ export default async function DashboardPage() {
 
         <div className="rounded-[10px] border border-border bg-card p-5 shadow-sm">
           <Link href="/financials" className="flex items-baseline justify-between group">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 YTD Revenue
               </p>
-              <CurrencyDisplay agorot={ytdRevenue} variant="income" className="mt-1 text-2xl font-bold" />
+              <p className="text-[10px] text-muted-foreground">
+                Your commission across properties · per currency
+              </p>
+              <div className="mt-1 space-y-0.5">
+                {Object.keys(ytdCommissionByCurrency).length === 0 ? (
+                  <CurrencyDisplay agorot={0} variant="income" className="text-2xl font-bold" />
+                ) : (
+                  Object.entries(ytdCommissionByCurrency)
+                    .sort()
+                    .map(([currency, amount]) => (
+                      <CurrencyDisplay
+                        key={currency}
+                        agorot={amount}
+                        currency={currency}
+                        variant="income"
+                        className="block text-2xl font-bold"
+                      />
+                    ))
+                )}
+              </div>
             </div>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(152_54%_25%/0.08)] group-hover:bg-[hsl(152_54%_25%/0.15)] transition-colors">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[hsl(152_54%_25%/0.08)] group-hover:bg-[hsl(152_54%_25%/0.15)] transition-colors">
               <TrendingUp className="h-4 w-4 text-financial-income" />
             </div>
           </Link>
@@ -106,9 +137,10 @@ export default async function DashboardPage() {
             )}
           </div>
           <p className="font-mono text-xs text-muted-foreground">
-            {formatILS(ytdRevenue)} / {formatILS(VAT_THRESHOLD_AGOROT)}
+            {formatILS(ytdCommissionILS)} / {formatILS(VAT_THRESHOLD_AGOROT)}
           </p>
         </div>
+        <p className="mt-1 text-[10px] text-muted-foreground">ILS commission only — USD/foreign income not converted</p>
         <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <div
             className={`h-full rounded-full transition-[width] duration-700 ease-out ${isVatWarning ? 'bg-status-danger' : 'bg-primary'}`}
