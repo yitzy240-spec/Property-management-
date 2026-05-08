@@ -265,18 +265,18 @@ export default async function OwnerPortalPage({
           <section>
             <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Financials</p>
             <div className="rounded-[10px] border border-border bg-card p-5 shadow-sm">
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">{currentYear} Income</p>
-                  <CurrencyDisplay agorot={ytdBookingIncome} variant="income" className="text-lg font-bold" />
+              <div className="grid grid-cols-3 gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">{currentYear} Income</p>
+                  <CurrencyDisplay agorot={ytdBookingIncome} variant="income" className="block truncate text-base font-bold" />
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">{currentYear} Bills</p>
-                  <CurrencyDisplay agorot={totalBills} variant="expense" className="text-lg font-bold" />
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">{currentYear} Bills</p>
+                  <CurrencyDisplay agorot={totalBills} variant="expense" className="block truncate text-base font-bold" />
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Properties</p>
-                  <p className="font-mono text-lg font-bold">{properties?.length ?? 0}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">Properties</p>
+                  <p className="truncate font-mono text-base font-bold">{properties?.length ?? 0}</p>
                 </div>
               </div>
             </div>

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailAccessToken } from '@/lib/gmail'
-import { withHebrewAliases } from '@/lib/bill-routing'
+import { verifyBillRouting, resolveBillRoutingWithoutLabel, withHebrewAliases } from '@/lib/bill-routing'
+import { parseBillPdf, parseBillHtml } from '@/lib/bill-parser'
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
 
@@ -195,58 +196,76 @@ export async function POST(request: Request) {
         }
       }
 
-      // AI extraction
-      let aiParsedData = null
-      const apiKey = process.env.GEMINI_API_KEY
-      if (apiKey) {
-        try {
-          if (pdfBase64) {
-            aiParsedData = await extractBillData(pdfBase64, 'pdf', subject, from, apiKey)
-          } else if (htmlBody) {
-            aiParsedData = await extractBillData(htmlBody, 'html', subject, from, apiKey)
-          }
-        } catch {
-          // Extraction failed
+      // AI extraction — use the shared parser so we get the same
+      // schema as the cron path, including account_number which the
+      // routing helper uses as its strongest signal.
+      let aiParsedData: Awaited<ReturnType<typeof parseBillPdf>> = null
+      try {
+        if (pdfBase64) {
+          aiParsedData = await parseBillPdf(pdfBase64)
+        } else if (htmlBody) {
+          aiParsedData = await parseBillHtml(htmlBody, subject, from)
         }
+      } catch {
+        // Extraction failed — bill still gets inserted for manual entry below
       }
 
-      // Property matching
-      let propertyId: string | null = null
-      const searchText = `${subject} ${aiParsedData?.account_holder || ''}`.toLowerCase()
-
+      // Property routing — same shared helpers as the cron, so
+      // account_number takes precedence over address (key for
+      // disambiguating Hagihon's "Agripas 6/8" labeling, IEC's
+      // mirrored "Agripas 8" labeling, etc).
       const { data: owners } = await serviceClient.from('owners').select('id, full_name')
       const { data: rawProperties } = await serviceClient.from('properties').select('id, owner_id, address, name').eq('is_active', true)
-      // Stamp Hebrew aliases so PDFs in Hebrew (e.g. Bezeq's
-      // "קרן היסוד 5 דירה 26") match against properties whose addresses
-      // are stored as English transliteration.
+      const { data: utilityAccounts } = await serviceClient
+        .from('property_utility_accounts')
+        .select('id, property_id, utility_type, account_number')
       const properties = rawProperties ? withHebrewAliases(rawProperties) : []
 
+      // First try owner-name match (English & Hebrew tokens) on
+      // subject + AI-parsed account_holder. If that finds a candidate,
+      // pass it through verifyBillRouting so the PDF cross-checks it.
+      let labelPropertyId: string | null = null
+      const searchText = `${subject} ${aiParsedData?.account_holder || ''}`.toLowerCase()
       for (const owner of owners ?? []) {
-        const nameParts = owner.full_name.toLowerCase().split(' ')
-        const allMatch = nameParts.length >= 2 && nameParts.every((p: string) => p.length > 2 && searchText.includes(p))
-        if (allMatch) {
+        const tokens = owner.full_name.toLowerCase().split(/\s+/).filter((t: string) => t.length >= 3)
+        if (tokens.length >= 2 && tokens.every((t: string) => searchText.includes(t))) {
           const prop = properties.find(p => p.owner_id === owner.id)
-          if (prop) { propertyId = prop.id; break }
+          if (prop) { labelPropertyId = prop.id; break }
         }
       }
 
-      // Address matching fallback — try English fuzzy first, then
-      // Hebrew aliases (catches Bezeq / Hagihon / vaad PDFs).
-      if (!propertyId && aiParsedData?.address) {
-        const addr = (aiParsedData.address as string).toLowerCase()
-        const englishMatch = properties.find(p => addr.includes(p.address.toLowerCase()) || p.address.toLowerCase().includes(addr))
-        if (englishMatch) {
-          propertyId = englishMatch.id
-        } else {
-          const aliasMatch = properties.find(p =>
-            (p.hebrewAliases ?? []).some(alias => addr.includes(alias.toLowerCase())),
-          )
-          if (aliasMatch) propertyId = aliasMatch.id
-        }
-      }
+      const routing = labelPropertyId
+        ? verifyBillRouting({
+            labelPropertyId,
+            parsedPdf: {
+              account_number: aiParsedData?.account_number ?? undefined,
+              account_holder: aiParsedData?.account_holder ?? undefined,
+              address: aiParsedData?.address ?? undefined,
+              bill_type: aiParsedData?.bill_type,
+            },
+            utilityAccounts: utilityAccounts ?? [],
+            properties,
+          })
+        : resolveBillRoutingWithoutLabel({
+            parsedPdf: {
+              account_number: aiParsedData?.account_number ?? undefined,
+              address: aiParsedData?.address ?? undefined,
+              bill_type: aiParsedData?.bill_type,
+            },
+            utilityAccounts: utilityAccounts ?? [],
+            properties,
+          })
 
-      // Create bill
-      await serviceClient.from('bills').insert({
+      // bills.property_id is NOT NULL — when routing returns mismatch,
+      // fall back to the pre-match candidate so the bill isn't lost.
+      const propertyId =
+        routing.propertyId ??
+        (routing.confidence === 'mismatch' ? labelPropertyId : null)
+
+      // Create bill — UNIQUE index on gmail_message_id makes the
+      // insert idempotent, so concurrent webhook invocations from
+      // Pub/Sub at-least-once delivery can't produce duplicates.
+      const { error: billError } = await serviceClient.from('bills').insert({
         property_id: propertyId,
         bill_type: aiParsedData?.bill_type || 'other',
         amount_agorot: aiParsedData?.amount_agorot || 0,
@@ -254,12 +273,24 @@ export async function POST(request: Request) {
         billing_period_start: aiParsedData?.period_start || null,
         billing_period_end: aiParsedData?.period_end || null,
         status: 'pending_review',
-        is_anomaly: false,
+        is_anomaly: routing.confidence === 'mismatch',
+        anomaly_note: routing.confidence === 'mismatch' ? routing.reason ?? null : null,
         pdf_storage_path: storagePath,
         gmail_message_id: messageId,
-        ai_parsed_data: aiParsedData,
+        routing_confidence: routing.confidence,
+        ai_parsed_data: {
+          ...aiParsedData,
+          match_method: routing.signal,
+          routing_reason: routing.reason,
+          source: 'webhook',
+        },
       })
 
+      // 23505 = unique_violation: another webhook invocation beat us
+      // to it. Treat as success — the row exists.
+      if (billError && billError.code !== '23505') {
+        console.error('[Gmail Webhook] insert failed', billError.message)
+      }
       bills++
     }
 
@@ -301,74 +332,7 @@ Reply ONLY "yes" or "no".` }] }],
   }
 }
 
-/** Stage 2: Full bill data extraction from PDF or HTML */
-async function extractBillData(
-  content: string,
-  type: 'pdf' | 'html',
-  subject: string,
-  from: string,
-  apiKey: string
-): Promise<{
-  bill_type: string
-  amount_agorot: number
-  due_date: string | null
-  period_start: string | null
-  period_end: string | null
-  address: string | null
-  account_holder: string | null
-} | null> {
-  const prompt = `Extract billing information from this Israeli utility bill.
-Email subject: ${subject}
-Email from: ${from}
-
-${type === 'html' ? `Email HTML body:\n${content.substring(0, 10000)}` : ''}
-
-Extract:
-- bill_type: one of "arnona", "iec", "water", "vaad_bayit", "internet", "gas", "other"
-- amount: total amount due in ILS (number, e.g. 842.50)
-- due_date: payment due date in YYYY-MM-DD format
-- period_start: billing period start in YYYY-MM-DD
-- period_end: billing period end in YYYY-MM-DD
-- address: property address
-- account_holder: name of person/entity
-
-Return ONLY valid JSON. Use null for unknown fields.`
-
-  const body: Record<string, unknown> = {
-    contents: [{ parts: type === 'pdf'
-      ? [{ text: prompt }, { inline_data: { mime_type: 'application/pdf', data: content } }]
-      : [{ text: prompt }]
-    }],
-  }
-
-  const res = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify(body),
-    }
-  )
-
-  if (!res.ok) return null
-  const data = await res.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) return null
-
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return null
-    const parsed = JSON.parse(jsonMatch[0])
-    return {
-      bill_type: parsed.bill_type || 'other',
-      amount_agorot: parsed.amount ? Math.round(parsed.amount * 100) : 0,
-      due_date: parsed.due_date || null,
-      period_start: parsed.period_start || null,
-      period_end: parsed.period_end || null,
-      address: parsed.address || null,
-      account_holder: parsed.account_holder || null,
-    }
-  } catch {
-    return null
-  }
-}
+// extractBillData was removed in favor of parseBillPdf / parseBillHtml
+// from lib/bill-parser.ts so the webhook gets the same schema as the
+// cron path — including account_number which the routing helper uses
+// as its strongest signal.
