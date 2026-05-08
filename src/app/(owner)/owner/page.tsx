@@ -15,16 +15,23 @@ import { OwnerStatements } from '@/components/features/billing/owner-statements'
 import { VisitList } from '@/components/features/visit-list'
 import { OwnerDocumentVault } from '@/components/features/owner-document-vault'
 import { ImpersonationBanner } from '@/components/features/impersonation-banner'
+import { BillsYearFilter } from '@/components/features/bills-year-filter'
 
 const BILLS_PAGE_SIZE = 10
+
+const ALL_YEARS = 'all'
 
 export default async function OwnerPortalPage({
   searchParams,
 }: {
-  searchParams?: { bills_page?: string }
+  searchParams?: { bills_page?: string; bills_year?: string }
 }) {
   const billsPage = Math.max(1, parseInt(searchParams?.bills_page ?? '1', 10) || 1)
   const billsOffset = (billsPage - 1) * BILLS_PAGE_SIZE
+  // Default the bills view to the current calendar year so owners
+  // don't get the entire history dumped on them. They can still see
+  // older bills via the year selector.
+  const requestedYear = searchParams?.bills_year ?? String(new Date().getFullYear())
   const supabase = createServerSupabaseClient()
   const serviceClient = createServiceClient()
   const cookieStore = cookies()
@@ -106,9 +113,24 @@ export default async function OwnerPortalPage({
     // Sort by due_date desc so the most-recent due date shows first;
     // null due_dates fall to the bottom. Paginate at 10 per page so
     // owners with long history can flip through, not just see the top
-    // chunk.
+    // chunk. Year filter applied below if requestedYear !== ALL_YEARS.
     propertyIds.length > 0
-      ? dataClient.from('bills').select('*, properties(name)', { count: 'exact' }).in('property_id', propertyIds).eq('status', 'approved').order('due_date', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).range(billsOffset, billsOffset + BILLS_PAGE_SIZE - 1)
+      ? (() => {
+          let q = dataClient.from('bills').select('*, properties(name)', { count: 'exact' })
+            .in('property_id', propertyIds)
+            .eq('status', 'approved')
+          if (requestedYear !== ALL_YEARS) {
+            const yearStart = `${requestedYear}-01-01`
+            const yearEnd = `${requestedYear}-12-31`
+            // Match bills whose due_date is in the year, OR (no
+            // due_date) whose created_at is in the year. Same priority
+            // the year-total uses, so the count and list agree.
+            q = q.or(`and(due_date.gte.${yearStart},due_date.lte.${yearEnd}),and(due_date.is.null,created_at.gte.${yearStart}T00:00:00Z,created_at.lte.${yearEnd}T23:59:59Z)`)
+          }
+          return q.order('due_date', { ascending: false, nullsFirst: false })
+                  .order('created_at', { ascending: false })
+                  .range(billsOffset, billsOffset + BILLS_PAGE_SIZE - 1)
+        })()
       : Promise.resolve({ data: [], count: 0 }),
     propertyIds.length > 0
       ? dataClient.from('tasks').select('*, properties(name)').in('property_id', propertyIds).order('created_at', { ascending: false }).limit(10)
@@ -127,6 +149,22 @@ export default async function OwnerPortalPage({
   const bills = billsResult.data
   const billsTotal = (billsResult as { count?: number }).count ?? 0
   const billsTotalPages = Math.max(1, Math.ceil(billsTotal / BILLS_PAGE_SIZE))
+
+  // Compute which years have approved bills for this owner, so the
+  // year selector only offers years that actually have data.
+  const { data: billYearsRaw } = propertyIds.length > 0
+    ? await dataClient
+        .from('bills')
+        .select('due_date, created_at')
+        .in('property_id', propertyIds)
+        .eq('status', 'approved')
+    : { data: [] }
+  const yearSet = new Set<string>()
+  for (const b of billYearsRaw ?? []) {
+    const date = (b.due_date as string | null) || (b.created_at as string)
+    if (date) yearSet.add(String(new Date(date).getFullYear()))
+  }
+  const availableYears = Array.from(yearSet).sort((a, b) => Number(b) - Number(a))
 
   const stagingPhotos = ((taskMedia as unknown[]) ?? []).filter((m: any) =>
     m.tasks?.is_cleaning && propertyIds.includes(m.tasks?.property_id)
@@ -308,12 +346,19 @@ export default async function OwnerPortalPage({
               </div>
             </div>
 
-            {bills && bills.length > 0 && (
+            {availableYears.length > 0 && (
               <div className="mt-3 overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
-                <div className="border-b border-border px-4 py-2">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Recent Bills</p>
+                <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    {requestedYear === ALL_YEARS ? 'Bills (all)' : `Bills · ${requestedYear}`}
+                  </p>
+                  <BillsYearFilter selected={requestedYear} years={availableYears} />
                 </div>
-                {bills.map((bill, i) => {
+                {!bills || bills.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+                    No bills for {requestedYear === ALL_YEARS ? 'this owner' : requestedYear}
+                  </p>
+                ) : (bills.map((bill, i) => {
                   const typeLabels: Record<string, string> = {
                     iec: 'Electricity',
                     water: 'Water',
@@ -351,35 +396,42 @@ export default async function OwnerPortalPage({
                       </div>
                     </div>
                   )
-                })}
+                }))}
               </div>
             )}
 
-            {billsTotalPages > 1 && (
-              <div className="mt-3 flex items-center justify-between text-xs">
-                {billsPage > 1 ? (
-                  <a
-                    href={`/owner?bills_page=${billsPage - 1}`}
-                    className="rounded-[var(--radius-button)] border border-border bg-card px-3 py-1.5 font-medium text-foreground hover:bg-muted"
-                  >
-                    ← Previous
-                  </a>
-                ) : (
-                  <span />
-                )}
-                <p className="text-muted-foreground">Page {billsPage} of {billsTotalPages}</p>
-                {billsPage < billsTotalPages ? (
-                  <a
-                    href={`/owner?bills_page=${billsPage + 1}`}
-                    className="rounded-[var(--radius-button)] border border-border bg-card px-3 py-1.5 font-medium text-foreground hover:bg-muted"
-                  >
-                    Next →
-                  </a>
-                ) : (
-                  <span />
-                )}
-              </div>
-            )}
+            {billsTotalPages > 1 && (() => {
+              // Preserve the year filter across paginator clicks so
+              // navigating Page 1 → 2 doesn't drop the filter.
+              const yearParam = requestedYear !== String(new Date().getFullYear())
+                ? `&bills_year=${encodeURIComponent(requestedYear)}`
+                : ''
+              return (
+                <div className="mt-3 flex items-center justify-between text-xs">
+                  {billsPage > 1 ? (
+                    <a
+                      href={`/owner?bills_page=${billsPage - 1}${yearParam}`}
+                      className="rounded-[var(--radius-button)] border border-border bg-card px-3 py-1.5 font-medium text-foreground hover:bg-muted"
+                    >
+                      ← Previous
+                    </a>
+                  ) : (
+                    <span />
+                  )}
+                  <p className="text-muted-foreground">Page {billsPage} of {billsTotalPages}</p>
+                  {billsPage < billsTotalPages ? (
+                    <a
+                      href={`/owner?bills_page=${billsPage + 1}${yearParam}`}
+                      className="rounded-[var(--radius-button)] border border-border bg-card px-3 py-1.5 font-medium text-foreground hover:bg-muted"
+                    >
+                      Next →
+                    </a>
+                  ) : (
+                    <span />
+                  )}
+                </div>
+              )
+            })()}
           </section>
         )}
 
