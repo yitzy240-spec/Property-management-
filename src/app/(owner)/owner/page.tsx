@@ -167,19 +167,29 @@ export default async function OwnerPortalPage({
   const { data: ytdBookingsRaw } = propertyIds.length > 0
     ? await dataClient
         .from('bookings')
-        .select('gross_rental_agorot, channel_fees_agorot')
+        .select('gross_rental_agorot, channel_fees_agorot, currency, properties(commission_rate)')
         .in('property_id', propertyIds)
         .gte('check_in', ytdStart)
         .lte('check_in', ytdEnd)
         .not('gross_rental_agorot', 'is', null)
         .eq('is_cancelled', false)
     : { data: [] }
-  // Net of platform fees so owners see what hits the bank, not what
-  // the guest paid the platform. Airbnb / Booking.com take ~15%.
-  const ytdBookingIncome = (ytdBookingsRaw ?? []).reduce(
-    (s, b) => s + ((b.gross_rental_agorot ?? 0) - ((b as { channel_fees_agorot?: number | null }).channel_fees_agorot ?? 0)),
-    0,
-  )
+  // Owner's actual receipt after BOTH platform fee and manager
+  // commission — i.e. what hits the bank. Per booking:
+  //   (gross - channel_fees) * (1 - commission_rate)
+  // Grouped by currency so a USD Airbnb stay and an ILS direct
+  // booking don't get summed as if they share a unit; display
+  // shows one line per currency, no FX conversion.
+  const incomeByCurrency: Record<string, number> = {}
+  for (const b of ytdBookingsRaw ?? []) {
+    const gross = b.gross_rental_agorot ?? 0
+    const fees = (b as { channel_fees_agorot?: number | null }).channel_fees_agorot ?? 0
+    const hostReceipt = gross - fees
+    const rate = ((b as { properties?: { commission_rate?: number } | null }).properties?.commission_rate) ?? 0
+    const ownerNet = Math.round(hostReceipt * (1 - rate))
+    const c = (b as { currency?: string }).currency || 'ILS'
+    incomeByCurrency[c] = (incomeByCurrency[c] || 0) + ownerNet
+  }
 
   return (
     <div className="mx-auto min-h-screen max-w-2xl bg-[#FAFAFA]">
@@ -268,15 +278,32 @@ export default async function OwnerPortalPage({
               <div className="grid grid-cols-3 gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-xs text-muted-foreground">{currentYear} Income</p>
-                  <CurrencyDisplay agorot={ytdBookingIncome} variant="income" className="block truncate text-base font-bold" />
+                  <p className="text-[10px] text-muted-foreground">After fees & commission</p>
+                  <div className="mt-1 space-y-0.5">
+                    {Object.keys(incomeByCurrency).length === 0 ? (
+                      <CurrencyDisplay agorot={0} variant="income" className="block truncate text-base font-bold" />
+                    ) : (
+                      Object.entries(incomeByCurrency)
+                        .sort()
+                        .map(([currency, amount]) => (
+                          <CurrencyDisplay
+                            key={currency}
+                            agorot={amount}
+                            currency={currency}
+                            variant="income"
+                            className="block truncate text-base font-bold"
+                          />
+                        ))
+                    )}
+                  </div>
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs text-muted-foreground">{currentYear} Bills</p>
-                  <CurrencyDisplay agorot={totalBills} variant="expense" className="block truncate text-base font-bold" />
+                  <CurrencyDisplay agorot={totalBills} variant="expense" className="mt-1 block truncate text-base font-bold" />
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs text-muted-foreground">Properties</p>
-                  <p className="truncate font-mono text-base font-bold">{properties?.length ?? 0}</p>
+                  <p className="mt-1 truncate font-mono text-base font-bold">{properties?.length ?? 0}</p>
                 </div>
               </div>
             </div>
