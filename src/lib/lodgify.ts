@@ -420,13 +420,17 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
     const currency = lb.currency || 'USD'
 
     try {
-      // Check if this exact Lodgify booking already exists
+      // Check if this exact Lodgify booking already exists. Match by
+      // external_id ONLY — not (property_id, external_id) — so that
+      // if the booking was reassigned to a different property in
+      // Lodgify, we update the existing row's property_id instead of
+      // creating a duplicate while the original row sits untouched
+      // (the Ari Sonneberg "appears in two apartments" bug).
       const { data: existing } = await supabase
         .from('bookings')
         .select('id')
-        .eq('property_id', property.id)
         .eq('external_id', `lodgify_${lb.id}`)
-        .single()
+        .maybeSingle()
 
       const guestName = lb.guest?.name || null
 

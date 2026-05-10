@@ -157,7 +157,12 @@ describe('Statement Calculator', () => {
     expect(results[0].direction).toBe('owner_owes')
   })
 
-  it('skips owners with no activity', async () => {
+  it('creates a draft for every owner with active properties (incl. zero-activity)', async () => {
+    // Behaviour change: previously owners with zero charges were
+    // skipped, which left private-tier owners (e.g. Bobbi/Mesila —
+    // no platform bookings, owner-paid bills) without any statement
+    // to attach manual line items to. Now every owner with at least
+    // one active property gets a draft.
     const client = buildMockClient({
       owners: [
         { id: 'o1', full_name: 'Active', email: 'a@t.com', green_invoice_client_id: null },
@@ -173,8 +178,24 @@ describe('Statement Calculator', () => {
     })
 
     const results = await calculateMonthlyStatements(client as never, billingMonth)
-    expect(results).toHaveLength(1)
-    expect(results[0].ownerName).toBe('Active')
+    expect(results).toHaveLength(2)
+    const idle = results.find(r => r.ownerName === 'Idle')!
+    expect(idle.netAmountAgorot).toBe(0)
+    expect(idle.lineItems).toHaveLength(0)
+    expect(idle.direction).toBe('zero')
+  })
+
+  it('skips owners with no active properties at all', async () => {
+    const client = buildMockClient({
+      owners: [{ id: 'o1', full_name: 'Property-less', email: 'p@t.com', green_invoice_client_id: null }],
+      properties: [],
+      bookings: [],
+      work_logs: [],
+      bills: [],
+    })
+
+    const results = await calculateMonthlyStatements(client as never, billingMonth)
+    expect(results).toHaveLength(0)
   })
 
   it('multiple properties grouped correctly', async () => {

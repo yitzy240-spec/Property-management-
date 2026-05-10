@@ -220,7 +220,13 @@ export async function calculateMonthlyStatements(
     const charges = totalCommission + totalHourly + totalFixed + totalBills
     const net = charges - totalRental
 
-    if (totalRental === 0 && charges === 0) continue
+    // Previously skipped owners with zero auto-charges. That meant
+    // owners on private/manual arrangements (e.g. Bobbi at Mesila —
+    // no platform bookings, no fixed fee, all utilities owner-paid)
+    // never got a statement at all, so admin had nowhere to add the
+    // occasional one-off charge or reimbursement. Now we always
+    // create a draft for any owner with at least one active
+    // property; admin can edit / delete / add line items as needed.
 
     const direction: StatementDirection =
       net > 0 ? 'owner_owes' : net < 0 ? 'marcus_owes' : 'zero'

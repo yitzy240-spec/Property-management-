@@ -26,29 +26,33 @@ export async function GET(request: Request) {
     const prevMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1))
     const billingMonth = `${prevMonth.getUTCFullYear()}-${String(prevMonth.getUTCMonth() + 1).padStart(2, '0')}-01`
 
-    // Check if already generated
+    // Look up which owners already have a statement this month so
+    // we only fill in the gaps. If the cron retries (or someone
+    // already manually generated for some owners), this is idempotent.
     const { data: existing } = await serviceClient
       .from('monthly_statements')
-      .select('id')
+      .select('owner_id')
       .eq('billing_month', billingMonth)
-      .limit(1)
+    const ownersWithStatement = new Set((existing ?? []).map(s => s.owner_id))
 
-    if (existing && existing.length > 0) {
-      return NextResponse.json({ message: `Statements already exist for ${billingMonth}`, skipped: true })
-    }
-
-    const calculations = await calculateMonthlyStatements(serviceClient, billingMonth)
+    const allCalculations = await calculateMonthlyStatements(serviceClient, billingMonth)
+    const calculations = allCalculations.filter(c => !ownersWithStatement.has(c.ownerId))
 
     if (calculations.length === 0) {
-      return NextResponse.json({ message: 'No billable activity', statements: 0 })
+      return NextResponse.json({
+        message: `All owners already have a statement for ${billingMonth}`,
+        billing_month: billingMonth,
+        skipped: true,
+      })
     }
 
     const results = await insertStatements(serviceClient, calculations)
 
     return NextResponse.json({
-      message: `Generated ${results.length} statements for ${billingMonth}`,
+      message: `Generated ${results.length} new statement(s) for ${billingMonth}`,
       billing_month: billingMonth,
       statements: results.length,
+      skipped_existing: ownersWithStatement.size,
     })
   } catch (err) {
     console.error('[Cron:Billing] Error:', err)

@@ -24,24 +24,27 @@ export async function POST(request: Request) {
 
   const serviceClient = createServiceClient()
 
-  // Check for existing statements this month
+  // Find owners who already have at least one statement this month —
+  // we only fill in the gaps. Re-runnable, doesn't duplicate. (The
+  // unique constraint on (owner_id, billing_month) was dropped in
+  // migration 00029, so admin can still add additional statements
+  // for an owner manually; this auto-generation just stays one-per-
+  // owner-per-month so it doesn't pile on duplicates.)
   const { data: existing } = await serviceClient
     .from('monthly_statements')
-    .select('id, owner_id')
+    .select('owner_id')
     .eq('billing_month', billing_month)
+  const ownersWithStatement = new Set((existing ?? []).map(s => s.owner_id))
 
-  if (existing && existing.length > 0) {
-    return NextResponse.json(
-      { error: `Statements already exist for ${billing_month}. Delete them first to regenerate.`, existing: existing.length },
-      { status: 409 }
-    )
-  }
-
-  // Calculate statements
-  const calculations = await calculateMonthlyStatements(serviceClient, billing_month)
+  const allCalculations = await calculateMonthlyStatements(serviceClient, billing_month)
+  const calculations = allCalculations.filter(c => !ownersWithStatement.has(c.ownerId))
 
   if (calculations.length === 0) {
-    return NextResponse.json({ message: 'No billable activity found for this month', statements: 0 })
+    return NextResponse.json({
+      message: 'All owners already have a statement for this month',
+      statements: 0,
+      skipped_existing: ownersWithStatement.size,
+    })
   }
 
   const results = await insertStatements(serviceClient, calculations)
@@ -49,5 +52,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     message: `Generated ${results.length} statement(s)`,
     statements: results,
+    skipped_existing: ownersWithStatement.size,
   })
 }

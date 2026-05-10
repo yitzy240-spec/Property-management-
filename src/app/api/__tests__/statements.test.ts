@@ -126,11 +126,16 @@ describe('/api/statements/generate', () => {
     expect(data.error).toContain('billing_month')
   })
 
-  it('returns 409 if statements already exist', async () => {
-    mockSelectResult = { data: [{ id: 'existing' }], error: null }
+  it('skips owners who already have a statement and only fills the gaps', async () => {
+    // Pre-existing statement for one owner — generator should now
+    // succeed (not 409) and the response should reflect that some
+    // owners were skipped rather than rejecting the whole call.
+    mockSelectResult = { data: [{ owner_id: 'owner-already-has-one' }], error: null }
     const { POST } = await import('../statements/generate/route')
     const res = await POST(makeRequest('http://localhost/api/statements/generate', { billing_month: '2026-03-01' }))
-    expect(res.status).toBe(409)
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.skipped_existing).toBe(1)
   })
 })
 
