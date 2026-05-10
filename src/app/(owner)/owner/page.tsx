@@ -315,8 +315,9 @@ export default async function OwnerPortalPage({
             <div className="rounded-[10px] border border-border bg-card p-5 shadow-sm">
               <div className="grid grid-cols-3 gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-xs text-muted-foreground">{currentYear} Income</p>
-                  <p className="text-[10px] text-muted-foreground">After fees & commission</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {currentYear} Income<span className="text-muted-foreground/70">*</span>
+                  </p>
                   <div className="mt-1 space-y-0.5">
                     {Object.keys(incomeByCurrency).length === 0 ? (
                       <CurrencyDisplay agorot={0} variant="income" className="block truncate text-base font-bold" />
@@ -329,7 +330,7 @@ export default async function OwnerPortalPage({
                             agorot={amount}
                             currency={currency}
                             variant="income"
-                            className="block truncate text-base font-bold"
+                            className="block truncate text-base font-bold tabular-nums"
                           />
                         ))
                     )}
@@ -337,13 +338,20 @@ export default async function OwnerPortalPage({
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs text-muted-foreground">{currentYear} Bills</p>
-                  <CurrencyDisplay agorot={totalBills} variant="expense" className="mt-1 block truncate text-base font-bold" />
+                  <CurrencyDisplay agorot={totalBills} variant="expense" className="mt-1 block truncate text-base font-bold tabular-nums" />
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs text-muted-foreground">Properties</p>
                   <p className="mt-1 truncate font-mono text-base font-bold">{properties?.length ?? 0}</p>
                 </div>
               </div>
+              {/* Footnote — explains the asterisk on Income without
+                  cluttering the tile (the inline "After fees &
+                  commission" subtitle was forcing the amount to
+                  truncate at $26,573...). */}
+              <p className="mt-3 text-[10px] text-muted-foreground">
+                <span className="text-muted-foreground/70">*</span> After Airbnb/Booking.com fees and Marcus Properties commission
+              </p>
             </div>
 
             {availableYears.length > 0 && (
@@ -368,7 +376,11 @@ export default async function OwnerPortalPage({
                     vaad_bayit: "Va'ad Bayit",
                     other: 'Other',
                   }
-                  const billDate = bill.billing_period_end || bill.due_date || bill.created_at?.split('T')[0]
+                  // Match the admin property page — owners see the
+                  // due_date as the bill's date. Fallback chain only
+                  // kicks in for the rare case where a manual bill
+                  // has no due_date, so the row never shows blank.
+                  const billDate = bill.due_date || bill.billing_period_end || bill.created_at?.split('T')[0]
                   return (
                     <div key={bill.id} className={`flex items-center justify-between px-4 py-2.5 ${i > 0 ? 'border-t border-border' : ''}`}>
                       <div>
