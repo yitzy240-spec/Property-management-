@@ -7,6 +7,9 @@ import { UserManagement } from '@/components/features/user-management'
 import { IntegrationHealth } from '@/components/features/integration-health'
 import { SeasonalTemplateSettings } from '@/components/features/seasonal-template-settings'
 import { isGmailConnected } from '@/lib/gmail'
+import { CanvaConnect } from '@/components/features/canva-connect'
+import { CanvaStatusToast } from '@/components/features/canva-status-toast'
+import { loadCanvaTokens } from '@/lib/canva'
 
 export default async function SettingsPage() {
   let gmailConnected = false
@@ -16,8 +19,18 @@ export default async function SettingsPage() {
     // Gmail check failed — show as disconnected
   }
 
+  let canvaConnected = false
+  try {
+    canvaConnected = !!(await loadCanvaTokens())
+  } catch {
+    canvaConnected = false
+  }
+
   return (
     <div className="space-y-8">
+      <Suspense fallback={null}>
+        <CanvaStatusToast />
+      </Suspense>
       <div>
         <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
         <p className="text-xs text-muted-foreground">
@@ -54,6 +67,13 @@ export default async function SettingsPage() {
         <Suspense fallback={null}>
           <GmailConnect isConnected={gmailConnected} />
         </Suspense>
+      </section>
+
+      <section>
+        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Canva Integration
+        </p>
+        <CanvaConnect connected={canvaConnected} />
       </section>
 
       <section>
