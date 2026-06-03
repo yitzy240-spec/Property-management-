@@ -100,6 +100,83 @@ export async function clearCanvaTokens(): Promise<void> {
   ])
 }
 
+export interface UpdateDesignCodesInput {
+  designId: string
+  designName: string
+  newApartmentCode?: string
+  newBuildingCode?: string
+  accessToken: string
+}
+
+export interface UpdateDesignResult {
+  success: boolean
+  message: string
+}
+
+export async function updateCanvaDesignCodes(input: UpdateDesignCodesInput): Promise<UpdateDesignResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY env var not configured')
+
+  const systemPrompt = `You are an agent that updates codes in Canva apartment guides.
+You have access to the Canva MCP.
+Given a design ID and one or both new codes to update:
+1. Call get-design-content with the design_id to read the current text
+2. Find the current values for any codes that need updating (look for "Apartment codes:" and "Building code:" labels on the check-in page)
+3. Call start-editing-transaction with the design_id
+4. For each code that needs updating, use find_and_replace_text operation via perform-editing-operations to replace the old value with the new one
+5. Call commit-editing-transaction to save
+Respond ONLY with JSON: {"success": true/false, "message": "..."}`
+
+  const userMessage = `Update codes in Canva design "${input.designId}" (${input.designName}).
+${input.newApartmentCode ? `Set the apartment code to: "${input.newApartmentCode}" — find the current value after the label "Apartment codes:" and replace it.` : ''}
+${input.newBuildingCode ? `Set the building code to: "${input.newBuildingCode}" — find the current value after the label "Building code:" and replace it.` : ''}
+Only update the fields listed above.`
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'mcp-client-2025-04-04',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+      mcp_servers: [
+        {
+          type: 'url',
+          url: 'https://mcp.canva.com/mcp',
+          name: 'canva',
+          authorization_token: input.accessToken,
+        },
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    return { success: false, message: `Anthropic API ${response.status}: ${text.slice(0, 200)}` }
+  }
+
+  const data = (await response.json()) as { content?: Array<{ type: string; text?: string }> }
+  const fullText = (data.content ?? [])
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text ?? '')
+    .join('')
+
+  const match = fullText.match(/\{[\s\S]*\}/)
+  if (!match) return { success: false, message: fullText || 'No JSON in response' }
+  try {
+    const parsed = JSON.parse(match[0]) as { success: boolean; message: string }
+    return parsed
+  } catch {
+    return { success: false, message: 'Failed to parse JSON response' }
+  }
+}
+
 export async function refreshCanvaTokensIfNeeded(): Promise<CanvaTokens | null> {
   const tokens = await loadCanvaTokens()
   if (!tokens) return null
