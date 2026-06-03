@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Link2, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -28,23 +28,92 @@ interface TaskOption {
   contractor_name: string | null
 }
 
+const JERUSALEM_TZ = 'Asia/Jerusalem'
+
+function fmt(d: Date): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: JERUSALEM_TZ,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(d)
+}
+
+function jerusalemOffsetMinutes(at: Date): number {
+  const tzNamePart =
+    new Intl.DateTimeFormat('en-US', { timeZone: JERUSALEM_TZ, timeZoneName: 'shortOffset' })
+      .formatToParts(at)
+      .find((p) => p.type === 'timeZoneName')?.value ?? 'GMT+2'
+  const match = tzNamePart.match(/GMT([+-]\d+)(?::(\d+))?/)
+  if (!match) return 120
+  const hours = Number(match[1])
+  const minutes = Number(match[2] ?? '0')
+  return hours * 60 + (hours < 0 ? -minutes : minutes)
+}
+
+function jerusalemDateAt(days: number, hour: number, minute: number, from: Date): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: JERUSALEM_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(from)
+  const y = Number(parts.find((p) => p.type === 'year')!.value)
+  const m = Number(parts.find((p) => p.type === 'month')!.value)
+  const d = Number(parts.find((p) => p.type === 'day')!.value)
+  const candidate = new Date(Date.UTC(y, m - 1, d + days, hour, minute, 0))
+  const offsetMin = jerusalemOffsetMinutes(candidate)
+  return new Date(candidate.getTime() - offsetMin * 60 * 1000)
+}
+
 export function MagicLinkGenerator({ propertyId, propertyName }: MagicLinkGeneratorProps) {
-  const [step, setStep] = useState<'type' | 'tasks' | 'done'>('type')
+  const [step, setStep] = useState<'type' | 'guest-options' | 'tasks' | 'done'>('type')
   const [generating, setGenerating] = useState(false)
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [tasks, setTasks] = useState<TaskOption[]>([])
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
 
+  // Guest form state
+  const [revealImmediately, setRevealImmediately] = useState(false)
+  const [revealInDays, setRevealInDays] = useState<string>('')
+  const [neverExpires, setNeverExpires] = useState(false)
+  const [expiresInDays, setExpiresInDays] = useState<string>('')
+
   function reset() {
     setStep('type')
     setGeneratedUrl(null)
     setCopied(false)
     setSelectedTasks(new Set())
+    setRevealImmediately(false)
+    setRevealInDays('')
+    setNeverExpires(false)
+    setExpiresInDays('')
   }
 
+  const now = useMemo(() => new Date(), [step])
+
+  const revealAtPreview = useMemo(() => {
+    if (revealImmediately) return null
+    const n = Number(revealInDays)
+    if (revealInDays === '' || isNaN(n) || n < 0 || n > 30) return null
+    return jerusalemDateAt(n, 7, 0, now)
+  }, [revealImmediately, revealInDays, now])
+
+  const expiresAtPreview = useMemo(() => {
+    if (neverExpires) return null
+    const n = Number(expiresInDays)
+    if (expiresInDays === '' || isNaN(n) || n < 0 || n > 30) return null
+    return jerusalemDateAt(n, 23, 59, now)
+  }, [neverExpires, expiresInDays, now])
+
+  const revealChosen = revealImmediately || revealInDays !== ''
+  const expiryChosen = neverExpires || expiresInDays !== ''
+  const canGenerateGuest = revealChosen && expiryChosen && !generating
+
   async function handleContractorClick() {
-    // Fetch open tasks for this property
     const supabase = createClient()
     const { data } = await supabase
       .from('tasks')
@@ -53,7 +122,7 @@ export function MagicLinkGenerator({ propertyId, propertyName }: MagicLinkGenera
       .in('status', ['pending', 'in_progress'])
       .order('created_at', { ascending: false })
 
-    const taskList = (data ?? []).map(t => ({
+    const taskList = (data ?? []).map((t) => ({
       id: t.id,
       title: t.title,
       status: t.status,
@@ -61,18 +130,16 @@ export function MagicLinkGenerator({ propertyId, propertyName }: MagicLinkGenera
     }))
 
     if (taskList.length === 0) {
-      // No tasks — generate a general contractor link
-      await generate('contractor')
+      await generateContractor()
     } else {
       setTasks(taskList)
-      // Pre-select all tasks
-      setSelectedTasks(new Set(taskList.map(t => t.id)))
+      setSelectedTasks(new Set(taskList.map((t) => t.id)))
       setStep('tasks')
     }
   }
 
   function toggleTask(taskId: string) {
-    setSelectedTasks(prev => {
+    setSelectedTasks((prev) => {
       const next = new Set(prev)
       if (next.has(taskId)) next.delete(taskId)
       else next.add(taskId)
@@ -80,37 +147,61 @@ export function MagicLinkGenerator({ propertyId, propertyName }: MagicLinkGenera
     })
   }
 
-  async function generate(linkType: 'contractor' | 'guest') {
+  async function generateContractor() {
     setGenerating(true)
     setGeneratedUrl(null)
-
     try {
-      // For contractor links with selected tasks, use the first task
-      // (magic link system is per-task, but we include task_ids in payload)
-      const taskId = linkType === 'contractor' && selectedTasks.size > 0
-        ? Array.from(selectedTasks)[0]
-        : undefined
-
+      const taskId = selectedTasks.size > 0 ? Array.from(selectedTasks)[0] : undefined
       const res = await fetch('/api/magic-links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           property_id: propertyId,
-          link_type: linkType,
+          link_type: 'contractor',
           task_id: taskId,
-          task_ids: linkType === 'contractor' ? Array.from(selectedTasks) : undefined,
+          task_ids: Array.from(selectedTasks),
+          // contractor links keep the existing default — 72 hours via DB-row expiry
+          expires_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
+          code_reveals_at: null,
         }),
       })
-
       if (!res.ok) {
         const body = await res.json()
         throw new Error(body.error || 'Failed to generate')
       }
-
       const { url } = await res.json()
       setGeneratedUrl(url)
       setStep('done')
-      toast.success(`${linkType === 'guest' ? 'Guest' : 'Contractor'} link generated`)
+      toast.success('Contractor link generated')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to generate link')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  async function generateGuest() {
+    setGenerating(true)
+    setGeneratedUrl(null)
+    try {
+      const res = await fetch('/api/magic-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          property_id: propertyId,
+          link_type: 'guest',
+          code_reveals_at: revealAtPreview ? revealAtPreview.toISOString() : null,
+          expires_at: expiresAtPreview ? expiresAtPreview.toISOString() : null,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error || 'Failed to generate')
+      }
+      const { url } = await res.json()
+      setGeneratedUrl(url)
+      setStep('done')
+      toast.success('Guest link generated')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to generate link')
     } finally {
@@ -137,9 +228,7 @@ export function MagicLinkGenerator({ propertyId, propertyName }: MagicLinkGenera
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle>Generate Magic Link</DrawerTitle>
-          <DrawerDescription>
-            Create a secure link for {propertyName}. Expires in 72 hours.
-          </DrawerDescription>
+          <DrawerDescription>Create a secure link for {propertyName}.</DrawerDescription>
         </DrawerHeader>
 
         <div className="p-4">
@@ -152,22 +241,107 @@ export function MagicLinkGenerator({ propertyId, propertyName }: MagicLinkGenera
               >
                 <div>
                   <p className="text-sm font-semibold">Contractor Link</p>
-                  <p className="text-xs text-muted-foreground">Task checklist, photo upload, entry code, Waze</p>
+                  <p className="text-xs text-muted-foreground">Task checklist, photo upload, entry code, Waze · 72h expiry</p>
                 </div>
               </button>
               <button
-                onClick={() => generate('guest')}
+                onClick={() => setStep('guest-options')}
                 disabled={generating}
                 className="flex w-full items-center justify-between rounded-[10px] border border-border p-4 text-left transition-colors hover:bg-muted/40"
               >
                 <div>
                   <p className="text-sm font-semibold">Guest Check-in Link</p>
-                  <p className="text-xs text-muted-foreground">Entry code (time-gated), video guide, stay info</p>
+                  <p className="text-xs text-muted-foreground">Pick when the code reveals and when the link expires</p>
                 </div>
               </button>
-              {generating && (
-                <p className="text-center text-xs text-muted-foreground">Generating...</p>
-              )}
+            </div>
+          )}
+
+          {step === 'guest-options' && (
+            <div className="space-y-4">
+              <section className="rounded-[10px] border border-border p-4">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Code reveal</p>
+                <label className="mt-3 flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={revealImmediately}
+                    onChange={(e) => {
+                      setRevealImmediately(e.target.checked)
+                      if (e.target.checked) setRevealInDays('')
+                    }}
+                  />
+                  Reveal immediately
+                </label>
+                <div className="mt-2 flex items-center gap-2 text-sm">
+                  <span>Reveal in</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={revealInDays}
+                    onChange={(e) => {
+                      setRevealInDays(e.target.value)
+                      if (e.target.value !== '') setRevealImmediately(false)
+                    }}
+                    disabled={revealImmediately}
+                    className="h-8 w-20 rounded-[6px] border border-border bg-background px-2 text-sm"
+                  />
+                  <span>days</span>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {revealImmediately
+                    ? 'Code shows on first open.'
+                    : revealAtPreview
+                      ? `Code reveals ${fmt(revealAtPreview)} (Jerusalem)`
+                      : 'Pick a number of days or check the box above.'}
+                </p>
+              </section>
+
+              <section className="rounded-[10px] border border-border p-4">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Link expiry</p>
+                <label className="mt-3 flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={neverExpires}
+                    onChange={(e) => {
+                      setNeverExpires(e.target.checked)
+                      if (e.target.checked) setExpiresInDays('')
+                    }}
+                  />
+                  Never expires
+                </label>
+                <div className="mt-2 flex items-center gap-2 text-sm">
+                  <span>Expires in</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={expiresInDays}
+                    onChange={(e) => {
+                      setExpiresInDays(e.target.value)
+                      if (e.target.value !== '') setNeverExpires(false)
+                    }}
+                    disabled={neverExpires}
+                    className="h-8 w-20 rounded-[6px] border border-border bg-background px-2 text-sm"
+                  />
+                  <span>days</span>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {neverExpires
+                    ? 'Link never expires.'
+                    : expiresAtPreview
+                      ? `Expires ${fmt(expiresAtPreview)} (Jerusalem)`
+                      : 'Pick a number of days or check the box above.'}
+                </p>
+              </section>
+
+              <Button
+                onClick={generateGuest}
+                disabled={!canGenerateGuest}
+                className="h-11 w-full"
+              >
+                {generating ? 'Generating...' : 'Generate Guest Link'}
+              </Button>
             </div>
           )}
 
@@ -175,7 +349,7 @@ export function MagicLinkGenerator({ propertyId, propertyName }: MagicLinkGenera
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">Select tasks to include in the contractor link:</p>
               <div className="max-h-[300px] space-y-1 overflow-y-auto">
-                {tasks.map(task => (
+                {tasks.map((task) => (
                   <label
                     key={task.id}
                     className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/40"
@@ -199,7 +373,7 @@ export function MagicLinkGenerator({ propertyId, propertyName }: MagicLinkGenera
                 ))}
               </div>
               <Button
-                onClick={() => generate('contractor')}
+                onClick={generateContractor}
                 disabled={generating || selectedTasks.size === 0}
                 className="h-11 w-full"
               >
