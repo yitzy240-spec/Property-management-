@@ -1,11 +1,11 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { notFound } from 'next/navigation'
 import { ShieldOff } from 'lucide-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { verifyMagicLinkToken } from '@/lib/magic-links'
 import { GuestCheckIn } from '@/components/features/guest-check-in'
-
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
 export default async function GuestCheckInPage({
   params,
@@ -27,11 +27,16 @@ export default async function GuestCheckInPage({
 
     const { data: magicLink } = await serviceClient
       .from('magic_links')
-      .select('*')
+      .select('id, expires_at, code_reveals_at, is_used')
       .eq('token', params.token)
       .single()
 
     if (!magicLink) notFound()
+
+    // DB-backed expiry check (overrides the JWT exp claim, which is a far-future placeholder when DB expires_at is null).
+    if (magicLink.expires_at && new Date() > new Date(magicLink.expires_at)) {
+      throw new Error('expired')
+    }
 
     const { data: property } = await serviceClient
       .from('properties')
@@ -51,19 +56,14 @@ export default async function GuestCheckInPage({
       booking = data
     }
 
-    // SERVER-SIDE time gate
-    let entryCode: string | null = null
-    if (booking) {
-      const checkInDate = new Date(booking.check_in + 'T14:00:00+03:00')
-      const gateOpens = new Date(checkInDate.getTime() - 24 * 60 * 60 * 1000)
-      if (new Date() >= gateOpens) {
-        entryCode = property.entry_code
-      }
-    } else {
-      entryCode = property.entry_code
-    }
+    // Reveal gate: if code_reveals_at is null, reveal immediately. Otherwise wait until that timestamp.
+    const codeIsRevealed =
+      magicLink.code_reveals_at === null ||
+      new Date() >= new Date(magicLink.code_reveals_at)
 
-    // Fetch AI guest guide (non-blocking)
+    const entryCode = codeIsRevealed ? property.entry_code : null
+    const buildingEntryCode = codeIsRevealed ? property.building_entry_code : null
+
     let guideText: string | null = null
     try {
       const lang = (booking as Record<string, unknown>)?.guest_language as string || 'en'
@@ -81,7 +81,7 @@ export default async function GuestCheckInPage({
 
     return (
       <GuestCheckIn
-        property={{ ...property, entry_code: entryCode, building_entry_code: entryCode ? property.building_entry_code : null }}
+        property={{ ...property, entry_code: entryCode, building_entry_code: buildingEntryCode }}
         booking={booking}
         guideText={guideText}
       />
