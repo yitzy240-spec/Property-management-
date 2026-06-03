@@ -4,6 +4,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { verifyMagicLinkToken } from '@/lib/magic-links'
 import { GuestCheckIn } from '@/components/features/guest-check-in'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function GuestCheckInPage({
   params,
 }: {
