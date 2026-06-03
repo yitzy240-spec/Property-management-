@@ -153,6 +153,15 @@ Only update the fields listed above.`
           authorization_token: input.accessToken,
         },
       ],
+      // Under the mcp-client-2025-11-20 beta, tool config lives in a separate
+      // mcp_toolset entry. Every server in mcp_servers MUST be referenced by
+      // exactly one toolset or the request loads zero tools (NO_TOOLS_AVAILABLE).
+      tools: [
+        {
+          type: 'mcp_toolset',
+          mcp_server_name: 'canva',
+        },
+      ],
     }),
   })
 
