@@ -71,3 +71,55 @@ export async function verifyAndCheckMagicLink(
 
   return { ...payload, magic_link_id: magicLink.id }
 }
+
+const JERUSALEM_TZ = 'Asia/Jerusalem'
+
+function jerusalemOffsetMinutes(at: Date): number {
+  const tzNamePart =
+    new Intl.DateTimeFormat('en-US', { timeZone: JERUSALEM_TZ, timeZoneName: 'shortOffset' })
+      .formatToParts(at)
+      .find((p) => p.type === 'timeZoneName')?.value ?? 'GMT+2'
+  const match = tzNamePart.match(/GMT([+-]\d+)(?::(\d+))?/)
+  if (!match) return 120
+  const hours = Number(match[1])
+  const minutes = Number(match[2] ?? '0')
+  return hours * 60 + (hours < 0 ? -minutes : minutes)
+}
+
+function jerusalemDateAt(days: number, hour: number, minute: number, from: Date): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: JERUSALEM_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(from)
+  const y = Number(parts.find((p) => p.type === 'year')!.value)
+  const m = Number(parts.find((p) => p.type === 'month')!.value)
+  const d = Number(parts.find((p) => p.type === 'day')!.value)
+  const candidate = new Date(Date.UTC(y, m - 1, d + days, hour, minute, 0))
+  const offsetMin = jerusalemOffsetMinutes(candidate)
+  return new Date(candidate.getTime() - offsetMin * 60 * 1000)
+}
+
+export function computeRevealAt(revealInDays: number | null, from: Date = new Date()): Date | null {
+  if (revealInDays === null) return null
+  return jerusalemDateAt(revealInDays, 7, 0, from)
+}
+
+export function computeExpiresAt(expiresInDays: number | null, from: Date = new Date()): Date | null {
+  if (expiresInDays === null) return null
+  return jerusalemDateAt(expiresInDays, 23, 59, from)
+}
+
+export function validateRevealAndExpiry(
+  revealAt: Date | null,
+  expiresAt: Date | null,
+  now: Date = new Date(),
+): void {
+  if (expiresAt && expiresAt < now) {
+    throw new Error('expires_at is in the past')
+  }
+  if (revealAt && expiresAt && revealAt > expiresAt) {
+    throw new Error('code_reveals_at cannot be after expires_at')
+  }
+}
