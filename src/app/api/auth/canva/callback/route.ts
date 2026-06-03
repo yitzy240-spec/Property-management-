@@ -19,6 +19,7 @@ export async function GET(request: Request) {
   const state = url.searchParams.get('state')
   const cookieStore = cookies()
   const expectedState = cookieStore.get('canva_oauth_state')?.value
+  const codeVerifier = cookieStore.get('canva_code_verifier')?.value
 
   if (!code) {
     return NextResponse.redirect(new URL('/settings?canva=missing_code', request.url))
@@ -26,9 +27,13 @@ export async function GET(request: Request) {
   if (!expectedState || !state || state !== expectedState) {
     return NextResponse.redirect(new URL('/settings?canva=state_mismatch', request.url))
   }
+  if (!codeVerifier) {
+    // PKCE verifier cookie missing/expired — can't complete the exchange.
+    return NextResponse.redirect(new URL('/settings?canva=state_mismatch', request.url))
+  }
 
   try {
-    const tokens = await exchangeCodeForTokens(code)
+    const tokens = await exchangeCodeForTokens(code, codeVerifier)
     await storeCanvaTokens(tokens)
   } catch (err) {
     // Log server-side; client toast uses whitelisted codes only.
@@ -38,5 +43,6 @@ export async function GET(request: Request) {
 
   const response = NextResponse.redirect(new URL('/settings?canva=connected', request.url))
   response.cookies.delete('canva_oauth_state')
+  response.cookies.delete('canva_code_verifier')
   return response
 }

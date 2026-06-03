@@ -21,6 +21,7 @@ const exchangeMock = vi.fn(async () => ({
 const storeMock = vi.fn(async () => {})
 
 let stateCookie: string | undefined = 'STATE123'
+let verifierCookie: string | undefined = 'VERIFIER123'
 
 vi.mock('@/lib/canva', () => ({
   exchangeCodeForTokens: (...args: unknown[]) => exchangeMock(...(args as [])),
@@ -29,8 +30,11 @@ vi.mock('@/lib/canva', () => ({
 
 vi.mock('next/headers', () => ({
   cookies: () => ({
-    get: (name: string) =>
-      name === 'canva_oauth_state' && stateCookie ? { value: stateCookie } : undefined,
+    get: (name: string) => {
+      if (name === 'canva_oauth_state') return stateCookie ? { value: stateCookie } : undefined
+      if (name === 'canva_code_verifier') return verifierCookie ? { value: verifierCookie } : undefined
+      return undefined
+    },
   }),
 }))
 
@@ -50,6 +54,7 @@ describe('/api/auth/canva/callback', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     stateCookie = 'STATE123'
+    verifierCookie = 'VERIFIER123'
   })
 
   it('completes the roundtrip on a cross-site callback (no live session) when state matches', async () => {
@@ -58,8 +63,19 @@ describe('/api/auth/canva/callback', () => {
 
     expect(res.status).toBe(307)
     expect(res.headers.get('location')).toContain('canva=connected')
-    expect(exchangeMock).toHaveBeenCalledWith('CODE')
+    // PKCE verifier from the cookie is replayed at token exchange.
+    expect(exchangeMock).toHaveBeenCalledWith('CODE', 'VERIFIER123')
     expect(storeMock).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a missing PKCE verifier cookie', async () => {
+    verifierCookie = undefined
+    const { GET } = await import('../auth/canva/callback/route')
+    const res = await GET(callbackRequest({ code: 'CODE', state: 'STATE123' }))
+
+    expect(res.status).toBe(307)
+    expect(res.headers.get('location')).toContain('canva=state_mismatch')
+    expect(exchangeMock).not.toHaveBeenCalled()
   })
 
   it('rejects a state mismatch — CSRF gate preserved', async () => {
