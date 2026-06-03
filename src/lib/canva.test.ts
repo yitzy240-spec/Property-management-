@@ -1,0 +1,21 @@
+import { describe, it, expect } from 'vitest'
+import { parseCanvaDesignId } from './canva'
+
+describe('parseCanvaDesignId', () => {
+  it('extracts ID from a standard Canva URL', () => {
+    expect(parseCanvaDesignId('https://www.canva.com/design/DAGmTDKfFrI/abc/view')).toBe('DAGmTDKfFrI')
+  })
+
+  it('handles URLs without www', () => {
+    expect(parseCanvaDesignId('https://canva.com/design/DAHCHqRRpzI/edit')).toBe('DAHCHqRRpzI')
+  })
+
+  it('returns null for non-Canva URLs', () => {
+    expect(parseCanvaDesignId('https://example.com/design/foo')).toBeNull()
+  })
+
+  it('returns null for empty/null input', () => {
+    expect(parseCanvaDesignId('')).toBeNull()
+    expect(parseCanvaDesignId(null)).toBeNull()
+  })
+})
