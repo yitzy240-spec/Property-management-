@@ -28,8 +28,9 @@ export async function GET(request: Request) {
     const tokens = await exchangeCodeForTokens(code)
     await storeCanvaTokens(tokens)
   } catch (err) {
-    const msg = encodeURIComponent(err instanceof Error ? err.message : 'unknown')
-    return NextResponse.redirect(new URL(`/settings?canva=error&msg=${msg}`, request.url))
+    // Log server-side; client toast uses whitelisted codes only.
+    console.error('[canva oauth] callback failed:', err instanceof Error ? err.message : err)
+    return NextResponse.redirect(new URL('/settings?canva=error', request.url))
   }
 
   const response = NextResponse.redirect(new URL('/settings?canva=connected', request.url))

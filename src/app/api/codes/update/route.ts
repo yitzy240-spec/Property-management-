@@ -3,6 +3,12 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
 import { refreshCanvaTokensIfNeeded, parseCanvaDesignId, updateCanvaDesignCodes } from '@/lib/canva'
 
+// Vercel: allow this route up to 60s. With ~4 Canva-linked properties and ~10s
+// per Anthropic+MCP call, comfortable headroom. Cap property_ids server-side
+// to keep within budget.
+export const maxDuration = 60
+const MAX_PROPERTIES_PER_JOB = 20
+
 export async function POST(request: Request) {
   let user
   try {
@@ -21,6 +27,12 @@ export async function POST(request: Request) {
 
   if (!body.property_ids?.length) {
     return NextResponse.json({ error: 'property_ids required' }, { status: 400 })
+  }
+  if (body.property_ids.length > MAX_PROPERTIES_PER_JOB) {
+    return NextResponse.json(
+      { error: `Up to ${MAX_PROPERTIES_PER_JOB} properties per job. Split into multiple runs.` },
+      { status: 400 },
+    )
   }
   if (!body.apartment_code && !body.building_code) {
     return NextResponse.json({ error: 'apartment_code or building_code required' }, { status: 400 })
@@ -44,8 +56,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: jobErr?.message ?? 'failed to create job' }, { status: 500 })
   }
 
-  // Kick off processing async — errors persisted to the job row.
-  void processJob(job.id, body).catch(() => {})
+  // Run synchronously: Vercel serverless kills any work that outlives the response,
+  // so we keep the function alive until processJob completes. The client polls
+  // /api/codes/jobs/:id and will see status='done' on first poll. The per-property
+  // row updates inside processJob remain useful as a debug trail in the DB.
+  try {
+    await processJob(job.id, body)
+  } catch {
+    // Errors are already persisted into the job row's results.
+  }
 
   return NextResponse.json({ job_id: job.id })
 }

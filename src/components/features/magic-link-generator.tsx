@@ -5,6 +5,7 @@ import { Link2, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
+import { jerusalemDateAt } from '@/lib/jerusalem-time'
 import {
   Drawer,
   DrawerClose,
@@ -28,44 +29,15 @@ interface TaskOption {
   contractor_name: string | null
 }
 
-const JERUSALEM_TZ = 'Asia/Jerusalem'
-
 function fmt(d: Date): string {
   return new Intl.DateTimeFormat('en-GB', {
-    timeZone: JERUSALEM_TZ,
+    timeZone: 'Asia/Jerusalem',
     weekday: 'short',
     day: 'numeric',
     month: 'short',
     hour: 'numeric',
     minute: '2-digit',
   }).format(d)
-}
-
-function jerusalemOffsetMinutes(at: Date): number {
-  const tzNamePart =
-    new Intl.DateTimeFormat('en-US', { timeZone: JERUSALEM_TZ, timeZoneName: 'shortOffset' })
-      .formatToParts(at)
-      .find((p) => p.type === 'timeZoneName')?.value ?? 'GMT+2'
-  const match = tzNamePart.match(/GMT([+-]\d+)(?::(\d+))?/)
-  if (!match) return 120
-  const hours = Number(match[1])
-  const minutes = Number(match[2] ?? '0')
-  return hours * 60 + (hours < 0 ? -minutes : minutes)
-}
-
-function jerusalemDateAt(days: number, hour: number, minute: number, from: Date): Date {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: JERUSALEM_TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(from)
-  const y = Number(parts.find((p) => p.type === 'year')!.value)
-  const m = Number(parts.find((p) => p.type === 'month')!.value)
-  const d = Number(parts.find((p) => p.type === 'day')!.value)
-  const candidate = new Date(Date.UTC(y, m - 1, d + days, hour, minute, 0))
-  const offsetMin = jerusalemOffsetMinutes(candidate)
-  return new Date(candidate.getTime() - offsetMin * 60 * 1000)
 }
 
 export function MagicLinkGenerator({ propertyId, propertyName }: MagicLinkGeneratorProps) {
