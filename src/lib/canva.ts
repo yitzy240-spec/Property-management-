@@ -1,3 +1,9 @@
+import { createServiceClient } from '@/lib/supabase/server'
+import { encrypt, decrypt } from '@/lib/encryption'
+
+const CANVA_TOKEN_ENDPOINT = 'https://api.canva.com/rest/v1/oauth/token'
+const CANVA_AUTHORIZE_ENDPOINT = 'https://www.canva.com/api/oauth/authorize'
+
 export interface CanvaTokens {
   access_token: string
   refresh_token: string
@@ -8,4 +14,124 @@ export function parseCanvaDesignId(url: string | null): string | null {
   if (!url) return null
   const match = url.match(/canva\.com\/design\/([A-Za-z0-9_-]+)/)
   return match?.[1] ?? null
+}
+
+export function getCanvaAuthorizeUrl(state: string): string {
+  const clientId = process.env.CANVA_CLIENT_ID
+  if (!clientId) throw new Error('CANVA_CLIENT_ID env var not configured')
+  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/canva/callback`
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope: 'design:content:read design:content:write design:meta:read',
+    state,
+  })
+  return `${CANVA_AUTHORIZE_ENDPOINT}?${params.toString()}`
+}
+
+export async function exchangeCodeForTokens(code: string): Promise<CanvaTokens> {
+  const clientId = process.env.CANVA_CLIENT_ID
+  const clientSecret = process.env.CANVA_CLIENT_SECRET
+  if (!clientId || !clientSecret) throw new Error('Canva OAuth client not configured')
+  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/canva/callback`
+
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+  const res = await fetch(CANVA_TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${basic}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri,
+    }),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Canva token exchange failed: ${res.status} ${text}`)
+  }
+
+  const json = (await res.json()) as { access_token: string; refresh_token: string; expires_in: number }
+  return {
+    access_token: json.access_token,
+    refresh_token: json.refresh_token,
+    expires_at: new Date(Date.now() + json.expires_in * 1000).toISOString(),
+  }
+}
+
+export async function storeCanvaTokens(tokens: CanvaTokens): Promise<void> {
+  const client = createServiceClient()
+  const rows = [
+    { key: 'canva_access_token', value: await encrypt(tokens.access_token) },
+    { key: 'canva_refresh_token', value: await encrypt(tokens.refresh_token) },
+    { key: 'canva_token_expires_at', value: tokens.expires_at },
+  ]
+  for (const row of rows) {
+    await client.from('app_settings').upsert(row, { onConflict: 'key' })
+  }
+}
+
+export async function loadCanvaTokens(): Promise<CanvaTokens | null> {
+  const client = createServiceClient()
+  const { data } = await client
+    .from('app_settings')
+    .select('key, value')
+    .in('key', ['canva_access_token', 'canva_refresh_token', 'canva_token_expires_at'])
+  if (!data || data.length < 3) return null
+  const map = Object.fromEntries(data.map((r) => [r.key, r.value]))
+  if (!map.canva_access_token || !map.canva_refresh_token || !map.canva_token_expires_at) return null
+  return {
+    access_token: await decrypt(map.canva_access_token),
+    refresh_token: await decrypt(map.canva_refresh_token),
+    expires_at: map.canva_token_expires_at,
+  }
+}
+
+export async function clearCanvaTokens(): Promise<void> {
+  const client = createServiceClient()
+  await client.from('app_settings').delete().in('key', [
+    'canva_access_token',
+    'canva_refresh_token',
+    'canva_token_expires_at',
+  ])
+}
+
+export async function refreshCanvaTokensIfNeeded(): Promise<CanvaTokens | null> {
+  const tokens = await loadCanvaTokens()
+  if (!tokens) return null
+  const expiresAt = new Date(tokens.expires_at)
+  const fiveMinFromNow = new Date(Date.now() + 5 * 60 * 1000)
+  if (expiresAt > fiveMinFromNow) return tokens
+
+  const clientId = process.env.CANVA_CLIENT_ID
+  const clientSecret = process.env.CANVA_CLIENT_SECRET
+  if (!clientId || !clientSecret) throw new Error('Canva OAuth client not configured')
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+  const res = await fetch(CANVA_TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${basic}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: tokens.refresh_token,
+    }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Canva token refresh failed: ${res.status} ${text}`)
+  }
+  const json = (await res.json()) as { access_token: string; refresh_token: string; expires_in: number }
+  const updated: CanvaTokens = {
+    access_token: json.access_token,
+    refresh_token: json.refresh_token,
+    expires_at: new Date(Date.now() + json.expires_in * 1000).toISOString(),
+  }
+  await storeCanvaTokens(updated)
+  return updated
 }
