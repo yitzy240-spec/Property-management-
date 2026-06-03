@@ -22,6 +22,7 @@ import {
   Sparkles,
   X,
   Banknote,
+  KeyRound,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -43,6 +44,7 @@ const bottomTabs = [
 const menuItems = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/properties', label: 'Properties', icon: Building2 },
+  { href: '/codes', label: 'Codes', icon: KeyRound },
   { href: '/visits', label: 'Visits', icon: ClipboardCheck },
   { href: '/owners', label: 'Owners', icon: Users },
   { href: '/tasks', label: 'Tasks', icon: ClipboardList },
