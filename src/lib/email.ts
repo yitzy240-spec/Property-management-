@@ -67,6 +67,18 @@ export async function sendContractorMagicLink(
   })
 }
 
+function formatJerusalemDateTime(d: Date): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Jerusalem',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(d)
+}
+
 /** Send a check-in link to a guest */
 export async function sendGuestCheckInLink(
   email: string,
@@ -74,7 +86,12 @@ export async function sendGuestCheckInLink(
   propertyName: string,
   checkIn: string,
   magicLinkUrl: string,
+  codeRevealsAt: Date | null = null,
 ) {
+  const revealLine =
+    codeRevealsAt && codeRevealsAt > new Date()
+      ? `<p style="color: #6B7280; font-size: 14px; margin: 0 0 16px;">Your entry code will appear at <strong>${formatJerusalemDateTime(codeRevealsAt)}</strong>.</p>`
+      : ''
   return sendEmail({
     to: email,
     subject: `Your Check-in Details — ${propertyName}`,
@@ -84,7 +101,7 @@ export async function sendGuestCheckInLink(
         <h2 style="color: #1E3A5F; margin: 0 0 8px;">Welcome to ${propertyName}</h2>
         <p style="color: #6B7280; font-size: 14px; margin: 0 0 16px;">Hi ${guestName || 'Guest'},</p>
         <p style="color: #6B7280; font-size: 14px; margin: 0 0 4px;">Your check-in is on <strong>${checkIn}</strong>.</p>
-        <p style="color: #6B7280; font-size: 14px; margin: 0 0 16px;">Your entry code will be available 24 hours before check-in.</p>
+        ${revealLine}
         <a href="${magicLinkUrl}" style="display: inline-block; background: #1E3A5F; color: #F8F7F4; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500;">View Check-in Details</a>
         <p style="color: #9CA3AF; font-size: 12px; margin-top: 24px;">If you have questions, contact your host directly.</p>
         <p style="color: #9CA3AF; font-size: 11px; margin-top: 16px;">— Marcus Properties via ApartmentOS</p>
