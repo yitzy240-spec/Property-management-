@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { generateMagicLinkToken } from '@/lib/magic-links'
+import {
+  generateMagicLinkToken,
+  validateRevealAndExpiry,
+} from '@/lib/magic-links'
 import { requireAdmin, AuthError } from '@/lib/auth'
 import { sendContractorMagicLink, sendGuestCheckInLink } from '@/lib/email'
 import type { MagicLinkType } from '@/types'
@@ -23,7 +26,8 @@ export async function POST(request: Request) {
     booking_id,
     link_type,
     send_email = true,
-    expires_in_hours = 72,
+    expires_at: expiresAtRaw = null,
+    code_reveals_at: codeRevealsAtRaw = null,
   } = body as {
     property_id: string
     task_id?: string
@@ -32,7 +36,8 @@ export async function POST(request: Request) {
     booking_id?: string
     link_type: MagicLinkType
     send_email?: boolean
-    expires_in_hours?: number
+    expires_at?: string | null
+    code_reveals_at?: string | null
   }
 
   if (!property_id || !link_type) {
@@ -42,14 +47,31 @@ export async function POST(request: Request) {
     )
   }
 
+  const expiresAt = expiresAtRaw ? new Date(expiresAtRaw) : null
+  const codeRevealsAt = codeRevealsAtRaw ? new Date(codeRevealsAtRaw) : null
+
+  try {
+    validateRevealAndExpiry(codeRevealsAt, expiresAt)
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Invalid reveal/expiry' },
+      { status: 400 },
+    )
+  }
+
+  // JWT exp: if expires_at is null, use a far-future expiry; the DB row is the actual gate.
+  const TEN_YEARS_HOURS = 24 * 365 * 10
+  const expiresInHoursForJwt = expiresAt
+    ? Math.max(1, Math.ceil((expiresAt.getTime() - Date.now()) / (60 * 60 * 1000)))
+    : TEN_YEARS_HOURS
+
   try {
     const token = await generateMagicLinkToken(
       { property_id, task_id, contractor_id, booking_id, link_type },
-      expires_in_hours
+      expiresInHoursForJwt,
     )
 
     const serviceClient = createServiceClient()
-    const expiresAt = new Date(Date.now() + expires_in_hours * 60 * 60 * 1000)
 
     const { error: dbError } = await serviceClient
       .from('magic_links')
@@ -60,7 +82,8 @@ export async function POST(request: Request) {
         task_id: task_id || null,
         contractor_id: contractor_id || null,
         booking_id: booking_id || null,
-        expires_at: expiresAt.toISOString(),
+        expires_at: expiresAt ? expiresAt.toISOString() : null,
+        code_reveals_at: codeRevealsAt ? codeRevealsAt.toISOString() : null,
       })
 
     if (dbError) {
@@ -71,7 +94,6 @@ export async function POST(request: Request) {
     const prefix = link_type === 'guest' ? 'guest' : 'contractor'
     const url = `${baseUrl}/${prefix}/${token}`
 
-    // Auto-send email if requested
     let emailSent = false
     if (send_email) {
       const { data: property } = await serviceClient
@@ -90,7 +112,6 @@ export async function POST(request: Request) {
           .single()
 
         if (contractor?.email) {
-          // Get task title
           let taskTitle = 'Task Assignment'
           if (task_id) {
             const { data: task } = await serviceClient
@@ -104,7 +125,7 @@ export async function POST(request: Request) {
               .from('tasks')
               .select('title')
               .in('id', task_ids)
-            taskTitle = (tasks ?? []).map(t => t.title).join(', ')
+            taskTitle = (tasks ?? []).map((t) => t.title).join(', ')
           }
 
           await sendContractorMagicLink(
@@ -132,6 +153,7 @@ export async function POST(request: Request) {
             propertyName,
             booking.check_in,
             url,
+            codeRevealsAt,
           )
           emailSent = true
         }
@@ -141,13 +163,14 @@ export async function POST(request: Request) {
     return NextResponse.json({
       token,
       url,
-      expires_at: expiresAt.toISOString(),
+      expires_at: expiresAt ? expiresAt.toISOString() : null,
+      code_reveals_at: codeRevealsAt ? codeRevealsAt.toISOString() : null,
       email_sent: emailSent,
     })
   } catch (err) {
     return NextResponse.json(
-      { error: 'Failed to generate magic link' },
-      { status: 500 }
+      { error: err instanceof Error ? err.message : 'Failed to generate magic link' },
+      { status: 500 },
     )
   }
 }
