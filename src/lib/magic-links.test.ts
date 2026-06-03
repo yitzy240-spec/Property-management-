@@ -16,7 +16,13 @@ vi.mock('@/lib/supabase/server', () => ({
 // Set env before import
 process.env.MAGIC_LINK_SECRET = 'test-secret-key-that-is-at-least-32-characters-long'
 
-import { generateMagicLinkToken, verifyMagicLinkToken } from './magic-links'
+import {
+  generateMagicLinkToken,
+  verifyMagicLinkToken,
+  computeRevealAt,
+  computeExpiresAt,
+  validateRevealAndExpiry,
+} from './magic-links'
 
 describe('Magic Link JWT System', () => {
   it('generates a valid JWT token', async () => {
@@ -131,5 +137,64 @@ describe('Magic Link JWT System', () => {
     expect(payload.task_id).toBe('task-1')
     expect(payload.contractor_id).toBe('cont-1')
     expect(payload.booking_id).toBe('book-1')
+  })
+})
+
+describe('computeRevealAt', () => {
+  it('returns null when reveal_in_days is null (reveal immediately)', () => {
+    expect(computeRevealAt(null, new Date('2026-06-03T10:00:00Z'))).toBeNull()
+  })
+
+  it('returns 07:00 Jerusalem time on day N when day count provided', () => {
+    // 2026-06-03 10:00 UTC = 13:00 Jerusalem (IDT, UTC+3)
+    // reveal_in_days = 2 → 2026-06-05 07:00 Jerusalem = 2026-06-05 04:00 UTC
+    const result = computeRevealAt(2, new Date('2026-06-03T10:00:00Z'))
+    expect(result?.toISOString()).toBe('2026-06-05T04:00:00.000Z')
+  })
+
+  it('handles day 0 (today at 7am Jerusalem)', () => {
+    const result = computeRevealAt(0, new Date('2026-06-03T10:00:00Z'))
+    expect(result?.toISOString()).toBe('2026-06-03T04:00:00.000Z')
+  })
+})
+
+describe('computeExpiresAt', () => {
+  it('returns null when expires_in_days is null (never expires)', () => {
+    expect(computeExpiresAt(null, new Date('2026-06-03T10:00:00Z'))).toBeNull()
+  })
+
+  it('returns 23:59 Jerusalem time on day N from creation', () => {
+    // 2026-06-03 10:00 UTC; expires_in_days = 5 → 2026-06-08 23:59 Jerusalem = 2026-06-08 20:59 UTC
+    const result = computeExpiresAt(5, new Date('2026-06-03T10:00:00Z'))
+    expect(result?.toISOString()).toBe('2026-06-08T20:59:00.000Z')
+  })
+})
+
+describe('validateRevealAndExpiry', () => {
+  it('passes when both are null', () => {
+    expect(() => validateRevealAndExpiry(null, null)).not.toThrow()
+  })
+
+  it('passes when reveal is before expiry', () => {
+    expect(() =>
+      validateRevealAndExpiry(
+        new Date('2026-06-04T04:00:00Z'),
+        new Date('2026-06-10T20:59:00Z'),
+      ),
+    ).not.toThrow()
+  })
+
+  it('throws when reveal is after expiry', () => {
+    expect(() =>
+      validateRevealAndExpiry(
+        new Date('2026-06-10T04:00:00Z'),
+        new Date('2026-06-05T20:59:00Z'),
+      ),
+    ).toThrow(/reveal.*after.*expir/i)
+  })
+
+  it('throws when expires_at is in the past', () => {
+    expect(() => validateRevealAndExpiry(null, new Date('2020-01-01T00:00:00Z')))
+      .toThrow(/past/i)
   })
 })

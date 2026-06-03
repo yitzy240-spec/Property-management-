@@ -4,6 +4,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { verifyMagicLinkToken } from '@/lib/magic-links'
 import { ContractorTaskView } from '@/components/features/contractor-task-view'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function ContractorMagicLinkPage({
   params,
 }: {

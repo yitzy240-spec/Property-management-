@@ -71,3 +71,28 @@ export async function verifyAndCheckMagicLink(
 
   return { ...payload, magic_link_id: magicLink.id }
 }
+
+import { jerusalemDateAt } from '@/lib/jerusalem-time'
+
+export function computeRevealAt(revealInDays: number | null, from: Date = new Date()): Date | null {
+  if (revealInDays === null) return null
+  return jerusalemDateAt(revealInDays, 7, 0, from)
+}
+
+export function computeExpiresAt(expiresInDays: number | null, from: Date = new Date()): Date | null {
+  if (expiresInDays === null) return null
+  return jerusalemDateAt(expiresInDays, 23, 59, from)
+}
+
+export function validateRevealAndExpiry(
+  revealAt: Date | null,
+  expiresAt: Date | null,
+  now: Date = new Date(),
+): void {
+  if (expiresAt && expiresAt < now) {
+    throw new Error('expires_at is in the past')
+  }
+  if (revealAt && expiresAt && revealAt > expiresAt) {
+    throw new Error('code_reveals_at cannot be after expires_at')
+  }
+}
