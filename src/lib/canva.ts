@@ -88,23 +88,43 @@ export async function storeCanvaTokens(tokens: CanvaTokens): Promise<void> {
     { key: 'canva_token_expires_at', value: tokens.expires_at },
   ]
   for (const row of rows) {
-    await client.from('app_settings').upsert(row, { onConflict: 'key' })
+    // Surface persistence failures instead of swallowing them — otherwise the
+    // callback reports "connected" while nothing was actually stored.
+    const { error } = await client.from('app_settings').upsert(row, { onConflict: 'key' })
+    if (error) {
+      throw new Error(`Failed to persist ${row.key}: ${error.message}`)
+    }
   }
 }
 
 export async function loadCanvaTokens(): Promise<CanvaTokens | null> {
   const client = createServiceClient()
-  const { data } = await client
+  const { data, error } = await client
     .from('app_settings')
     .select('key, value')
     .in('key', ['canva_access_token', 'canva_refresh_token', 'canva_token_expires_at'])
-  if (!data || data.length < 3) return null
+  if (error) {
+    console.error('[canva load] select failed:', error.message)
+    return null
+  }
+  if (!data || data.length < 3) {
+    console.error(`[canva load] expected 3 token rows, found ${data?.length ?? 0}`)
+    return null
+  }
   const map = Object.fromEntries(data.map((r) => [r.key, r.value]))
-  if (!map.canva_access_token || !map.canva_refresh_token || !map.canva_token_expires_at) return null
-  return {
-    access_token: await decrypt(map.canva_access_token),
-    refresh_token: await decrypt(map.canva_refresh_token),
-    expires_at: map.canva_token_expires_at,
+  if (!map.canva_access_token || !map.canva_refresh_token || !map.canva_token_expires_at) {
+    console.error('[canva load] one or more token rows had an empty value')
+    return null
+  }
+  try {
+    return {
+      access_token: await decrypt(map.canva_access_token),
+      refresh_token: await decrypt(map.canva_refresh_token),
+      expires_at: map.canva_token_expires_at,
+    }
+  } catch (err) {
+    console.error('[canva load] decrypt failed:', err instanceof Error ? err.message : err)
+    return null
   }
 }
 
