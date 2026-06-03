@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
-import { getCanvaAuthorizeUrl, clearCanvaTokens } from '@/lib/canva'
+import { getCanvaAuthorizeUrl, clearCanvaTokens, generatePkcePair } from '@/lib/canva'
 import crypto from 'crypto'
 
 export async function GET() {
@@ -12,16 +12,21 @@ export async function GET() {
   }
 
   const state = crypto.randomBytes(16).toString('hex')
-  const url = getCanvaAuthorizeUrl(state)
+  const { verifier, challenge } = generatePkcePair()
+  const url = getCanvaAuthorizeUrl(state, challenge)
 
-  const response = NextResponse.redirect(url)
-  response.cookies.set('canva_oauth_state', state, {
+  const cookieOpts = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'lax' as const,
     maxAge: 60 * 10,
     path: '/',
-  })
+  }
+  const response = NextResponse.redirect(url)
+  response.cookies.set('canva_oauth_state', state, cookieOpts)
+  // PKCE verifier — replayed at the callback's token exchange. Lax so it survives
+  // the cross-site return from canva.com, httpOnly so client JS can't read it.
+  response.cookies.set('canva_code_verifier', verifier, cookieOpts)
   return response
 }
 

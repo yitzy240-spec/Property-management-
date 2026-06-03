@@ -1,5 +1,12 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { parseCanvaDesignId, updateCanvaDesignCodes } from './canva'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
+import crypto from 'crypto'
+import {
+  parseCanvaDesignId,
+  updateCanvaDesignCodes,
+  generatePkcePair,
+  getCanvaAuthorizeUrl,
+  exchangeCodeForTokens,
+} from './canva'
 
 describe('parseCanvaDesignId', () => {
   it('extracts ID from a standard Canva URL', () => {
@@ -58,5 +65,56 @@ describe('updateCanvaDesignCodes — request shape', () => {
     // ...and referenced by exactly one toolset, or the API loads zero tools
     expect(body.tools).toEqual([{ type: 'mcp_toolset', mcp_server_name: 'canva' }])
     expect(body.tools[0].mcp_server_name).toBe(body.mcp_servers[0].name)
+  })
+})
+
+describe('Canva OAuth PKCE', () => {
+  const saved: Record<string, string | undefined> = {}
+  beforeEach(() => {
+    for (const k of ['CANVA_CLIENT_ID', 'CANVA_CLIENT_SECRET', 'NEXT_PUBLIC_APP_URL']) {
+      saved[k] = process.env[k]
+    }
+    process.env.CANVA_CLIENT_ID = 'cid'
+    process.env.CANVA_CLIENT_SECRET = 'secret'
+    process.env.NEXT_PUBLIC_APP_URL = 'https://app.example.com'
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    }
+  })
+
+  it('generatePkcePair derives an S256 challenge from the verifier', () => {
+    const { verifier, challenge } = generatePkcePair()
+    expect(verifier.length).toBeGreaterThanOrEqual(43)
+    expect(challenge).toBe(crypto.createHash('sha256').update(verifier).digest('base64url'))
+    // base64url — no +, /, or = padding
+    expect(challenge).not.toMatch(/[+/=]/)
+  })
+
+  it('getCanvaAuthorizeUrl includes code_challenge and S256 method (required by Canva)', () => {
+    const url = new URL(getCanvaAuthorizeUrl('STATE', 'CHALLENGE'))
+    expect(url.searchParams.get('code_challenge')).toBe('CHALLENGE')
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256')
+    expect(url.searchParams.get('response_type')).toBe('code')
+    expect(url.searchParams.get('state')).toBe('STATE')
+  })
+
+  it('exchangeCodeForTokens replays the code_verifier at token exchange', async () => {
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => ({
+      ok: true,
+      json: async () => ({ access_token: 'a', refresh_token: 'r', expires_in: 3600 }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await exchangeCodeForTokens('CODE', 'VERIFIER')
+
+    const [, init] = fetchMock.mock.calls[0]
+    const body = init.body as URLSearchParams
+    expect(body.get('grant_type')).toBe('authorization_code')
+    expect(body.get('code')).toBe('CODE')
+    expect(body.get('code_verifier')).toBe('VERIFIER')
   })
 })

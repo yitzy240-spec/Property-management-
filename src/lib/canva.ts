@@ -1,8 +1,20 @@
+import crypto from 'crypto'
 import { createServiceClient } from '@/lib/supabase/server'
 import { encrypt, decrypt } from '@/lib/encryption'
 
 const CANVA_TOKEN_ENDPOINT = 'https://api.canva.com/rest/v1/oauth/token'
 const CANVA_AUTHORIZE_ENDPOINT = 'https://www.canva.com/api/oauth/authorize'
+
+/**
+ * Canva Connect OAuth requires PKCE (SHA-256). Generate a random code_verifier
+ * and its S256 code_challenge. The verifier is stashed in a cookie by the start
+ * route and replayed at token exchange; the challenge goes on the authorize URL.
+ */
+export function generatePkcePair(): { verifier: string; challenge: string } {
+  const verifier = crypto.randomBytes(32).toString('base64url')
+  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url')
+  return { verifier, challenge }
+}
 
 export interface CanvaTokens {
   access_token: string
@@ -16,7 +28,7 @@ export function parseCanvaDesignId(url: string | null): string | null {
   return match?.[1] ?? null
 }
 
-export function getCanvaAuthorizeUrl(state: string): string {
+export function getCanvaAuthorizeUrl(state: string, codeChallenge: string): string {
   const clientId = process.env.CANVA_CLIENT_ID
   if (!clientId) throw new Error('CANVA_CLIENT_ID env var not configured')
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/canva/callback`
@@ -25,12 +37,15 @@ export function getCanvaAuthorizeUrl(state: string): string {
     client_id: clientId,
     redirect_uri: redirectUri,
     scope: 'design:content:read design:content:write design:meta:read',
+    // PKCE (required by Canva): omitting these returns a 400 at the authorize step.
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
     state,
   })
   return `${CANVA_AUTHORIZE_ENDPOINT}?${params.toString()}`
 }
 
-export async function exchangeCodeForTokens(code: string): Promise<CanvaTokens> {
+export async function exchangeCodeForTokens(code: string, codeVerifier: string): Promise<CanvaTokens> {
   const clientId = process.env.CANVA_CLIENT_ID
   const clientSecret = process.env.CANVA_CLIENT_SECRET
   if (!clientId || !clientSecret) throw new Error('Canva OAuth client not configured')
@@ -46,6 +61,8 @@ export async function exchangeCodeForTokens(code: string): Promise<CanvaTokens> 
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code,
+      // PKCE: the verifier matching the code_challenge sent at authorize time.
+      code_verifier: codeVerifier,
       redirect_uri: redirectUri,
     }),
   })
