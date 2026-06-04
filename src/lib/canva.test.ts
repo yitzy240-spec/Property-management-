@@ -6,6 +6,7 @@ import {
   generatePkcePair,
   getCanvaAuthorizeUrl,
   exchangeCodeForTokens,
+  getCanvaEmbedUrl,
 } from './canva'
 
 describe('parseCanvaDesignId', () => {
@@ -116,5 +117,16 @@ describe('Canva OAuth PKCE', () => {
     expect(body.get('grant_type')).toBe('authorization_code')
     expect(body.get('code')).toBe('CODE')
     expect(body.get('code_verifier')).toBe('VERIFIER')
+  })
+})
+
+describe('getCanvaEmbedUrl', () => {
+  it('builds the embed URL from a sharing link', () => {
+    expect(getCanvaEmbedUrl('https://www.canva.com/design/DAGmTDKfFrI/abc/view'))
+      .toBe('https://www.canva.com/design/DAGmTDKfFrI/view?embed')
+  })
+  it('returns null for non-Canva or empty input', () => {
+    expect(getCanvaEmbedUrl(null)).toBeNull()
+    expect(getCanvaEmbedUrl('https://example.com/x')).toBeNull()
   })
 })

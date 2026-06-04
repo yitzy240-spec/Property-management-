@@ -28,6 +28,12 @@ export function parseCanvaDesignId(url: string | null): string | null {
   return match?.[1] ?? null
 }
 
+/** Build the public embed-viewer URL for a Canva design from its sharing link. */
+export function getCanvaEmbedUrl(url: string | null): string | null {
+  const id = parseCanvaDesignId(url)
+  return id ? `https://www.canva.com/design/${id}/view?embed` : null
+}
+
 export function getCanvaAuthorizeUrl(state: string, codeChallenge: string): string {
   const clientId = process.env.CANVA_CLIENT_ID
   if (!clientId) throw new Error('CANVA_CLIENT_ID env var not configured')
