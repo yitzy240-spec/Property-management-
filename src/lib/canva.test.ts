@@ -30,7 +30,9 @@ describe('getCanvaEmbedUrl', () => {
 })
 
 describe('resolveCanvaDesignUrl', () => {
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
 
   it('canonicalizes a direct design link without any network call', async () => {
     const fetchMock = vi.fn()
