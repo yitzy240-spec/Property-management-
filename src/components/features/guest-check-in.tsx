@@ -115,16 +115,18 @@ export function GuestCheckIn({ property, booking, guideText, canvaEmbedUrl }: Gu
           {codeVisible && property.entry_code ? (
             <div className="animate-code-reveal">
               <KeyRound className="mx-auto h-7 w-7 text-status-safe" />
-              <p className="mt-2 text-xs font-semibold uppercase tracking-widest text-status-safe">Your Entry Code</p>
-              <p className="mt-2 font-mono text-5xl font-bold tracking-[0.25em] text-foreground">
-                {property.entry_code}
-              </p>
+              {/* Chronological order: building code first (you enter the building),
+                  then the door code, then the apartment-specific instructions. */}
               {property.building_entry_code && (
-                <div className="mt-3 rounded-lg bg-muted/50 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Building Entrance</p>
-                  <p className="font-mono text-lg font-bold tracking-[0.15em]">{property.building_entry_code}</p>
+                <div className="mt-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Building Code</p>
+                  <p className="mt-0.5 font-mono text-3xl font-bold tracking-[0.2em] text-foreground">{property.building_entry_code}</p>
                 </div>
               )}
+              <p className="mt-3 text-xs font-semibold uppercase tracking-widest text-status-safe">Door Code</p>
+              <p className="mt-1 font-mono text-5xl font-bold tracking-[0.25em] text-foreground">
+                {property.entry_code}
+              </p>
               {property.entry_instructions ? (
                 <p dir="auto" className="mt-3 whitespace-pre-line text-xs text-muted-foreground">
                   {property.entry_instructions}
@@ -134,7 +136,7 @@ export function GuestCheckIn({ property, booking, guideText, canvaEmbedUrl }: Gu
                   {canvaEmbedUrl
                     ? 'Step-by-step entry instructions are in your guide below.'
                     : property.building_entry_code
-                      ? 'Use the building code at the main entrance, then the apartment code on the Simplex lock.'
+                      ? 'Use the building code at the main entrance, then the door code on the Simplex lock.'
                       : 'Use this code on the Simplex lock at the front door.'}
                 </p>
               )}
