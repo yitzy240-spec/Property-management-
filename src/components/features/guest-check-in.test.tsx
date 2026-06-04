@@ -14,6 +14,7 @@ const baseProperty = {
   building_entry_code: '8889',
   youtube_tutorial_url: 'https://youtu.be/abc',
   canva_design_url: 'https://www.canva.com/design/DAGmTDKfFrI/view',
+  entry_instructions: null,
 }
 
 describe('GuestCheckIn', () => {
@@ -40,5 +41,16 @@ describe('GuestCheckIn', () => {
     expect(
       screen.getByText('Use the building code at the main entrance, then the apartment code on the Simplex lock.'),
     ).toBeTruthy()
+  })
+
+  it('shows the apartment-specific entry instructions when present', () => {
+    render(
+      <GuestCheckIn
+        property={{ ...baseProperty, entry_instructions: 'Take the lift to 3, turn right.' }}
+        booking={null}
+        canvaEmbedUrl={null}
+      />,
+    )
+    expect(screen.getByText('Take the lift to 3, turn right.')).toBeTruthy()
   })
 })

@@ -14,6 +14,7 @@ interface GuestCheckInProps {
     building_entry_code: string | null
     youtube_tutorial_url: string | null
     canva_design_url: string | null
+    entry_instructions: string | null
   }
   booking: {
     check_in: string
@@ -124,13 +125,19 @@ export function GuestCheckIn({ property, booking, guideText, canvaEmbedUrl }: Gu
                   <p className="font-mono text-lg font-bold tracking-[0.15em]">{property.building_entry_code}</p>
                 </div>
               )}
-              <p className="mt-3 text-xs text-muted-foreground">
-                {canvaEmbedUrl
-                  ? 'Step-by-step entry instructions are in your guide below.'
-                  : property.building_entry_code
-                    ? 'Use the building code at the main entrance, then the apartment code on the Simplex lock.'
-                    : 'Use this code on the Simplex lock at the front door.'}
-              </p>
+              {property.entry_instructions ? (
+                <p dir="auto" className="mt-3 whitespace-pre-line text-xs text-muted-foreground">
+                  {property.entry_instructions}
+                </p>
+              ) : (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {canvaEmbedUrl
+                    ? 'Step-by-step entry instructions are in your guide below.'
+                    : property.building_entry_code
+                      ? 'Use the building code at the main entrance, then the apartment code on the Simplex lock.'
+                      : 'Use this code on the Simplex lock at the front door.'}
+                </p>
+              )}
             </div>
           ) : (
             <>
