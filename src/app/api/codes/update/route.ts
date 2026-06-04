@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
 
@@ -55,6 +56,10 @@ export async function POST(request: Request) {
   } catch {
     // Errors are already persisted into the job row's results.
   }
+
+  // Invalidate cached pages that display these codes so they show fresh values.
+  revalidatePath('/codes')
+  revalidatePath('/properties')
 
   return NextResponse.json({ job_id: job.id })
 }

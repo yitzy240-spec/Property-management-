@@ -39,7 +39,7 @@ describe('GuestCheckIn', () => {
   it('falls back to explicit entry instructions when there is no embedded guide', () => {
     render(<GuestCheckIn property={baseProperty} booking={null} canvaEmbedUrl={null} />)
     expect(
-      screen.getByText('Use the building code at the main entrance, then the apartment code on the Simplex lock.'),
+      screen.getByText('Use the building code at the main entrance, then the door code on the Simplex lock.'),
     ).toBeTruthy()
   })
 
