@@ -16,6 +16,8 @@ export async function createProperty(data: Record<string, unknown>) {
   const serviceClient = createServiceClient()
   const { error } = await serviceClient.from('properties').insert(data)
   if (error) return { error: error.message }
+  revalidatePath('/properties')
+  revalidatePath('/codes')
   return { success: true }
 }
 
@@ -31,6 +33,9 @@ export async function updateProperty(id: string, data: Record<string, unknown>) 
   const serviceClient = createServiceClient()
   const { error } = await serviceClient.from('properties').update(data).eq('id', id)
   if (error) return { error: error.message }
+  revalidatePath('/properties')
+  revalidatePath(`/properties/${id}`)
+  revalidatePath('/codes')
   return { success: true }
 }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
@@ -21,6 +22,7 @@ interface CodeUpdateFormProps {
 }
 
 export function CodeUpdateForm({ properties }: CodeUpdateFormProps) {
+  const router = useRouter()
   const [apartmentCode, setApartmentCode] = useState('')
   const [buildingCode, setBuildingCode] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -69,7 +71,12 @@ export function CodeUpdateForm({ properties }: CodeUpdateFormProps) {
         if (res.ok) {
           const data = (await res.json()) as JobResult
           setJob(data)
-          if (data.status === 'done') return
+          if (data.status === 'done') {
+            // Re-fetch the server component so the apartments' "Current:" codes
+            // reflect the update we just made (otherwise the list stays stale).
+            router.refresh()
+            return
+          }
         }
         await new Promise((r) => setTimeout(r, 1000))
       }
