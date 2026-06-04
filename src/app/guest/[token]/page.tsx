@@ -6,6 +6,7 @@ import { ShieldOff } from 'lucide-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { verifyMagicLinkToken } from '@/lib/magic-links'
 import { GuestCheckIn } from '@/components/features/guest-check-in'
+import { getCanvaEmbedUrl } from '@/lib/canva'
 
 export default async function GuestCheckInPage({
   params,
@@ -84,6 +85,7 @@ export default async function GuestCheckInPage({
         property={{ ...property, entry_code: entryCode, building_entry_code: buildingEntryCode }}
         booking={booking}
         guideText={guideText}
+        canvaEmbedUrl={getCanvaEmbedUrl(property.canva_design_url)}
       />
     )
   } catch {
