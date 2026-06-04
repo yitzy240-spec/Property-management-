@@ -83,12 +83,13 @@ export function GuestCheckIn({ property, booking, guideText, canvaEmbedUrl }: Gu
               <BookOpen className="h-4 w-4 text-accent" />
               <p className="text-sm font-semibold">{property.name} Guide</p>
             </div>
-            <div className="relative w-full" style={{ height: '70vh', minHeight: 480 }}>
+            <div className="relative w-full" style={{ height: '70vh', minHeight: 480, maxHeight: 600 }}>
               <iframe
                 src={canvaEmbedUrl}
                 title={`${property.name} Guide`}
                 loading="lazy"
                 allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
                 className="absolute inset-0 h-full w-full"
                 style={{ border: 0 }}
               />
@@ -124,7 +125,11 @@ export function GuestCheckIn({ property, booking, guideText, canvaEmbedUrl }: Gu
                 </div>
               )}
               <p className="mt-3 text-xs text-muted-foreground">
-                Step-by-step entry instructions are in your guide below.
+                {canvaEmbedUrl
+                  ? 'Step-by-step entry instructions are in your guide below.'
+                  : property.building_entry_code
+                    ? 'Use the building code at the main entrance, then the apartment code on the Simplex lock.'
+                    : 'Use this code on the Simplex lock at the front door.'}
               </p>
             </div>
           ) : (

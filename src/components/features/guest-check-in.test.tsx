@@ -34,4 +34,11 @@ describe('GuestCheckIn', () => {
     expect(screen.getByText('Entry Video Guide')).toBeTruthy()
     expect(screen.queryByText('Apartment Video Guide')).toBeNull()
   })
+
+  it('falls back to explicit entry instructions when there is no embedded guide', () => {
+    render(<GuestCheckIn property={baseProperty} booking={null} canvaEmbedUrl={null} />)
+    expect(
+      screen.getByText('Use the building code at the main entrance, then the apartment code on the Simplex lock.'),
+    ).toBeTruthy()
+  })
 })
