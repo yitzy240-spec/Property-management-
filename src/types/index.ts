@@ -52,6 +52,7 @@ export interface Property {
   entry_code_updated_at: string | null
   youtube_tutorial_url: string | null
   canva_design_url: string | null
+  entry_instructions?: string | null
   ical_feed_urls: ICalFeed[]
   lodgify_property_id: string | null
   maintenance_notes: string | null

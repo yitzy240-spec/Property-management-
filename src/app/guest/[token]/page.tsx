@@ -41,7 +41,7 @@ export default async function GuestCheckInPage({
 
     const { data: property } = await serviceClient
       .from('properties')
-      .select('name, address, neighborhood, city, entry_code, building_entry_code, youtube_tutorial_url, canva_design_url')
+      .select('name, address, neighborhood, city, entry_code, building_entry_code, youtube_tutorial_url, canva_design_url, entry_instructions')
       .eq('id', payload.property_id)
       .single()
 
