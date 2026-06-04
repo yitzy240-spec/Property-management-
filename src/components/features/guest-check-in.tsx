@@ -21,9 +21,10 @@ interface GuestCheckInProps {
     guest_name: string | null
   } | null
   guideText?: string | null
+  canvaEmbedUrl?: string | null
 }
 
-export function GuestCheckIn({ property, booking, guideText }: GuestCheckInProps) {
+export function GuestCheckIn({ property, booking, guideText, canvaEmbedUrl }: GuestCheckInProps) {
   const [codeVisible, setCodeVisible] = useState(false)
   const [countdown, setCountdown] = useState('')
 
@@ -73,28 +74,37 @@ export function GuestCheckIn({ property, booking, guideText }: GuestCheckInProps
       </div>
 
       <div className="space-y-4 p-4">
-        {/* Apartment guide (Canva design link). The field stores a sharing
-            URL, not an image — render as a tappable card matching the
-            Video Guide pattern below so it opens in a new tab. */}
-        {property.canva_design_url && (
-          <a
-            href={property.canva_design_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block"
-          >
-            <div className="flex items-center gap-4 rounded-[10px] border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[hsl(var(--accent)/0.12)]">
-                <BookOpen className="h-5 w-5 text-accent" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold">{property.name} Guide</p>
-                <p className="text-xs text-muted-foreground">
-                  Wifi, appliances, neighborhood tips
-                </p>
-              </div>
+        {/* Apartment guide — embedded Canva viewer (browsable inline). The
+            published design renders live, so the host's Canva edits appear
+            automatically. Fallback link opens the full guide in a new tab. */}
+        {canvaEmbedUrl && (
+          <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+              <BookOpen className="h-4 w-4 text-accent" />
+              <p className="text-sm font-semibold">{property.name} Guide</p>
             </div>
-          </a>
+            <div className="relative w-full" style={{ height: '70vh', minHeight: 480, maxHeight: 600 }}>
+              <iframe
+                src={canvaEmbedUrl}
+                title={`${property.name} Guide`}
+                loading="lazy"
+                allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                className="absolute inset-0 h-full w-full"
+                style={{ border: 0 }}
+              />
+            </div>
+            {property.canva_design_url && (
+              <a
+                href={property.canva_design_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block border-t border-border px-4 py-2.5 text-center text-xs font-medium text-accent hover:underline"
+              >
+                Open full guide in Canva ↗
+              </a>
+            )}
+          </div>
         )}
 
         {/* Entry Code — Time-Gated */}
@@ -115,9 +125,11 @@ export function GuestCheckIn({ property, booking, guideText }: GuestCheckInProps
                 </div>
               )}
               <p className="mt-3 text-xs text-muted-foreground">
-                {property.building_entry_code
-                  ? 'Use the building code at the main entrance, then the apartment code on the Simplex lock.'
-                  : 'Use this code on the Simplex lock at the front door.'}
+                {canvaEmbedUrl
+                  ? 'Step-by-step entry instructions are in your guide below.'
+                  : property.building_entry_code
+                    ? 'Use the building code at the main entrance, then the apartment code on the Simplex lock.'
+                    : 'Use this code on the Simplex lock at the front door.'}
               </p>
             </div>
           ) : (
@@ -159,9 +171,9 @@ export function GuestCheckIn({ property, booking, guideText }: GuestCheckInProps
                 <Play className="h-5 w-5 text-destructive" />
               </div>
               <div>
-                <p className="text-sm font-semibold">Apartment Video Guide</p>
+                <p className="text-sm font-semibold">Entry Video Guide</p>
                 <p className="text-xs text-muted-foreground">
-                  Watch how to enter and use the apartment
+                  Watch how to get in — step-by-step
                 </p>
               </div>
             </div>
