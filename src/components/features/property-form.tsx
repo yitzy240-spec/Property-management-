@@ -46,6 +46,7 @@ export function PropertyForm({ property }: PropertyFormProps) {
       building_entry_code: formData.get('building_entry_code') as string || null,
       youtube_tutorial_url: formData.get('youtube_tutorial_url') as string || null,
       canva_design_url: formData.get('canva_design_url') as string || null,
+      entry_instructions: formData.get('entry_instructions') as string || null,
       owner_id: selectedOwnerId,
       commission_rate: parseFloat(formData.get('commission_rate') as string) || 0.20,
       management_fee_agorot: Math.round((parseFloat(formData.get('management_fee') as string) || 0) * 100),
@@ -140,6 +141,18 @@ export function PropertyForm({ property }: PropertyFormProps) {
                 <Label htmlFor="building_entry_code" className="text-xs font-medium">Building Code</Label>
                 <Input id="building_entry_code" name="building_entry_code" placeholder="2580 (optional)" className="h-11 font-mono" defaultValue={property?.building_entry_code ?? ''} />
               </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="entry_instructions" className="text-xs font-medium">Entry instructions</Label>
+                <textarea
+                  id="entry_instructions"
+                  name="entry_instructions"
+                  rows={3}
+                  placeholder="Apartment-specific steps, e.g. 'Enter the building code, take the lift to floor 3, then turn right.'"
+                  defaultValue={property?.entry_instructions ?? ''}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+                <p className="text-xs text-muted-foreground">Shown to guests under their entry code, on the guest check-in page.</p>
+              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -196,8 +209,8 @@ export function PropertyForm({ property }: PropertyFormProps) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="canva_design_url" className="text-xs font-medium">Canva Guest Guide URL</Label>
-              <Input id="canva_design_url" name="canva_design_url" type="url" placeholder="https://canva.com/design/..." defaultValue={property?.canva_design_url ?? ''} className="h-11" />
-              <p className="text-xs text-muted-foreground">Image URL for the guest check-in page</p>
+              <Input id="canva_design_url" name="canva_design_url" type="url" placeholder="https://canva.com/design/... or canva.link/..." defaultValue={property?.canva_design_url ?? ''} className="h-11" />
+              <p className="text-xs text-muted-foreground">Paste any Canva share link (short links work too) — the guide embeds on the guest page.</p>
             </div>
           </div>
         </div>
