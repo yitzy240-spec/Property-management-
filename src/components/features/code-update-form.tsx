@@ -9,23 +9,20 @@ interface PropertyOption {
   name: string
   entry_code: string | null
   building_entry_code: string | null
-  has_canva: boolean
 }
 
 interface JobResult {
   status: 'running' | 'done'
-  results: Record<string, { db: string; canva: string; message: string }>
+  results: Record<string, { db: string; message: string }>
 }
 
 interface CodeUpdateFormProps {
   properties: PropertyOption[]
-  canvaConnected: boolean
 }
 
-export function CodeUpdateForm({ properties, canvaConnected }: CodeUpdateFormProps) {
+export function CodeUpdateForm({ properties }: CodeUpdateFormProps) {
   const [apartmentCode, setApartmentCode] = useState('')
   const [buildingCode, setBuildingCode] = useState('')
-  const [updateCanva, setUpdateCanva] = useState(canvaConnected)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [jobId, setJobId] = useState<string | null>(null)
   const [job, setJob] = useState<JobResult | null>(null)
@@ -50,7 +47,6 @@ export function CodeUpdateForm({ properties, canvaConnected }: CodeUpdateFormPro
           apartment_code: apartmentCode.trim() || undefined,
           building_code: buildingCode.trim() || undefined,
           property_ids: Array.from(selected),
-          update_canva: updateCanva,
         }),
       })
       if (!res.ok) {
@@ -95,8 +91,8 @@ export function CodeUpdateForm({ properties, canvaConnected }: CodeUpdateFormPro
   const counts = { done: 0, failed: 0 }
   if (job) {
     for (const r of Object.values(job.results)) {
-      if (r.db === 'ok' && (r.canva === 'ok' || r.canva === 'skipped')) counts.done++
-      else if (r.db === 'failed' || r.canva === 'failed') counts.failed++
+      if (r.db === 'ok') counts.done++
+      else counts.failed++
     }
   }
 
@@ -126,20 +122,6 @@ export function CodeUpdateForm({ properties, canvaConnected }: CodeUpdateFormPro
                 />
               </label>
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={updateCanva}
-                onChange={(e) => setUpdateCanva(e.target.checked)}
-                disabled={!canvaConnected}
-              />
-              Update Canva guide where applicable
-              {!canvaConnected && (
-                <a href="/settings" className="text-xs text-muted-foreground underline">
-                  (Canva not connected)
-                </a>
-              )}
-            </label>
           </section>
 
           <section className="rounded-[10px] border border-border p-4">
@@ -166,9 +148,6 @@ export function CodeUpdateForm({ properties, canvaConnected }: CodeUpdateFormPro
                       {p.building_entry_code && <> · Building: {p.building_entry_code}</>}
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-[var(--radius-badge)] bg-muted px-1.5 py-0.5 text-[10px] font-medium">
-                    {p.has_canva ? 'Canva' : 'No Canva'}
-                  </span>
                 </label>
               ))}
             </div>
@@ -206,7 +185,7 @@ export function CodeUpdateForm({ properties, canvaConnected }: CodeUpdateFormPro
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{property.name}</p>
                     <p className="text-[11px] text-muted-foreground truncate">
-                      {r?.message || (r ? `DB ${r.db} · Canva ${r.canva}` : 'Queued...')}
+                      {r?.message || (r ? `DB ${r.db}` : 'Queued...')}
                     </p>
                   </div>
                   <StatusPill r={r} />
@@ -226,11 +205,9 @@ export function CodeUpdateForm({ properties, canvaConnected }: CodeUpdateFormPro
   )
 }
 
-function StatusPill({ r }: { r: { db: string; canva: string; message: string } | undefined }) {
+function StatusPill({ r }: { r: { db: string; message: string } | undefined }) {
   if (!r) return <span className="text-[11px] text-muted-foreground">Queued</span>
-  const failed = r.db === 'failed' || r.canva === 'failed'
-  const done = r.db === 'ok'
-  if (failed) return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">Failed</span>
-  if (done) return <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">Done</span>
+  if (r.db === 'failed') return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">Failed</span>
+  if (r.db === 'ok') return <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">Done</span>
   return <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">Updating...</span>
 }
