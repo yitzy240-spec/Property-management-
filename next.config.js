@@ -4,10 +4,17 @@ const withPWA = require('@ducanh2912/next-pwa').default({
   register: true,
   skipWaiting: true,
   workboxOptions: {
-    navigateFallbackDenylist: [/^\/guest\//, /^\/contractor\//, /^\/api\//],
+    // Never serve a cached fallback for page navigations — pages show live data.
+    navigateFallbackDenylist: [/.*/],
     runtimeCaching: [
       {
-        urlPattern: ({ url }) =>
+        // Always fetch pages fresh from the network. This app shows live data
+        // (entry codes, financials, bookings); serving a cached page makes
+        // edits look like they "didn't save". Covers every page navigation plus
+        // the explicit guest/contractor/api prefixes. Static assets
+        // (request.mode !== 'navigate') are unaffected and still cached.
+        urlPattern: ({ request, url }) =>
+          request?.mode === 'navigate' ||
           url.pathname.startsWith('/guest/') ||
           url.pathname.startsWith('/contractor/') ||
           url.pathname.startsWith('/api/'),
@@ -19,6 +26,11 @@ const withPWA = require('@ducanh2912/next-pwa').default({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Don't reuse the client-side router cache for dynamic pages — always re-fetch
+  // so admin pages (codes, property edit) reflect the latest DB after a change.
+  experimental: {
+    staleTimes: { dynamic: 0 },
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },
