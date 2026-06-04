@@ -2,11 +2,16 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
+import { resolveCanvaDesignUrl } from '@/lib/canva'
 
 export async function createProperty(data: Record<string, unknown>) {
   const supabase = createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
+
+  if ('canva_design_url' in data) {
+    data.canva_design_url = await resolveCanvaDesignUrl(data.canva_design_url as string | null)
+  }
 
   const serviceClient = createServiceClient()
   const { error } = await serviceClient.from('properties').insert(data)
@@ -18,6 +23,10 @@ export async function updateProperty(id: string, data: Record<string, unknown>) 
   const supabase = createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
+
+  if ('canva_design_url' in data) {
+    data.canva_design_url = await resolveCanvaDesignUrl(data.canva_design_url as string | null)
+  }
 
   const serviceClient = createServiceClient()
   const { error } = await serviceClient.from('properties').update(data).eq('id', id)
