@@ -55,6 +55,7 @@ describe('getCanvaEmbedUrl', () => {
   })
   it('returns null for non-Canva or empty input', () => {
     expect(getCanvaEmbedUrl(null)).toBeNull()
+    expect(getCanvaEmbedUrl('')).toBeNull()
     expect(getCanvaEmbedUrl('https://example.com/x')).toBeNull()
   })
 })
@@ -827,6 +828,7 @@ describe('getCanvaEmbedUrl', () => {
   })
   it('returns null for non-Canva or empty input', () => {
     expect(getCanvaEmbedUrl(null)).toBeNull()
+    expect(getCanvaEmbedUrl('')).toBeNull()
     expect(getCanvaEmbedUrl('https://example.com/x')).toBeNull()
   })
 })
