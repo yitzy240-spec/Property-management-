@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { createProperty, updateProperty } from '@/app/(admin)/properties/actions'
-import type { Property } from '@/types'
+import type { Property, GuestLink } from '@/types'
 
 interface PropertyFormProps {
   property?: Property
@@ -21,6 +21,7 @@ export function PropertyForm({ property }: PropertyFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [owners, setOwners] = useState<{ id: string; full_name: string; email: string }[]>([])
   const [selectedOwnerId, setSelectedOwnerId] = useState(property?.owner_id || '')
+  const [guestLinks, setGuestLinks] = useState<GuestLink[]>(property?.guest_links ?? [])
 
   useEffect(() => {
     fetch('/api/owners/list')
@@ -47,6 +48,9 @@ export function PropertyForm({ property }: PropertyFormProps) {
       youtube_tutorial_url: formData.get('youtube_tutorial_url') as string || null,
       canva_design_url: formData.get('canva_design_url') as string || null,
       entry_instructions: formData.get('entry_instructions') as string || null,
+      guest_links: guestLinks
+        .filter((l) => l.url.trim())
+        .map((l) => ({ label: l.label.trim() || 'Link', url: l.url.trim(), hide_until_revealed: !!l.hide_until_revealed })),
       owner_id: selectedOwnerId,
       commission_rate: parseFloat(formData.get('commission_rate') as string) || 0.20,
       management_fee_agorot: Math.round((parseFloat(formData.get('management_fee') as string) || 0) * 100),
@@ -211,6 +215,57 @@ export function PropertyForm({ property }: PropertyFormProps) {
               <Label htmlFor="canva_design_url" className="text-xs font-medium">Canva Guest Guide URL</Label>
               <Input id="canva_design_url" name="canva_design_url" type="url" placeholder="https://canva.com/design/... or canva.link/..." defaultValue={property?.canva_design_url ?? ''} className="h-11" />
               <p className="text-xs text-muted-foreground">Paste any Canva share link (short links work too) — the guide embeds on the guest page.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Guest links</Label>
+              <p className="text-xs text-muted-foreground">
+                Extra videos/links shown on the guest check-in page. Tick &quot;hide until revealed&quot; for any that show the door code.
+              </p>
+              <div className="space-y-2">
+                {guestLinks.map((link, i) => (
+                  <div key={i} className="space-y-2 rounded-lg border border-border p-2.5">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Input
+                        placeholder="Label (e.g. Wifi guide)"
+                        value={link.label}
+                        onChange={(e) => setGuestLinks((ls) => ls.map((l, j) => (j === i ? { ...l, label: e.target.value } : l)))}
+                        className="h-9"
+                      />
+                      <Input
+                        type="url"
+                        placeholder="https://..."
+                        value={link.url}
+                        onChange={(e) => setGuestLinks((ls) => ls.map((l, j) => (j === i ? { ...l, url: e.target.value } : l)))}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={link.hide_until_revealed}
+                          onChange={(e) => setGuestLinks((ls) => ls.map((l, j) => (j === i ? { ...l, hide_until_revealed: e.target.checked } : l)))}
+                        />
+                        Hide until code is revealed
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setGuestLinks((ls) => ls.filter((_, j) => j !== i))}
+                        className="text-xs font-medium text-destructive hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setGuestLinks((ls) => [...ls, { label: '', url: '', hide_until_revealed: false }])}
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                + Add link
+              </button>
             </div>
           </div>
         </div>

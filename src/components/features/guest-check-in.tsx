@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, MapPin, Play, Lock, KeyRound, BookOpen } from 'lucide-react'
+import { Clock, MapPin, Play, Lock, KeyRound, BookOpen, Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import type { GuestLink } from '@/types'
 
 interface GuestCheckInProps {
   property: {
@@ -15,6 +16,7 @@ interface GuestCheckInProps {
     youtube_tutorial_url: string | null
     canva_design_url: string | null
     entry_instructions: string | null
+    guest_links: GuestLink[] | null
   }
   booking: {
     check_in: string
@@ -167,8 +169,8 @@ export function GuestCheckIn({ property, booking, guideText, canvaEmbedUrl }: Gu
           )}
         </div>
 
-        {/* Video Tutorial */}
-        {property.youtube_tutorial_url && (
+        {/* Entry Video — gated behind the code reveal because it shows the door code */}
+        {codeVisible && property.entry_code && property.youtube_tutorial_url && (
           <a
             href={property.youtube_tutorial_url}
             target="_blank"
@@ -188,6 +190,22 @@ export function GuestCheckIn({ property, booking, guideText, canvaEmbedUrl }: Gu
             </div>
           </a>
         )}
+
+        {/* Custom guest links — each hidden until reveal if flagged */}
+        {(property.guest_links ?? [])
+          .filter((link) => link.url && (!link.hide_until_revealed || (codeVisible && property.entry_code)))
+          .map((link, i) => (
+            <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="block">
+              <div className="flex items-center gap-4 rounded-[10px] border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[hsl(var(--accent)/0.12)]">
+                  <Link2 className="h-5 w-5 text-accent" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{link.label || 'Link'}</p>
+                </div>
+              </div>
+            </a>
+          ))}
 
         {/* AI Guest Guide */}
         {guideText && (

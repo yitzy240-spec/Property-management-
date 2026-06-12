@@ -49,3 +49,5 @@ marcus-lodgify.png
 # playwright artifacts
 /test-results/
 /playwright-report/
+.tmp/
+marcus-code-agent-skill.zip

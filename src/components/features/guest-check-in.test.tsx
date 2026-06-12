@@ -15,6 +15,7 @@ const baseProperty = {
   youtube_tutorial_url: 'https://youtu.be/abc',
   canva_design_url: 'https://www.canva.com/design/DAGmTDKfFrI/view',
   entry_instructions: null,
+  guest_links: [],
 }
 
 describe('GuestCheckIn', () => {
@@ -52,5 +53,39 @@ describe('GuestCheckIn', () => {
       />,
     )
     expect(screen.getByText('Take the lift to 3, turn right.')).toBeTruthy()
+  })
+
+  it('hides the entry video until the code is revealed (it shows the door code)', () => {
+    const { rerender } = render(
+      <GuestCheckIn property={{ ...baseProperty, entry_code: null }} booking={null} canvaEmbedUrl={null} />,
+    )
+    expect(screen.queryByText('Entry Video Guide')).toBeNull()
+    rerender(<GuestCheckIn property={baseProperty} booking={null} canvaEmbedUrl={null} />)
+    expect(screen.getByText('Entry Video Guide')).toBeTruthy()
+  })
+
+  it('renders an always-visible guest link even before the code is revealed', () => {
+    render(
+      <GuestCheckIn
+        property={{
+          ...baseProperty,
+          entry_code: null,
+          guest_links: [{ label: 'Wifi & appliances', url: 'https://ex.com/wifi', hide_until_revealed: false }],
+        }}
+        booking={null}
+        canvaEmbedUrl={null}
+      />,
+    )
+    expect(screen.getByText('Wifi & appliances')).toBeTruthy()
+  })
+
+  it('hides a gated guest link until the code is revealed', () => {
+    const gated = { label: 'Door video', url: 'https://ex.com/door', hide_until_revealed: true }
+    const { rerender } = render(
+      <GuestCheckIn property={{ ...baseProperty, entry_code: null, guest_links: [gated] }} booking={null} canvaEmbedUrl={null} />,
+    )
+    expect(screen.queryByText('Door video')).toBeNull()
+    rerender(<GuestCheckIn property={{ ...baseProperty, guest_links: [gated] }} booking={null} canvaEmbedUrl={null} />)
+    expect(screen.getByText('Door video')).toBeTruthy()
   })
 })
