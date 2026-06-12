@@ -38,6 +38,12 @@ export interface Owner {
   updated_at: string
 }
 
+export interface GuestLink {
+  label: string
+  url: string
+  hide_until_revealed: boolean
+}
+
 export interface Property {
   id: string
   owner_id: string
@@ -53,6 +59,7 @@ export interface Property {
   youtube_tutorial_url: string | null
   canva_design_url: string | null
   entry_instructions?: string | null
+  guest_links?: GuestLink[] | null
   ical_feed_urls: ICalFeed[]
   lodgify_property_id: string | null
   maintenance_notes: string | null
