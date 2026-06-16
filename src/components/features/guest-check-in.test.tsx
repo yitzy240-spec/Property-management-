@@ -79,6 +79,38 @@ describe('GuestCheckIn', () => {
     expect(screen.getByText('Wifi & appliances')).toBeTruthy()
   })
 
+  it('renders the chosen icon for a guest link (video → play icon)', () => {
+    const { container } = render(
+      <GuestCheckIn
+        property={{
+          ...baseProperty,
+          entry_code: null, // suppress the entry video so the only play icon is the link's
+          guest_links: [{ label: 'Fridge guide', url: 'https://ex.com/v', hide_until_revealed: false, icon: 'video' }],
+        }}
+        booking={null}
+        canvaEmbedUrl={null}
+      />,
+    )
+    expect(screen.getByText('Fridge guide')).toBeTruthy()
+    expect(container.querySelector('.lucide-play')).toBeTruthy()
+  })
+
+  it('falls back to the link icon when a guest link has no icon (legacy links)', () => {
+    const { container } = render(
+      <GuestCheckIn
+        property={{
+          ...baseProperty,
+          entry_code: null,
+          guest_links: [{ label: 'Old link', url: 'https://ex.com/o', hide_until_revealed: false }],
+        }}
+        booking={null}
+        canvaEmbedUrl={null}
+      />,
+    )
+    expect(screen.getByText('Old link')).toBeTruthy()
+    expect(container.querySelector('.lucide-link2')).toBeTruthy()
+  })
+
   it('hides a gated guest link until the code is revealed', () => {
     const gated = { label: 'Door video', url: 'https://ex.com/door', hide_until_revealed: true }
     const { rerender } = render(

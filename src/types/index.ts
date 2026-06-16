@@ -38,10 +38,21 @@ export interface Owner {
   updated_at: string
 }
 
+export type GuestLinkIcon =
+  | 'link'
+  | 'video'
+  | 'document'
+  | 'wifi'
+  | 'location'
+  | 'info'
+  | 'trash'
+  | 'appliance'
+
 export interface GuestLink {
   label: string
   url: string
   hide_until_revealed: boolean
+  icon?: GuestLinkIcon
 }
 
 export interface Property {

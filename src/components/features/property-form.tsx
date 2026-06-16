@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { createProperty, updateProperty } from '@/app/(admin)/properties/actions'
-import type { Property, GuestLink } from '@/types'
+import type { Property, GuestLink, GuestLinkIcon } from '@/types'
+import { GUEST_LINK_ICON_OPTIONS } from '@/lib/guest-link-icons'
 
 interface PropertyFormProps {
   property?: Property
@@ -50,7 +51,7 @@ export function PropertyForm({ property }: PropertyFormProps) {
       entry_instructions: formData.get('entry_instructions') as string || null,
       guest_links: guestLinks
         .filter((l) => l.url.trim())
-        .map((l) => ({ label: l.label.trim() || 'Link', url: l.url.trim(), hide_until_revealed: !!l.hide_until_revealed })),
+        .map((l) => ({ label: l.label.trim() || 'Link', url: l.url.trim(), hide_until_revealed: !!l.hide_until_revealed, icon: l.icon ?? 'link' })),
       owner_id: selectedOwnerId,
       commission_rate: parseFloat(formData.get('commission_rate') as string) || 0.20,
       management_fee_agorot: Math.round((parseFloat(formData.get('management_fee') as string) || 0) * 100),
@@ -239,6 +240,13 @@ export function PropertyForm({ property }: PropertyFormProps) {
                         className="h-9"
                       />
                     </div>
+                    <NativeSelect
+                      options={GUEST_LINK_ICON_OPTIONS}
+                      value={link.icon ?? 'link'}
+                      onChange={(e) => setGuestLinks((ls) => ls.map((l, j) => (j === i ? { ...l, icon: e.target.value as GuestLinkIcon } : l)))}
+                      className="h-9"
+                      aria-label="Link icon"
+                    />
                     <div className="flex items-center justify-between">
                       <label className="flex items-center gap-2 text-xs text-muted-foreground">
                         <input
@@ -261,7 +269,7 @@ export function PropertyForm({ property }: PropertyFormProps) {
               </div>
               <button
                 type="button"
-                onClick={() => setGuestLinks((ls) => [...ls, { label: '', url: '', hide_until_revealed: false }])}
+                onClick={() => setGuestLinks((ls) => [...ls, { label: '', url: '', hide_until_revealed: false, icon: 'link' }])}
                 className="text-xs font-medium text-accent hover:underline"
               >
                 + Add link
