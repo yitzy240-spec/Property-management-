@@ -9,12 +9,8 @@ export async function createProperty(data: Record<string, unknown>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
-  let canvaResolved: string | null = null
   if ('canva_design_url' in data) {
-    const pasted = data.canva_design_url as string | null
-    data.canva_design_url = await resolveCanvaDesignUrl(pasted)
-    canvaResolved = data.canva_design_url as string | null
-    console.log('[canva-debug] create', { pasted, resolved: canvaResolved }) // TEMP debug
+    data.canva_design_url = await resolveCanvaDesignUrl(data.canva_design_url as string | null)
   }
 
   const serviceClient = createServiceClient()
@@ -22,7 +18,7 @@ export async function createProperty(data: Record<string, unknown>) {
   if (error) return { error: error.message }
   revalidatePath('/properties')
   revalidatePath('/codes')
-  return { success: true, canvaResolved }
+  return { success: true }
 }
 
 export async function updateProperty(id: string, data: Record<string, unknown>) {
@@ -30,12 +26,8 @@ export async function updateProperty(id: string, data: Record<string, unknown>) 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
-  let canvaResolved: string | null = null
   if ('canva_design_url' in data) {
-    const pasted = data.canva_design_url as string | null
-    data.canva_design_url = await resolveCanvaDesignUrl(pasted)
-    canvaResolved = data.canva_design_url as string | null
-    console.log('[canva-debug] update', { id, pasted, resolved: canvaResolved }) // TEMP debug
+    data.canva_design_url = await resolveCanvaDesignUrl(data.canva_design_url as string | null)
   }
 
   const serviceClient = createServiceClient()
@@ -44,7 +36,7 @@ export async function updateProperty(id: string, data: Record<string, unknown>) 
   revalidatePath('/properties')
   revalidatePath(`/properties/${id}`)
   revalidatePath('/codes')
-  return { success: true, canvaResolved }
+  return { success: true }
 }
 
 export async function createOwner(data: Record<string, unknown>) {
