@@ -56,14 +56,19 @@ export async function resolveCanvaDesignUrl(input: string | null): Promise<strin
   if (!trimmed) return null
 
   const direct = parseCanvaDesign(trimmed)
-  if (direct) return `https://www.canva.com/design/${designPath(direct)}/view`
+  if (direct) {
+    console.log('[canva-debug] resolve direct', { input: trimmed, design: direct }) // TEMP debug
+    return `https://www.canva.com/design/${designPath(direct)}/view`
+  }
 
   try {
     const res = await fetch(trimmed, { redirect: 'manual', signal: AbortSignal.timeout(8000) })
-    const resolved = parseCanvaDesign(res.headers.get('location'))
+    const location = res.headers.get('location')
+    const resolved = parseCanvaDesign(location)
+    console.log('[canva-debug] resolve redirect', { input: trimmed, status: res.status, location, resolved }) // TEMP debug
     if (resolved) return `https://www.canva.com/design/${designPath(resolved)}/view`
-  } catch {
-    // Network/timeout failure — fall through and keep the original input.
+  } catch (e) {
+    console.log('[canva-debug] resolve fetch failed', { input: trimmed, error: String(e) }) // TEMP debug
   }
   return trimmed
 }

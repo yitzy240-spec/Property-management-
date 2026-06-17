@@ -67,7 +67,17 @@ export function PropertyForm({ property }: PropertyFormProps) {
         setLoading(false)
         return
       }
-      toast.success('Property updated')
+      // TEMP debug: surface pasted vs stored Canva URL to diagnose "reverts after save"
+      toast.success('Property updated', {
+        duration: 30000,
+        description: (
+          <span className="block break-all text-xs leading-relaxed">
+            <b>Canva pasted:</b> {(data.canva_design_url as string) || '(empty)'}
+            <br />
+            <b>Canva stored:</b> {result.canvaResolved || '(empty)'}
+          </span>
+        ),
+      })
       router.push(`/properties/${property.id}`)
     } else {
       const result = await createProperty(data)
