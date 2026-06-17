@@ -18,8 +18,12 @@ describe('parseCanvaDesignId', () => {
 })
 
 describe('getCanvaEmbedUrl', () => {
-  it('builds the embed URL from a sharing link', () => {
+  it('preserves the share token (required for anonymous guest viewing)', () => {
     expect(getCanvaEmbedUrl('https://www.canva.com/design/DAGmTDKfFrI/abc/view'))
+      .toBe('https://www.canva.com/design/DAGmTDKfFrI/abc/view?embed')
+  })
+  it('builds a tokenless embed URL when the link has no token', () => {
+    expect(getCanvaEmbedUrl('https://www.canva.com/design/DAGmTDKfFrI/view'))
       .toBe('https://www.canva.com/design/DAGmTDKfFrI/view?embed')
   })
   it('returns null for non-Canva or empty input', () => {
@@ -34,11 +38,11 @@ describe('resolveCanvaDesignUrl', () => {
     vi.unstubAllGlobals()
   })
 
-  it('canonicalizes a direct design link without any network call', async () => {
+  it('canonicalizes a direct design link, keeping the token, without any network call', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
     expect(await resolveCanvaDesignUrl('https://www.canva.com/design/DAGmTDKfFrI/abc/edit?x=1'))
-      .toBe('https://www.canva.com/design/DAGmTDKfFrI/view')
+      .toBe('https://www.canva.com/design/DAGmTDKfFrI/abc/view')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -58,7 +62,7 @@ describe('resolveCanvaDesignUrl', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
     expect(await resolveCanvaDesignUrl('https://canva.link/honh3op06pgtcpk'))
-      .toBe('https://www.canva.com/design/DAHCHqRRpzI/view')
+      .toBe('https://www.canva.com/design/DAHCHqRRpzI/tok/view')
   })
 
   it('keeps the original link if the redirect cannot be resolved to an id', async () => {
