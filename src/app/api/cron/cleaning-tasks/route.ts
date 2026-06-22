@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyAdmins } from '@/lib/notifications'
 import { CLEANING_CHECKLIST } from '@/lib/cleaning-checklist'
@@ -23,6 +24,11 @@ export async function GET(request: Request) {
   const serviceClient = createServiceClient()
 
   const removed = await reconcileOrphanCleaningTasks(serviceClient)
+  if (removed > 0) {
+    revalidatePath('/calendar')
+    revalidatePath('/tasks')
+    revalidatePath('/dashboard')
+  }
 
   const today = new Date()
   const nextWeek = new Date(today)
@@ -133,6 +139,8 @@ export async function GET(request: Request) {
 
   // Notify admin
   if (created > 0) {
+    revalidatePath('/calendar')
+    revalidatePath('/tasks')
     await notifyAdmins({
       title: `${created} turnover task${created > 1 ? 's' : ''} created`,
       body: toCreate.map(b => (b.properties as unknown as { name: string })?.name).join(', '),

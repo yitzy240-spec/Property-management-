@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     revalidatePath('/tasks')
     revalidatePath('/dashboard')
+    revalidatePath('/calendar')
     return NextResponse.json({ success: true })
   }
 
@@ -40,10 +41,12 @@ export async function POST(request: Request) {
   }
 
   // Bust the Next.js cache for task pages so detail view shows fresh data,
-  // plus the dashboard so its "Open Tasks" banner reflects new status.
+  // plus the dashboard so its "Open Tasks" banner reflects new status, and the
+  // calendar so a cancelled/completed cleaning drops off the turnover view.
   revalidatePath('/tasks')
   revalidatePath(`/tasks/${taskId}`)
   revalidatePath('/dashboard')
+  revalidatePath('/calendar')
 
   return NextResponse.json({ success: true })
 }

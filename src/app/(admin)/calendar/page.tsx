@@ -1,9 +1,15 @@
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
+import { unstable_noStore as noStore } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { TurnoverCalendar } from '@/components/features/turnover-calendar'
 
 export default async function CalendarPage() {
+  // Opt out of the Next.js Data Cache: the calendar must reflect live bookings
+  // and cleaning tasks. Without this, deleted/changed tasks linger here even
+  // though the page renders dynamically (the underlying query is cached).
+  noStore()
   const serviceClient = createServiceClient()
 
   // Fetch a wider range for calendar view (current month +/- 1 month)
