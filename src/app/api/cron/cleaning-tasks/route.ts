@@ -2,11 +2,15 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyAdmins } from '@/lib/notifications'
 import { CLEANING_CHECKLIST } from '@/lib/cleaning-checklist'
+import { findOrphanCleaningTaskIds } from '@/lib/cleaning-reconcile'
 
 /**
  * GET /api/cron/cleaning-tasks
  *
- * Auto-creates turnover cleaning tasks for upcoming checkouts (7 days out).
+ * Auto-creates turnover cleaning tasks for upcoming checkouts (7 days out) and
+ * reconciles existing ones: removes pending auto cleaning tasks whose backing
+ * checkout moved or was cancelled (otherwise they linger on the calendar as a
+ * "Turnover clean" with no matching check-out).
  * Includes next check-in info in description and auto-assigns cleaning contractor.
  * Notifies admin when new tasks are created.
  */
@@ -17,6 +21,8 @@ export async function GET(request: Request) {
   }
 
   const serviceClient = createServiceClient()
+
+  const removed = await reconcileOrphanCleaningTasks(serviceClient)
 
   const today = new Date()
   const nextWeek = new Date(today)
@@ -59,7 +65,7 @@ export async function GET(request: Request) {
   ])
 
   if (!upcomingCheckouts || upcomingCheckouts.length === 0) {
-    return NextResponse.json({ message: 'No upcoming checkouts', created: 0 })
+    return NextResponse.json({ message: 'No upcoming checkouts', created: 0, removed })
   }
 
   // Build set of existing cleaning tasks
@@ -87,7 +93,7 @@ export async function GET(request: Request) {
   )
 
   if (toCreate.length === 0) {
-    return NextResponse.json({ message: 'All cleaning tasks already exist', created: 0 })
+    return NextResponse.json({ message: 'All cleaning tasks already exist', created: 0, removed })
   }
 
   // Create tasks with checklist
@@ -134,5 +140,47 @@ export async function GET(request: Request) {
     })
   }
 
-  return NextResponse.json({ message: `Created ${created} cleaning tasks`, created })
+  return NextResponse.json({ message: `Created ${created} cleaning tasks`, created, removed })
+}
+
+/**
+ * Remove pending auto cleaning tasks (within the calendar's ±1 month window)
+ * that no longer line up with a live, non-cancelled checkout — i.e. the booking
+ * moved to a different date or was cancelled after the task was created.
+ * Only touches `is_cleaning` + `pending` tasks (never started/finished work),
+ * and skips entirely if the bookings lookup errors (so a transient failure can
+ * never mass-delete tasks). Returns how many tasks were removed.
+ */
+async function reconcileOrphanCleaningTasks(
+  serviceClient: ReturnType<typeof createServiceClient>,
+): Promise<number> {
+  const now = new Date()
+  const rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0]
+  const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString().split('T')[0]
+
+  const [{ data: liveCheckouts, error: bookingsError }, { data: pendingCleanings }] =
+    await Promise.all([
+      serviceClient
+        .from('bookings')
+        .select('property_id, check_out')
+        .eq('is_cancelled', false)
+        .gte('check_out', rangeStart)
+        .lte('check_out', rangeEnd),
+      serviceClient
+        .from('tasks')
+        .select('id, property_id, due_date')
+        .eq('is_cleaning', true)
+        .eq('status', 'pending')
+        .gte('due_date', rangeStart)
+        .lte('due_date', rangeEnd),
+    ])
+
+  // Never delete based on an untrusted (errored/missing) bookings list.
+  if (bookingsError || !liveCheckouts) return 0
+
+  const orphanIds = findOrphanCleaningTaskIds(liveCheckouts, pendingCleanings ?? [])
+  if (orphanIds.length === 0) return 0
+
+  const { error: deleteError } = await serviceClient.from('tasks').delete().in('id', orphanIds)
+  return deleteError ? 0 : orphanIds.length
 }
