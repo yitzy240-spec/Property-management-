@@ -35,6 +35,7 @@ export async function updateProperty(id: string, data: Record<string, unknown>) 
   if (error) return { error: error.message }
   revalidatePath('/properties')
   revalidatePath(`/properties/${id}`)
+  revalidatePath(`/properties/${id}/edit`)
   revalidatePath('/codes')
   return { success: true }
 }

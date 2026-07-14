@@ -12,6 +12,7 @@ const mockEq = vi.fn()
 const mockSingle = vi.fn()
 const mockUpsert = vi.fn().mockResolvedValue({ error: null })
 const mockLimit = vi.fn()
+const mockRevalidatePath = vi.fn()
 
 /**
  * Build a chainable query builder. Most chain methods return `this`;
@@ -35,6 +36,14 @@ function makeQuery() {
 
 function makeFrom() {
   return (table: string) => {
+    if (table === 'properties') {
+      return {
+        update: (data: Record<string, unknown>) => {
+          mockUpdate(data)
+          return { eq: mockEq }
+        },
+      }
+    }
     if (table === 'bills') {
       const q = makeQuery()
       ;(q as Record<string, unknown>).update = (data: Record<string, unknown>) => {
@@ -64,8 +73,29 @@ vi.mock('@/lib/supabase/server', () => ({
 // `revalidatePath` requires Next's static-generation store, which doesn't
 // exist outside a request — stub it so the action can run in unit tests.
 vi.mock('next/cache', () => ({
-  revalidatePath: vi.fn(),
+  revalidatePath: mockRevalidatePath,
 }))
+
+describe('updateProperty', () => {
+  beforeEach(() => {
+    mockEq.mockReset().mockResolvedValue({ error: null })
+    mockRevalidatePath.mockReset()
+  })
+
+  it('invalidates the edit page so it reloads the complete saved guest-link list', async () => {
+    const { updateProperty } = await import('./actions')
+
+    await updateProperty('property-1', {
+      guest_links: [
+        { label: 'Fridge', url: 'https://example.com/fridge', hide_until_revealed: false },
+        { label: 'Garbage', url: 'https://example.com/garbage', hide_until_revealed: false },
+        { label: 'Shabbat code', url: 'https://example.com/code', hide_until_revealed: false },
+      ],
+    })
+
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/properties/property-1/edit')
+  })
+})
 
 describe('updateBillStatus', () => {
   beforeEach(() => {
