@@ -70,6 +70,8 @@ export interface Property {
   youtube_tutorial_url: string | null
   canva_design_url: string | null
   entry_instructions?: string | null
+  wifi_name?: string | null
+  wifi_password?: string | null
   guest_links?: GuestLink[] | null
   ical_feed_urls: ICalFeed[]
   lodgify_property_id: string | null

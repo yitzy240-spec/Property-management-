@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth'
+import { GMAIL_LABEL_MAPPING_KEY, parseLabelMapping, setLabelsForProperty } from '@/lib/gmail-label-mapping'
 import { resolveCanvaDesignUrl } from '@/lib/canva'
 
 export async function createProperty(data: Record<string, unknown>) {
@@ -13,11 +14,39 @@ export async function createProperty(data: Record<string, unknown>) {
   }
 
   const serviceClient = createServiceClient()
-  const { error } = await serviceClient.from('properties').insert(data)
+  const { data: created, error } = await serviceClient.from('properties').insert(data).select('id').single()
   if (error) return { error: error.message }
   revalidatePath('/properties')
   revalidatePath('/codes')
-  return { success: true }
+  return { success: true, id: created?.id as string | undefined }
+}
+
+/**
+ * Route these Gmail labels' bills to the property (replaces its previous
+ * labels). Labels already routed to another property are returned as
+ * conflicts and left unchanged.
+ */
+export async function savePropertyGmailLabels(propertyId: string, labels: string[]) {
+  await requireAdmin()
+
+  const serviceClient = createServiceClient()
+  const { data: setting } = await serviceClient
+    .from('app_settings')
+    .select('value')
+    .eq('key', GMAIL_LABEL_MAPPING_KEY)
+    .maybeSingle()
+
+  const current = parseLabelMapping(setting?.value)
+  const { mapping, conflicts } = setLabelsForProperty(current, propertyId, labels)
+
+  const { error } = await serviceClient.from('app_settings').upsert({
+    key: GMAIL_LABEL_MAPPING_KEY,
+    value: JSON.stringify(mapping),
+    description: 'Gmail label name -> property id, for the parse-bills cron',
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'key' })
+  if (error) return { error: error.message, conflicts }
+  return { success: true, conflicts }
 }
 
 export async function updateProperty(id: string, data: Record<string, unknown>) {

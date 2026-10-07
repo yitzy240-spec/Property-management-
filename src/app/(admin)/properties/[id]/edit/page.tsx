@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { PropertyForm } from '@/components/features/property-form'
+import { listUserLabelNames } from '@/lib/gmail'
+import { GMAIL_LABEL_MAPPING_KEY, labelsForProperty, parseLabelMapping } from '@/lib/gmail-label-mapping'
 
 export default async function EditPropertyPage({
   params,
@@ -21,6 +23,12 @@ export default async function EditPropertyPage({
 
   if (!property) notFound()
 
+  const [{ data: labelSetting }, gmailLabelOptions] = await Promise.all([
+    serviceClient.from('app_settings').select('value').eq('key', GMAIL_LABEL_MAPPING_KEY).maybeSingle(),
+    listUserLabelNames(),
+  ])
+  const gmailLabels = labelsForProperty(parseLabelMapping(labelSetting?.value), params.id)
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
@@ -34,7 +42,7 @@ export default async function EditPropertyPage({
           <p className="text-xs text-muted-foreground">Update property details and integrations.</p>
         </div>
       </div>
-      <PropertyForm property={property} />
+      <PropertyForm property={property} gmailLabels={gmailLabels} gmailLabelOptions={gmailLabelOptions} />
     </div>
   )
 }

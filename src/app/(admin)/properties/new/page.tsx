@@ -3,8 +3,11 @@ export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { PropertyForm } from '@/components/features/property-form'
+import { listUserLabelNames } from '@/lib/gmail'
 
-export default function NewPropertyPage() {
+export default async function NewPropertyPage() {
+  const gmailLabelOptions = await listUserLabelNames()
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
@@ -20,7 +23,7 @@ export default function NewPropertyPage() {
           </p>
         </div>
       </div>
-      <PropertyForm />
+      <PropertyForm gmailLabelOptions={gmailLabelOptions} />
     </div>
   )
 }

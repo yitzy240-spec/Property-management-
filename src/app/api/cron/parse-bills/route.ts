@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getGmailAccessToken } from '@/lib/gmail'
 import { parseBillPdf, parseBillHtml } from '@/lib/bill-parser'
 import { verifyBillRouting, withHebrewAliases } from '@/lib/bill-routing'
+import { GMAIL_LABEL_MAPPING_KEY, parseLabelMapping } from '@/lib/gmail-label-mapping'
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
 const PAGE_SIZE = 100
@@ -77,14 +78,14 @@ async function runParseBills(lookbackDays: number, labelFilter: string | null = 
   const { data: mappingSetting } = await serviceClient
     .from('app_settings')
     .select('value')
-    .eq('key', 'gmail_bill_label_mapping')
+    .eq('key', GMAIL_LABEL_MAPPING_KEY)
     .single()
 
   if (!mappingSetting) {
     return NextResponse.json({ error: 'No Gmail label mapping configured', parsed: 0 }, { status: 500 })
   }
 
-  const labelToProperty: Record<string, string> = JSON.parse(mappingSetting.value)
+  const labelToProperty = parseLabelMapping(mappingSetting.value)
 
   // Load utility accounts (with id) and properties for routing verification
   const [{ data: utilityAccounts }, { data: rawProperties }] = await Promise.all([

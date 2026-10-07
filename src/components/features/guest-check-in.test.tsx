@@ -120,4 +120,28 @@ describe('GuestCheckIn', () => {
     rerender(<GuestCheckIn property={{ ...baseProperty, guest_links: [gated] }} booking={null} canvaEmbedUrl={null} />)
     expect(screen.getByText('Door video')).toBeTruthy()
   })
+  it('shows WiFi network and password once codes are revealed', () => {
+    render(
+      <GuestCheckIn
+        property={{ ...baseProperty, wifi_name: 'Marcus-Guest', wifi_password: 'shalom123' }}
+        booking={null}
+        canvaEmbedUrl={null}
+      />,
+    )
+    expect(screen.getByText('Marcus-Guest')).toBeTruthy()
+    expect(screen.getByText('shalom123')).toBeTruthy()
+  })
+
+  it('hides WiFi before the 24h reveal window, like the entry code', () => {
+    render(
+      <GuestCheckIn
+        property={{ ...baseProperty, wifi_name: 'Marcus-Guest', wifi_password: 'shalom123' }}
+        booking={{ check_in: '2099-01-01', check_out: '2099-01-05', guest_name: 'Test' }}
+        canvaEmbedUrl={null}
+      />,
+    )
+    expect(screen.queryByText('Marcus-Guest')).toBeNull()
+    expect(screen.queryByText('shalom123')).toBeNull()
+    expect(screen.queryByText('1234')).toBeNull()
+  })
 })

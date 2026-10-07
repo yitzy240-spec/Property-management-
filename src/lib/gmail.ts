@@ -79,6 +79,25 @@ export async function isGmailConnected(): Promise<boolean> {
   return !!data
 }
 
+/** Names of the user-created Gmail labels, or [] if Gmail isn't connected / the call fails. */
+export async function listUserLabelNames(): Promise<string[]> {
+  try {
+    if (!(await isGmailConnected())) return []
+    const accessToken = await getGmailAccessToken()
+    const res = await fetch(`${GMAIL_API_BASE}/users/me/labels`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return ((data.labels || []) as { name: string; type: string }[])
+      .filter(l => l.type === 'user')
+      .map(l => l.name)
+      .sort()
+  } catch {
+    return []
+  }
+}
+
 // ══════════════════════════════════════
 // BILL EMAIL FETCHING — Per-sender targeted queries
 // ══════════════════════════════════════

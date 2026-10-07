@@ -41,7 +41,7 @@ export default async function GuestCheckInPage({
 
     const { data: property } = await serviceClient
       .from('properties')
-      .select('name, address, neighborhood, city, entry_code, building_entry_code, youtube_tutorial_url, canva_design_url, entry_instructions, guest_links')
+      .select('name, address, neighborhood, city, entry_code, building_entry_code, youtube_tutorial_url, canva_design_url, entry_instructions, guest_links, wifi_name, wifi_password')
       .eq('id', payload.property_id)
       .single()
 
@@ -64,6 +64,8 @@ export default async function GuestCheckInPage({
 
     const entryCode = codeIsRevealed ? property.entry_code : null
     const buildingEntryCode = codeIsRevealed ? property.building_entry_code : null
+    const wifiName = codeIsRevealed ? property.wifi_name : null
+    const wifiPassword = codeIsRevealed ? property.wifi_password : null
 
     let guideText: string | null = null
     try {
@@ -82,7 +84,7 @@ export default async function GuestCheckInPage({
 
     return (
       <GuestCheckIn
-        property={{ ...property, entry_code: entryCode, building_entry_code: buildingEntryCode }}
+        property={{ ...property, entry_code: entryCode, building_entry_code: buildingEntryCode, wifi_name: wifiName, wifi_password: wifiPassword }}
         booking={booking}
         guideText={guideText}
         canvaEmbedUrl={getCanvaEmbedUrl(property.canva_design_url)}

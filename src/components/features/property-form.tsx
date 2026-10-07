@@ -8,21 +8,33 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
-import { createProperty, updateProperty } from '@/app/(admin)/properties/actions'
-import type { Property, GuestLink, GuestLinkIcon } from '@/types'
+import { createProperty, updateProperty, savePropertyGmailLabels } from '@/app/(admin)/properties/actions'
+import type { Property, GuestLink, GuestLinkIcon, ICalFeed } from '@/types'
 import { GUEST_LINK_ICON_OPTIONS } from '@/lib/guest-link-icons'
 
 interface PropertyFormProps {
   property?: Property
+  /** Gmail labels currently routed to this property (bill scraping). */
+  gmailLabels?: string[]
+  /** User-created Gmail label names, for suggestions. Empty if Gmail isn't connected. */
+  gmailLabelOptions?: string[]
 }
 
-export function PropertyForm({ property }: PropertyFormProps) {
+const ICAL_PLATFORM_OPTIONS = [
+  { value: 'airbnb', label: 'Airbnb' },
+  { value: 'booking_com', label: 'Booking.com' },
+  { value: 'other', label: 'Other' },
+]
+
+export function PropertyForm({ property, gmailLabels: initialGmailLabels = [], gmailLabelOptions = [] }: PropertyFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [owners, setOwners] = useState<{ id: string; full_name: string; email: string }[]>([])
   const [selectedOwnerId, setSelectedOwnerId] = useState(property?.owner_id || '')
   const [guestLinks, setGuestLinks] = useState<GuestLink[]>(property?.guest_links ?? [])
+  const [icalFeeds, setIcalFeeds] = useState<ICalFeed[]>(property?.ical_feed_urls ?? [])
+  const [gmailLabels, setGmailLabels] = useState<string[]>(initialGmailLabels)
 
   useEffect(() => {
     fetch('/api/owners/list')
@@ -49,6 +61,8 @@ export function PropertyForm({ property }: PropertyFormProps) {
       youtube_tutorial_url: formData.get('youtube_tutorial_url') as string || null,
       canva_design_url: formData.get('canva_design_url') as string || null,
       entry_instructions: formData.get('entry_instructions') as string || null,
+      wifi_name: formData.get('wifi_name') as string || null,
+      wifi_password: formData.get('wifi_password') as string || null,
       guest_links: guestLinks
         .filter((l) => l.url.trim())
         .map((l) => ({ label: l.label.trim() || 'Link', url: l.url.trim(), hide_until_revealed: !!l.hide_until_revealed, icon: l.icon ?? 'link' })),
@@ -57,6 +71,9 @@ export function PropertyForm({ property }: PropertyFormProps) {
       management_fee_agorot: Math.round((parseFloat(formData.get('management_fee') as string) || 0) * 100),
       hourly_rate_agorot: Math.round((parseFloat(formData.get('hourly_rate') as string) || 0) * 100),
       lodgify_property_id: formData.get('lodgify_property_id') as string || null,
+      ical_feed_urls: icalFeeds
+        .filter((f) => f.url.trim())
+        .map((f) => ({ platform: f.platform || 'other', url: f.url.trim() })),
     }
 
     if (isEditing) {
@@ -67,6 +84,7 @@ export function PropertyForm({ property }: PropertyFormProps) {
         setLoading(false)
         return
       }
+      if (!(await saveGmailLabels(property.id))) return
       toast.success('Property updated')
       router.push(`/properties/${property.id}`)
     } else {
@@ -77,11 +95,31 @@ export function PropertyForm({ property }: PropertyFormProps) {
         setLoading(false)
         return
       }
+      if (result.id && !(await saveGmailLabels(result.id))) return
       toast.success('Property created')
       router.push('/properties')
     }
 
     router.refresh()
+  }
+
+  /** Returns false (and stays on the form) if a label belongs to another property. */
+  async function saveGmailLabels(propertyId: string): Promise<boolean> {
+    const wanted = gmailLabels.map((l) => l.trim()).filter(Boolean)
+    const unchanged =
+      wanted.length === initialGmailLabels.length && wanted.every((l) => initialGmailLabels.includes(l))
+    if (unchanged) return true
+    const result = await savePropertyGmailLabels(propertyId, wanted)
+    if (result.error || result.conflicts.length > 0) {
+      const message = result.error
+        ? `Property saved, but Gmail labels failed: ${result.error}`
+        : `Property saved, but these Gmail labels already belong to another property: ${result.conflicts.join(', ')}`
+      setError(message)
+      toast.error(message)
+      setLoading(false)
+      return false
+    }
+    return true
   }
 
   // Resolve current image: custom > lodgify
@@ -158,6 +196,15 @@ export function PropertyForm({ property }: PropertyFormProps) {
                 />
                 <p className="text-xs text-muted-foreground">Shown to guests under their entry code, on the guest check-in page.</p>
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="wifi_name" className="text-xs font-medium">WiFi Network</Label>
+                <Input id="wifi_name" name="wifi_name" placeholder="Marcus-Guest" className="h-11 font-mono" defaultValue={property?.wifi_name ?? ''} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="wifi_password" className="text-xs font-medium">WiFi Password</Label>
+                <Input id="wifi_password" name="wifi_password" placeholder="(optional)" className="h-11 font-mono" defaultValue={property?.wifi_password ?? ''} />
+              </div>
+              <p className="text-xs text-muted-foreground sm:col-span-3">WiFi is revealed to guests at the same time as the entry code.</p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -207,6 +254,85 @@ export function PropertyForm({ property }: PropertyFormProps) {
               <Label htmlFor="lodgify_property_id" className="text-xs font-medium">Lodgify Property ID</Label>
               <Input id="lodgify_property_id" name="lodgify_property_id" placeholder="From Lodgify URL or Settings mapper" defaultValue={property?.lodgify_property_id ?? ''} className="h-11 font-mono" />
               <p className="text-xs text-muted-foreground">Links this property to Lodgify for booking + financial sync</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Calendar feeds (iCal)</Label>
+              <p className="text-xs text-muted-foreground">
+                Airbnb / Booking.com calendar export links. Bookings sync daily; cleaning tasks are created from them.
+              </p>
+              <div className="space-y-2">
+                {icalFeeds.map((feed, i) => (
+                  <div key={i} className="flex flex-col gap-2 rounded-lg border border-border p-2.5 sm:flex-row sm:items-center">
+                    <NativeSelect
+                      options={ICAL_PLATFORM_OPTIONS}
+                      value={feed.platform || 'other'}
+                      onChange={(e) => setIcalFeeds((fs) => fs.map((f, j) => (j === i ? { ...f, platform: e.target.value } : f)))}
+                      className="h-9 sm:w-40"
+                      aria-label="Feed platform"
+                    />
+                    <Input
+                      type="url"
+                      placeholder="https://www.airbnb.com/calendar/ical/....ics"
+                      value={feed.url}
+                      onChange={(e) => setIcalFeeds((fs) => fs.map((f, j) => (j === i ? { ...f, url: e.target.value } : f)))}
+                      className="h-9 min-w-0 flex-1 font-mono text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIcalFeeds((fs) => fs.filter((_, j) => j !== i))}
+                      className="self-end text-xs font-medium text-destructive hover:underline sm:self-auto"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setIcalFeeds((fs) => [...fs, { platform: 'airbnb', url: '' }])}
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                + Add calendar feed
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Gmail bill labels</Label>
+              <p className="text-xs text-muted-foreground">
+                Bills in these Gmail labels are scanned daily and filed under this property.
+                {gmailLabelOptions.length === 0 && ' (Gmail label suggestions unavailable — type the exact label name.)'}
+              </p>
+              <div className="space-y-2">
+                {gmailLabels.map((label, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Input
+                      list="gmail-label-options"
+                      placeholder="Exact Gmail label, e.g. Bills/Agripas 6"
+                      value={label}
+                      onChange={(e) => setGmailLabels((ls) => ls.map((l, j) => (j === i ? e.target.value : l)))}
+                      className="h-9 min-w-0 flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setGmailLabels((ls) => ls.filter((_, j) => j !== i))}
+                      className="text-xs font-medium text-destructive hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <datalist id="gmail-label-options">
+                {gmailLabelOptions.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+              <button
+                type="button"
+                onClick={() => setGmailLabels((ls) => [...ls, ''])}
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                + Add Gmail label
+              </button>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="youtube_tutorial_url" className="text-xs font-medium">YouTube Tutorial URL</Label>

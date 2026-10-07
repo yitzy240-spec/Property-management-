@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, MapPin, Play, Lock, KeyRound, BookOpen } from 'lucide-react'
+import { Clock, MapPin, Play, Lock, KeyRound, BookOpen, Wifi } from 'lucide-react'
 import { guestLinkIcon } from '@/lib/guest-link-icons'
 import { Button } from '@/components/ui/button'
 import type { GuestLink } from '@/types'
@@ -17,6 +17,8 @@ interface GuestCheckInProps {
     youtube_tutorial_url: string | null
     canva_design_url: string | null
     entry_instructions: string | null
+    wifi_name?: string | null
+    wifi_password?: string | null
     guest_links: GuestLink[] | null
   }
   booking: {
@@ -149,7 +151,7 @@ export function GuestCheckIn({ property, booking, guideText, canvaEmbedUrl }: Gu
               <Lock className="mx-auto h-7 w-7 text-muted-foreground/50" />
               <p className="mt-2 text-sm font-medium">Entry code available soon</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Your entry code will be revealed 24 hours before check-in.
+                Your entry code and WiFi details will be revealed 24 hours before check-in.
               </p>
               {countdown && (
                 <div className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-badge)] bg-muted px-2.5 py-1 font-mono text-sm">
@@ -169,6 +171,30 @@ export function GuestCheckIn({ property, booking, guideText, canvaEmbedUrl }: Gu
             </>
           )}
         </div>
+
+        {/* WiFi — same reveal rules as the entry code (server nulls it until code_reveals_at) */}
+        {codeVisible && (property.wifi_name || property.wifi_password) && (
+          <div className="rounded-[10px] border border-border bg-card p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Wifi className="h-4 w-4 text-accent" />
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">WiFi</p>
+            </div>
+            <div className="mt-2 space-y-2">
+              {property.wifi_name && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Network</p>
+                  <p className="select-all break-all font-mono text-base font-semibold text-foreground">{property.wifi_name}</p>
+                </div>
+              )}
+              {property.wifi_password && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Password</p>
+                  <p className="select-all break-all font-mono text-base font-semibold text-foreground">{property.wifi_password}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Entry Video — gated behind the code reveal because it shows the door code */}
         {codeVisible && property.entry_code && property.youtube_tutorial_url && (
