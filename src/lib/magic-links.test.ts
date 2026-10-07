@@ -171,6 +171,9 @@ describe('computeExpiresAt', () => {
 })
 
 describe('validateRevealAndExpiry', () => {
+  // Relative to now so these don't start failing once the dates pass.
+  const daysFromNow = (d: number) => new Date(Date.now() + d * 24 * 60 * 60 * 1000)
+
   it('passes when both are null', () => {
     expect(() => validateRevealAndExpiry(null, null)).not.toThrow()
   })
@@ -178,8 +181,8 @@ describe('validateRevealAndExpiry', () => {
   it('passes when reveal is before expiry', () => {
     expect(() =>
       validateRevealAndExpiry(
-        new Date('2026-06-04T04:00:00Z'),
-        new Date('2026-06-10T20:59:00Z'),
+        daysFromNow(4),
+        daysFromNow(10),
       ),
     ).not.toThrow()
   })
@@ -187,8 +190,8 @@ describe('validateRevealAndExpiry', () => {
   it('throws when reveal is after expiry', () => {
     expect(() =>
       validateRevealAndExpiry(
-        new Date('2026-06-10T04:00:00Z'),
-        new Date('2026-06-05T20:59:00Z'),
+        daysFromNow(10),
+        daysFromNow(5),
       ),
     ).toThrow(/reveal.*after.*expir/i)
   })

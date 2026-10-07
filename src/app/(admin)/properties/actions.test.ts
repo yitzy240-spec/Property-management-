@@ -13,6 +13,8 @@ const mockSingle = vi.fn()
 const mockUpsert = vi.fn().mockResolvedValue({ error: null })
 const mockLimit = vi.fn()
 const mockRevalidatePath = vi.fn()
+const ADMIN_USER = { id: 'admin-1', app_metadata: { role: 'admin' } }
+let mockAuthUser: { id: string; app_metadata: Record<string, unknown> } | null = ADMIN_USER
 
 /**
  * Build a chainable query builder. Most chain methods return `this`;
@@ -62,7 +64,7 @@ function makeFrom() {
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabaseClient: () => ({
     auth: {
-      getUser: async () => ({ data: { user: { id: 'admin-1' } } }),
+      getUser: async () => ({ data: { user: mockAuthUser } }),
     },
   }),
   createServiceClient: () => ({
@@ -75,6 +77,28 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('next/cache', () => ({
   revalidatePath: mockRevalidatePath,
 }))
+
+describe('admin authorization', () => {
+  beforeEach(() => {
+    mockAuthUser = ADMIN_USER
+  })
+
+  // Server actions are callable by any logged-in user (owners included) —
+  // they write with the service-role client, so they must check the role.
+  it('rejects a logged-in non-admin (e.g. an owner)', async () => {
+    mockAuthUser = { id: 'owner-1', app_metadata: { role: 'owner' } }
+    const { updateProperty } = await import('./actions')
+    await expect(updateProperty('prop-1', { name: 'x' })).rejects.toThrow(/admin/i)
+    mockAuthUser = ADMIN_USER
+  })
+
+  it('rejects a logged-out caller', async () => {
+    mockAuthUser = null
+    const { updateBillStatus } = await import('./actions')
+    await expect(updateBillStatus('bill-1', 'approved')).rejects.toThrow(/authenticated/i)
+    mockAuthUser = ADMIN_USER
+  })
+})
 
 describe('updateProperty', () => {
   beforeEach(() => {
