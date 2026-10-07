@@ -20,10 +20,15 @@
  * Net: positive = owner owes Marcus, negative = Marcus owes owner
  *
  * All statements start as 'draft' for admin review/edit before sending.
+ *
+ * Currency: bookings keep the currency they were entered in (e.g. USD). The
+ * statement is in ILS, so each booking is converted here with the rate saved
+ * on the booking, and the line shows the conversion ("$1,000 × 3.70 = ₪3,700").
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import type { StatementLineItemData, StatementDirection, LineItemSection, LineItemCategory } from '@/types'
+import { toIlsAgorot } from '@/lib/booking-currency'
 
 const CC_SURCHARGE_RATE = 0.035
 
@@ -96,7 +101,7 @@ export async function calculateMonthlyStatements(
 
   const { data: bookings, error: bookErr } = await supabase
     .from('bookings')
-    .select('id, property_id, platform, gross_rental_agorot, guest_name, check_in, check_out')
+    .select('id, property_id, platform, gross_rental_agorot, currency, exchange_rate, guest_name, check_in, check_out')
     .eq('is_cancelled', false)
     .gte('check_out', start)
     .lte('check_out', end)
@@ -143,11 +148,16 @@ export async function calculateMonthlyStatements(
       // ── BOOKINGS SECTION ──
       const propBookings = (bookings ?? []).filter(b => b.property_id === prop.id)
       for (const booking of propBookings) {
-        const rental = booking.gross_rental_agorot ?? 0
+        const amount = booking.gross_rental_agorot ?? 0
         const platform = booking.platform || 'direct'
 
         if (platform === 'owner_stay') continue
-        if (rental <= 0) continue
+        if (amount <= 0) continue
+
+        // ILS figure for the statement; label shows any conversion.
+        const ils = toIlsAgorot(amount, booking.currency, booking.exchange_rate)
+        const rental = ils.agorot
+        const isForeign = (booking.currency || 'ILS').toUpperCase() !== 'ILS'
 
         const guestLabel = booking.guest_name || 'Guest'
         const dateRange = `${booking.check_in} – ${booking.check_out}`
@@ -156,13 +166,13 @@ export async function calculateMonthlyStatements(
           // Airbnb: pays owner their share AND pays Marcus commission directly.
           // Zero financial impact on the statement — just informational.
           lineItems.push(li(p, 'bookings', 'commission_platform',
-            `${guestLabel} via Airbnb (₪${(rental / 100).toLocaleString()}) — commission paid by Airbnb`,
+            `${guestLabel} via Airbnb (${ils.label}) — commission paid by Airbnb`,
             0, booking.id, 'booking'))
         } else if (platform === 'direct') {
           // Direct: Marcus collected the rent, deducts commission
           totalRental += rental
           lineItems.push(li(p, 'bookings', 'rental_direct',
-            `${guestLabel} (${dateRange})`,
+            isForeign ? `${guestLabel} (${dateRange}) — ${ils.label}` : `${guestLabel} (${dateRange})`,
             -rental, booking.id, 'booking'))
 
           const commission = Math.round(rental * rate)
@@ -178,7 +188,7 @@ export async function calculateMonthlyStatements(
           if (commission > 0) {
             totalCommission += commission
             lineItems.push(li(p, 'bookings', 'commission_platform',
-              `${guestLabel} via ${platform} — ${rateLabel} commission (on ₪${(rental / 100).toLocaleString()})`,
+              `${guestLabel} via ${platform} — ${rateLabel} commission (on ${ils.label})`,
               commission, booking.id, 'booking'))
           }
         }

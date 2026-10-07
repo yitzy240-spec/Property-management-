@@ -3,6 +3,7 @@ import { requireAdmin, AuthError } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { callGemini } from '@/lib/ai'
 import { formatILS } from '@/lib/utils'
+import { toIlsAgorot } from '@/lib/booking-currency'
 
 /**
  * POST /api/ai/generate-report
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
     { data: fees },
     { data: tasks },
   ] = await Promise.all([
-    serviceClient.from('bookings').select('property_id, gross_rental_agorot, channel_fees_agorot, check_in, check_out, platform, guest_name')
+    serviceClient.from('bookings').select('property_id, gross_rental_agorot, channel_fees_agorot, currency, exchange_rate, check_in, check_out, platform, guest_name')
       .in('property_id', propertyIds).gte('check_out', startStr).lt('check_out', endStr),
     serviceClient.from('bills').select('property_id, bill_type, amount_agorot')
       .in('property_id', propertyIds).eq('status', 'approved')
@@ -72,8 +73,9 @@ export async function POST(request: Request) {
     const pFees = (fees ?? []).filter(f => f.property_id === property.id)
     const pTasks = (tasks ?? []).filter(t => t.property_id === property.id)
 
-    const gross = pb.reduce((s, b) => s + (b.gross_rental_agorot ?? 0), 0)
-    const channelFees = pb.reduce((s, b) => s + (b.channel_fees_agorot ?? 0), 0)
+    // Bookings keep their own currency (e.g. USD); convert to ₪ for the report.
+    const gross = pb.reduce((s, b) => s + toIlsAgorot(b.gross_rental_agorot ?? 0, b.currency, b.exchange_rate).agorot, 0)
+    const channelFees = pb.reduce((s, b) => s + toIlsAgorot(b.channel_fees_agorot ?? 0, b.currency, b.exchange_rate).agorot, 0)
     const totalBills = pBills.reduce((s, b) => s + b.amount_agorot, 0)
     const mgmtFees = pFees.reduce((s, f) => s + f.amount_agorot, 0)
     const expenses = pTasks.reduce((s, t) => s + (t.expense_agorot ?? 0), 0)

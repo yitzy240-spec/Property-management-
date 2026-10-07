@@ -430,6 +430,7 @@ function toBookingRows(rows: unknown[]) {
     gross_rental_agorot: b.gross_rental_agorot as number | null,
     currency: (b.currency as string) || 'ILS',
     original_amount_cents: b.original_amount_cents as number | null,
+    exchange_rate: b.exchange_rate as number | null,
     commission_amount_agorot: b.commission_amount_agorot as number | null,
     commission_collected: (b.commission_collected as boolean) || false,
     deposit_amount_agorot: b.deposit_amount_agorot as number | null,

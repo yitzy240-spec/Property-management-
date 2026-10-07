@@ -241,6 +241,37 @@ describe('Statement Calculator', () => {
   })
 })
 
+describe('Statement Calculator — USD bookings', () => {
+  const billingMonth = '2026-09-01'
+  const owners = [{ id: 'o1', full_name: 'Test', email: 't@test.com', green_invoice_client_id: null }]
+  const properties = [{ id: 'p1', owner_id: 'o1', name: 'Keren Hayesod 5', commission_rate: 0.20, management_fee_agorot: 0, hourly_rate_agorot: 0, is_active: true }]
+
+  // Ariel's case: $1,000 direct booking entered at 3.70. Stored as USD cents,
+  // converted only on the statement.
+  it('converts a USD direct booking with the rate saved on the booking', async () => {
+    const client = buildMockClient({
+      owners, properties, work_logs: [], bills: [],
+      bookings: [{ id: 'b1', property_id: 'p1', platform: 'direct', gross_rental_agorot: 100000, currency: 'USD', exchange_rate: 3.7, guest_name: 'Test', check_in: '2026-09-22', check_out: '2026-09-26' }],
+    })
+    const [stmt] = await calculateMonthlyStatements(client as never, billingMonth)
+    expect(stmt.grossRentalAgorot).toBe(370000)
+    expect(stmt.commissionAgorot).toBe(74000)
+    const rental = stmt.lineItems.find(i => i.category === 'rental_direct')!
+    expect(rental.amount_agorot).toBe(-370000)
+    expect(rental.description).toContain('$1,000 × 3.70 = ₪3,700')
+  })
+
+  it('USD booking without a rate (Lodgify) uses the default rate and flags it', async () => {
+    const client = buildMockClient({
+      owners, properties, work_logs: [], bills: [],
+      bookings: [{ id: 'b1', property_id: 'p1', platform: 'booking_com', gross_rental_agorot: 100000, currency: 'USD', exchange_rate: null, guest_name: 'G', check_in: '2026-09-01', check_out: '2026-09-03' }],
+    })
+    const [stmt] = await calculateMonthlyStatements(client as never, billingMonth)
+    expect(stmt.commissionAgorot).toBe(74000) // 20% of $1,000 × 3.70
+    expect(stmt.lineItems[0].description).toContain('(default rate)')
+  })
+})
+
 describe('CC Surcharge', () => {
   it('calculates 3.5%', () => {
     expect(calculateCcSurcharge(500000)).toBe(17500)

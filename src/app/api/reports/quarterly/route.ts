@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { formatILS } from '@/lib/utils'
 import { requireAdmin, AuthError } from '@/lib/auth'
+import { toIlsAgorot } from '@/lib/booking-currency'
 
 /**
  * POST /api/reports/quarterly
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
   // Get bookings for the quarter
   const { data: bookings } = await serviceClient
     .from('bookings')
-    .select('property_id, gross_rental_agorot, channel_fees_agorot, check_in, check_out, platform')
+    .select('property_id, gross_rental_agorot, channel_fees_agorot, currency, exchange_rate, check_in, check_out, platform')
     .in('property_id', propertyIds)
     .gte('check_out', startStr)
     .lt('check_out', endStr)
@@ -97,8 +98,9 @@ export async function POST(request: Request) {
     const propFees = (fees ?? []).filter((f) => f.property_id === property.id)
     const propTasks = (tasks ?? []).filter((t) => t.property_id === property.id)
 
-    const grossRevenue = propBookings.reduce((s, b) => s + (b.gross_rental_agorot ?? 0), 0)
-    const channelFees = propBookings.reduce((s, b) => s + (b.channel_fees_agorot ?? 0), 0)
+    // Bookings keep their own currency (e.g. USD); convert to ₪ for the report.
+    const grossRevenue = propBookings.reduce((s, b) => s + toIlsAgorot(b.gross_rental_agorot ?? 0, b.currency, b.exchange_rate).agorot, 0)
+    const channelFees = propBookings.reduce((s, b) => s + toIlsAgorot(b.channel_fees_agorot ?? 0, b.currency, b.exchange_rate).agorot, 0)
     const totalBills = propBills.reduce((s, b) => s + b.amount_agorot, 0)
     const totalMgmtFees = propFees.reduce((s, f) => s + f.amount_agorot, 0)
     const totalExpenses = propTasks.reduce((s, t) => s + (t.expense_agorot ?? 0), 0)

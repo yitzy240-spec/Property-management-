@@ -16,6 +16,7 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer'
 import { createClient } from '@/lib/supabase/client'
+import { DEFAULT_USD_ILS_RATE } from '@/lib/booking-currency'
 
 export function BookingAddButton({ propertyId, propertyName }: { propertyId?: string; propertyName?: string }) {
   const supabase = createClient()
@@ -25,7 +26,7 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([])
   const [selectedProperty, setSelectedProperty] = useState(propertyId || '')
   const [currency, setCurrency] = useState<'ILS' | 'USD'>('ILS')
-  const [fxRate, setFxRate] = useState('3.70')
+  const [fxRate, setFxRate] = useState(DEFAULT_USD_ILS_RATE.toFixed(2))
 
   useEffect(() => {
     if (!open || propertyId) return
@@ -44,21 +45,11 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
     const channelStr = formData.get('channel_fees') as string
     const depositStr = formData.get('deposit') as string
 
-    let grossAgorot: number | null = null
-    let originalCents: number | null = null
-    let exchangeRate: number | null = null
-
-    if (grossStr) {
-      const amount = parseFloat(grossStr)
-      if (currency === 'USD') {
-        const rate = parseFloat(fxRate) || 3.70
-        originalCents = Math.round(amount * 100)
-        grossAgorot = Math.round(amount * rate * 100)
-        exchangeRate = rate
-      } else {
-        grossAgorot = Math.round(amount * 100)
-      }
-    }
+    // Amounts are stored exactly as entered, in the chosen currency's smallest
+    // unit (no conversion). The USD rate is saved for the monthly statement,
+    // which is the only place the booking is converted to ₪.
+    const grossAgorot = grossStr ? Math.round(parseFloat(grossStr) * 100) : null
+    const exchangeRate = currency === 'USD' ? (parseFloat(fxRate) || DEFAULT_USD_ILS_RATE) : null
 
     try {
       const res = await fetch('/api/bookings', {
@@ -73,7 +64,6 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
           gross_rental_agorot: grossAgorot,
           channel_fees_agorot: channelStr ? Math.round(parseFloat(channelStr) * 100) : null,
           currency,
-          original_amount_cents: originalCents,
           exchange_rate: exchangeRate,
           deposit_amount_agorot: depositStr ? Math.round(parseFloat(depositStr) * 100) : null,
           notes: formData.get('notes') as string || null,
@@ -178,26 +168,29 @@ export function BookingAddButton({ propertyId, propertyName }: { propertyId?: st
             </div>
 
             {currency === 'USD' && (
-              <div className="flex items-center gap-2 rounded-[10px] bg-muted/50 px-3 py-2">
-                <span className="text-xs text-muted-foreground">× rate</span>
-                <Input
-                  value={fxRate}
-                  onChange={e => setFxRate(e.target.value)}
-                  type="number"
-                  step="0.01"
-                  className="h-8 w-20 text-center font-mono text-sm"
-                />
-                <span className="text-xs text-muted-foreground">= ₪{fxRate && parseFloat(fxRate) ? '...' : '0'}</span>
+              <div className="space-y-1 rounded-[10px] bg-muted/50 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">$1 = ₪</span>
+                  <Input
+                    value={fxRate}
+                    onChange={e => setFxRate(e.target.value)}
+                    type="number"
+                    step="0.01"
+                    aria-label="USD to ILS exchange rate"
+                    className="h-8 w-20 text-center font-mono text-sm"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">Saved in dollars. This rate is only used to convert it on the owner&apos;s monthly statement.</p>
               </div>
             )}
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Channel Fees (₪)</Label>
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Channel Fees ({currency === 'USD' ? '$' : '₪'})</Label>
               <Input name="channel_fees" type="number" step="0.01" placeholder="225.00" className="h-11" />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Deposit (₪)</Label>
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Deposit ({currency === 'USD' ? '$' : '₪'})</Label>
               <Input name="deposit" type="number" step="0.01" placeholder="Optional" className="h-11" />
             </div>
 

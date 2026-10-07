@@ -68,7 +68,10 @@ export async function POST(request: Request) {
             guest_name: bookingData.guest?.name || bookingData.guest_name || null,
             check_in: bookingData.arrival || bookingData.check_in,
             check_out: bookingData.departure || bookingData.check_out,
-            gross_rental_agorot: grossAgorot,
+            // Amounts are in the booking's own currency (USD for these
+            // properties) — same rule as the Lodgify sync. Skip financials
+            // when Lodgify sends none so an entered amount isn't wiped.
+            ...(grossAgorot ? { gross_rental_agorot: grossAgorot, currency: bookingData.currency || 'USD' } : {}),
             synced_at: new Date().toISOString(),
             // Reactivate if a previously-cancelled booking comes back.
             is_cancelled: false,

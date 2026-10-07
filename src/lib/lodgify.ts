@@ -434,6 +434,14 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
 
       const guestName = lb.guest?.name || null
 
+      // Only write financials when Lodgify actually has an amount. Bookings
+      // created in ApartmentOS are pushed to Lodgify WITHOUT an amount, so
+      // Lodgify echoes them back with total 0 — overwriting would wipe the
+      // amount/currency the admin entered.
+      const financials = grossRentalAgorot
+        ? { gross_rental_agorot: grossRentalAgorot, channel_fees_agorot: channelFeesAgorot, currency }
+        : {}
+
       const bookingData = {
         property_id: property.id,
         platform,
@@ -441,9 +449,7 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
         guest_name: guestName,
         check_in: lb.arrival,
         check_out: lb.departure,
-        gross_rental_agorot: grossRentalAgorot,
-        channel_fees_agorot: channelFeesAgorot,
-        currency,
+        ...financials,
         synced_at: new Date().toISOString(),
         // Always clear cancellation flag for active bookings — handles
         // reactivation if a previously-cancelled booking is reinstated.
@@ -470,9 +476,7 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
           // Update existing booking with Lodgify financial data but keep real guest name
           const updateData: Record<string, unknown> = {
             external_id: `lodgify_${lb.id}`,
-            gross_rental_agorot: grossRentalAgorot,
-            channel_fees_agorot: channelFeesAgorot,
-            currency,
+            ...financials,
             platform: platform || dateMatch.guest_name ? undefined : platform,
             synced_at: new Date().toISOString(),
           }

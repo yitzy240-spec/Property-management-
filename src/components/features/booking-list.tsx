@@ -19,6 +19,7 @@ interface BookingRow {
   gross_rental_agorot: number | null
   currency: string
   original_amount_cents: number | null
+  exchange_rate?: number | null
   commission_amount_agorot: number | null
   commission_collected: boolean
   deposit_amount_agorot: number | null
@@ -216,13 +217,15 @@ function BookingAccordionRow({
             </div>
           )}
 
-          {/* Original currency */}
-          {booking.currency !== 'ILS' && booking.original_amount_cents && (
+          {/* Foreign-currency bookings are stored as entered; the rate only
+              applies when the monthly statement converts them to ₪. */}
+          {booking.currency !== 'ILS' && booking.gross_rental_agorot ? (
             <p className="text-xs text-muted-foreground">
-              Original: ${(booking.original_amount_cents / 100).toLocaleString()} {booking.currency}
-              {booking.gross_rental_agorot && ` (rate used for ILS conversion)`}
+              {booking.exchange_rate
+                ? `Statement rate: $1 = ₪${Number(booking.exchange_rate).toFixed(2)}`
+                : 'No rate saved — the statement uses the default rate'}
             </p>
-          )}
+          ) : null}
 
           {/* Delete (admin) — useful for cleaning up test stays / wrong owner_stay entries */}
           <div className="flex justify-end pt-1">
