@@ -198,8 +198,16 @@ describe('Webhook matching', () => {
     vi.clearAllMocks()
   })
 
+  async function mockVerifiedDoc(doc: Record<string, unknown> | Error) {
+    const { getDocument } = await import('@/lib/green-invoice')
+    const fn = getDocument as ReturnType<typeof vi.fn>
+    if (doc instanceof Error) fn.mockRejectedValueOnce(doc)
+    else fn.mockResolvedValueOnce(doc)
+  }
+
   it('handles voided document — reverts statement', async () => {
     mockSelectResult = { data: [{ id: 'stmt-1' }], error: null }
+    await mockVerifiedDoc({ id: 'doc-123', type: 400, status: 2 })
 
     const { POST } = await import('../webhooks/greeninvoice/route')
     const res = await POST(makeRequest('http://localhost', {
@@ -216,6 +224,7 @@ describe('Webhook matching', () => {
   it('handles receipt with no matching — returns matched: false', async () => {
     // No linked docs, no matching client, multiple sent statements
     mockSelectResult = { data: [], error: null }
+    await mockVerifiedDoc({ id: 'receipt-123', type: 400, status: 1, client: { id: 'c', name: 'Unknown Person' } })
 
     const { POST } = await import('../webhooks/greeninvoice/route')
     const res = await POST(makeRequest('http://localhost', {
@@ -229,6 +238,42 @@ describe('Webhook matching', () => {
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.matched).toBe(false)
+  })
+
+  // The webhook is unauthenticated: forged events must not change statements.
+  it('ignores a forged void that Green Invoice does not confirm', async () => {
+    mockSelectResult = { data: [{ id: 'stmt-1' }], error: null }
+    await mockVerifiedDoc(new Error('Green Invoice API 404'))
+    const { POST } = await import('../webhooks/greeninvoice/route')
+    const res = await POST(makeRequest('http://localhost', { id: 'fake-doc', type: 400, status: 2 }))
+    expect((await res.json()).message).toMatch(/Ignored/)
+  })
+
+  it('ignores a forged "paid" receipt that Green Invoice does not confirm', async () => {
+    mockSelectResult = { data: [{ id: 'stmt-1', net_amount_agorot: 1000 }], error: null }
+    await mockVerifiedDoc(new Error('Green Invoice API 404'))
+    const { POST } = await import('../webhooks/greeninvoice/route')
+    const res = await POST(makeRequest('http://localhost', {
+      id: 'fake-receipt', type: 400, status: 1, client: { name: 'Some Owner' },
+    }))
+    const data = await res.json()
+    expect(data.message).toMatch(/Ignored/)
+    expect(data.matched).toBe(false)
+  })
+
+  it('rejects filter-injection in the document id', async () => {
+    const { getDocument } = await import('@/lib/green-invoice')
+    const { POST } = await import('../webhooks/greeninvoice/route')
+    const res = await POST(makeRequest('http://localhost', { id: 'x,id.not.is.null', type: 400, status: 2 }))
+    expect((await res.json()).message).toMatch(/malformed/)
+    expect(getDocument).not.toHaveBeenCalled()
+  })
+
+  it('ignores order-paid with only a payment link id (link is in the owner\'s email)', async () => {
+    mockSelectResult = { data: [{ id: 'stmt-1', net_amount_agorot: 1000 }], error: null }
+    const { POST } = await import('../webhooks/greeninvoice/route')
+    const res = await POST(makeRequest('http://localhost', { event: 'sale-pages/order-paid', paymentLinkId: 'link-1' }))
+    expect((await res.json()).message).toMatch(/Ignored/)
   })
 
   it('rejects invalid JSON', async () => {

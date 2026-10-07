@@ -1,5 +1,26 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getDocument, type GIDocument } from '@/lib/green-invoice'
+
+// Green Invoice ids are plain tokens. Anything else (commas, dots, %, parens)
+// would be interpreted by the PostgREST .or()/.like() filters below.
+const GI_ID = /^[A-Za-z0-9_-]{1,64}$/
+function giId(value: unknown): string | null {
+  return typeof value === 'string' && GI_ID.test(value) ? value : null
+}
+
+/**
+ * This endpoint is unauthenticated (Green Invoice signs nothing), so the
+ * payload is only a hint: re-fetch the document from Green Invoice with our
+ * own API key and act on THAT. A forged or unknown id returns null.
+ */
+async function fetchVerifiedDocument(id: string): Promise<(GIDocument & { linkedDocuments?: Array<{ id: string }> }) | null> {
+  try {
+    return await getDocument(id)
+  } catch {
+    return null
+  }
+}
 
 /**
  * POST /api/webhooks/greeninvoice
@@ -18,18 +39,26 @@ export async function POST(request: Request) {
   // Log full payload for debugging
   console.log('[GI Webhook] Full payload:', JSON.stringify(body).slice(0, 1000))
 
-  const docId = body.id as string
+  const docId = giId(body.id)
   const docType = body.type as number
   const docStatus = body.status as number
   const amount = body.amount as number
-  const client = body.client as { id?: string; name?: string; emails?: string[] } | undefined
 
-  console.log(`[GI Webhook] doc=${docId} type=${docType} status=${docStatus} amount=${amount} client=${client?.name}`)
+  console.log(`[GI Webhook] doc=${docId} type=${docType} status=${docStatus} amount=${amount}`)
+
+  if (body.id !== undefined && !docId) {
+    return NextResponse.json({ message: 'Ignored: malformed document id' })
+  }
 
   const serviceClient = createServiceClient()
 
   // ── Case 1: Document voided (status 2) ──
-  if (docStatus === 2) {
+  if (docStatus === 2 && docId) {
+    const verified = await fetchVerifiedDocument(docId)
+    if (!verified || verified.status !== 2) {
+      console.warn(`[GI Webhook] void for ${docId} not confirmed by Green Invoice — ignored`)
+      return NextResponse.json({ message: 'Ignored: void not confirmed by Green Invoice' })
+    }
     const { data: statements } = await serviceClient
       .from('monthly_statements')
       .select('id')
@@ -62,12 +91,20 @@ export async function POST(request: Request) {
   // ── Case 2: Receipt created (type 400, status 1 = final) ──
   // Happens when owner pays via payment link
   if (docType === 400 && docStatus === 1 && docId) {
+    const verified = await fetchVerifiedDocument(docId)
+    if (!verified || verified.type !== 400 || verified.status !== 1) {
+      console.warn(`[GI Webhook] receipt ${docId} not confirmed by Green Invoice — ignored`)
+      return NextResponse.json({ message: 'Ignored: receipt not confirmed by Green Invoice', matched: false })
+    }
+    // Client name comes from the verified document, never the payload.
+    const client = verified.client
+
     let matched = false
 
     // Strategy 1: Match by linked documents (proforma → receipt)
-    const linkedDocs = (body.linkedDocuments || body.relatedDocuments || []) as Array<{ id: string }>
+    const linkedDocs = (verified.linkedDocuments || body.linkedDocuments || body.relatedDocuments || []) as Array<{ id: string }>
     for (const linked of linkedDocs) {
-      if (!linked.id) continue
+      if (!giId(linked?.id)) continue
       const { data: stmt } = await serviceClient
         .from('monthly_statements')
         .select('id, net_amount_agorot')
@@ -132,8 +169,19 @@ export async function POST(request: Request) {
   const event = body.event as string | undefined
   if (event === 'sale-pages/order-paid') {
     const bodyData = body.data as Record<string, unknown> | undefined
-    const paymentLinkId = (body.paymentLinkId || body.linkId || bodyData?.linkId) as string | undefined
+    const paymentLinkId = giId(body.paymentLinkId || body.linkId || bodyData?.linkId)
     console.log(`[GI Webhook] order-paid event, linkId=${paymentLinkId}`)
+
+    // The link id is in the payment URL emailed to the owner, so on its own it
+    // proves nothing. Only act if the event carries a receipt Green Invoice
+    // confirms is real and final. (Real payments also arrive as a receipt
+    // document event — Case 2 — which covers this when no receipt id is sent.)
+    const receiptId = giId(bodyData?.documentId ?? bodyData?.receiptId) ?? docId
+    const receipt = receiptId ? await fetchVerifiedDocument(receiptId) : null
+    if (!receipt || receipt.type !== 400 || receipt.status !== 1) {
+      console.warn(`[GI Webhook] order-paid for link ${paymentLinkId} has no verified receipt — ignored`)
+      return NextResponse.json({ message: 'Ignored: payment not confirmed by Green Invoice' })
+    }
 
     if (paymentLinkId) {
       // Match by payment link URL containing this ID
@@ -146,7 +194,7 @@ export async function POST(request: Request) {
       if (stmts && stmts.length > 0) {
         const stmt = stmts[0]
         console.log(`[GI Webhook] Matched by payment link ID → statement ${stmt.id}`)
-        await markStatementPaid(serviceClient, stmt.id, stmt.net_amount_agorot, docId || paymentLinkId)
+        await markStatementPaid(serviceClient, stmt.id, stmt.net_amount_agorot, receipt.id)
         return NextResponse.json({ message: 'Payment link matched', matched: true })
       }
     }
