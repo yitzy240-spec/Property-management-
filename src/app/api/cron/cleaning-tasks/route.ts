@@ -14,6 +14,10 @@ import { findOrphanCleaningTaskIds } from '@/lib/cleaning-reconcile'
  * "Turnover clean" with no matching check-out).
  * Includes next check-in info in description and auto-assigns cleaning contractor.
  * Notifies admin when new tasks are created.
+ *
+ * Scheduled (vercel.json) AFTER both booking syncs — iCal 05:00 UTC, Lodgify
+ * 07:00 UTC — so a booking that arrives via either sync gets its clean the
+ * same morning. Hobby crons fire anywhere within the hour, hence 08:00.
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
@@ -47,6 +51,7 @@ export async function GET(request: Request) {
     serviceClient
       .from('bookings')
       .select('id, property_id, check_out, guest_name, properties(name)')
+      .eq('is_cancelled', false)
       .gte('check_out', todayStr)
       .lte('check_out', nextWeekStr),
     serviceClient
@@ -66,6 +71,7 @@ export async function GET(request: Request) {
     serviceClient
       .from('bookings')
       .select('property_id, guest_name, check_in')
+      .eq('is_cancelled', false)
       .gte('check_in', todayStr)
       .order('check_in'),
   ])

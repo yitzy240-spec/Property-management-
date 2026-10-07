@@ -5,7 +5,7 @@ import { syncLodgifyBookings } from '@/lib/lodgify'
  * GET /api/cron/lodgify-sync
  *
  * Syncs bookings + financial data from Lodgify API.
- * Runs every 2 hours via Vercel Cron (lighter than iCal since Lodgify is API, not feed polling).
+ * Runs daily at 07:00 UTC via Vercel Cron (Hobby plan allows daily crons only).
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')

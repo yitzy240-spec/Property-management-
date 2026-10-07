@@ -5,7 +5,7 @@ import { syncAllFeeds } from '@/lib/ical-sync'
  * GET /api/cron/ical-sync
  *
  * Syncs iCal feeds from Airbnb, Booking.com, Lodgify for all active properties.
- * Runs every 30 minutes via Vercel Cron.
+ * Runs daily at 05:00 UTC via Vercel Cron (Hobby plan allows daily crons only).
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
