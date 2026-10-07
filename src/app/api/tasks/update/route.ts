@@ -31,9 +31,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true })
   }
 
+  // A date set by hand is deliberate: lock it so the cleaning cron's
+  // reconcile doesn't delete the task for not matching a checkout date.
+  const fields = 'due_date' in updates ? { ...updates, schedule_locked: true } : updates
+
   const { error } = await serviceClient
     .from('tasks')
-    .update(updates)
+    .update(fields)
     .eq('id', taskId)
 
   if (error) {

@@ -80,10 +80,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'No upcoming checkouts', created: 0, removed })
   }
 
-  // Build set of existing cleaning tasks
+  // Build set of existing cleaning tasks: by date (legacy tasks) and by the
+  // booking they were created for — a clean someone moved to another day still
+  // covers its booking, so it must not get a duplicate.
   const existingSet = new Set(
     (existingCleaningTasks ?? []).map(t => `${t.property_id}_${t.due_date}`)
   )
+  const { data: linkedTasks } = await serviceClient
+    .from('tasks')
+    .select('booking_id')
+    .eq('is_cleaning', true)
+    .in('booking_id', upcomingCheckouts.map(b => b.id))
+  const coveredBookings = new Set((linkedTasks ?? []).map(t => t.booking_id as string))
 
   // Build next-check-in map per property (after each checkout)
   const nextCheckInMap = new Map<string, { guest: string; date: string }>()
@@ -101,7 +109,7 @@ export async function GET(request: Request) {
 
   // Filter to only checkouts that need a task
   const toCreate = upcomingCheckouts.filter(
-    b => !existingSet.has(`${b.property_id}_${b.check_out}`)
+    b => !coveredBookings.has(b.id) && !existingSet.has(`${b.property_id}_${b.check_out}`)
   )
 
   if (toCreate.length === 0) {
@@ -125,6 +133,7 @@ export async function GET(request: Request) {
       status: 'pending',
       priority: 'high',
       is_cleaning: true,
+      booking_id: booking.id,
       due_date: booking.check_out,
       contractor_id: cleaningContractor?.id || null,
     }).select('id').single()
@@ -161,7 +170,8 @@ export async function GET(request: Request) {
  * Remove pending auto cleaning tasks (within the calendar's ±1 month window)
  * that no longer line up with a live, non-cancelled checkout — i.e. the booking
  * moved to a different date or was cancelled after the task was created.
- * Only touches `is_cleaning` + `pending` tasks (never started/finished work),
+ * Only touches `is_cleaning` + `pending` + unlocked tasks (never started/finished
+ * work, never a clean whose date a person or the agent set by hand),
  * and skips entirely if the bookings lookup errors (so a transient failure can
  * never mass-delete tasks). Returns how many tasks were removed.
  */
@@ -185,6 +195,8 @@ async function reconcileOrphanCleaningTasks(
         .select('id, property_id, due_date')
         .eq('is_cleaning', true)
         .eq('status', 'pending')
+        // Never touch a clean someone scheduled by hand (admin or agent).
+        .eq('schedule_locked', false)
         .gte('due_date', rangeStart)
         .lte('due_date', rangeEnd),
     ])

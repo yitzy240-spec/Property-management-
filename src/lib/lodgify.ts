@@ -447,6 +447,8 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
         platform,
         external_id: `lodgify_${lb.id}`,
         guest_name: guestName,
+        ...(lb.guest?.email ? { guest_email: lb.guest.email } : {}),
+        ...(lb.guest?.phone ? { guest_phone: lb.guest.phone } : {}),
         check_in: lb.arrival,
         check_out: lb.departure,
         ...financials,

@@ -31,6 +31,6 @@ export const config = {
     '/visits/:path*',
     '/notifications/:path*',
     '/owner/:path*',
-    '/api/((?!webhooks|cron|contractor|auth).*)',
+    '/api/((?!webhooks|cron|contractor|auth|agent).*)',
   ],
 }

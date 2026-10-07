@@ -6,6 +6,7 @@ import { LodgifyPropertyMapper } from '@/components/features/lodgify-property-ma
 import { UserManagement } from '@/components/features/user-management'
 import { IntegrationHealth } from '@/components/features/integration-health'
 import { SeasonalTemplateSettings } from '@/components/features/seasonal-template-settings'
+import { AgentApiTokens } from '@/components/features/agent-api-tokens'
 import { isGmailConnected } from '@/lib/gmail'
 
 export default async function SettingsPage() {
@@ -54,6 +55,13 @@ export default async function SettingsPage() {
         <Suspense fallback={null}>
           <GmailConnect isConnected={gmailConnected} />
         </Suspense>
+      </section>
+
+      <section>
+        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          AI Agent Access
+        </p>
+        <AgentApiTokens />
       </section>
 
       <section>
