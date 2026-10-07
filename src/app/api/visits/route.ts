@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createServiceClient, createServerSupabaseClient } from '@/lib/supabase/server'
+import { isAdminUser } from '@/lib/impersonation'
 
 export async function POST(req: NextRequest) {
   const supabase = createServerSupabaseClient()
@@ -9,6 +10,9 @@ export async function POST(req: NextRequest) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!isAdminUser(user)) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
   const body = await req.json()
@@ -67,6 +71,9 @@ export async function DELETE(req: NextRequest) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!isAdminUser(user)) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
   const { searchParams } = new URL(req.url)

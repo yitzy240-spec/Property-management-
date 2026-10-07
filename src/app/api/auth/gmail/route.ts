@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getGmailAuthUrl } from '@/lib/gmail'
+import { isAdminUser } from '@/lib/impersonation'
 
 /**
  * GET /api/auth/gmail
@@ -14,6 +15,9 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!isAdminUser(user)) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/gmail/callback`

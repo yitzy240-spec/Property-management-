@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { isGmailConnected, getGmailAccessToken } from '@/lib/gmail'
-import { requireAuth, AuthError } from '@/lib/auth'
+import { requireAdmin, AuthError } from '@/lib/auth'
 
 export async function GET() {
   try {
-    await requireAuth()
+    await requireAdmin()
   } catch (err) {
     if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

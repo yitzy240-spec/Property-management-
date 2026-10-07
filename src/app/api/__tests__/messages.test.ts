@@ -22,6 +22,8 @@ const mockInsert = vi.fn().mockReturnValue({
   }),
 })
 const mockUpdate = vi.fn().mockReturnValue({ error: null })
+// auth_user_id of the owner of the property being messaged about
+let mockPropertyOwnerAuthId: string | null = null
 
 vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: () => ({
@@ -36,7 +38,7 @@ vi.mock('@/lib/supabase/server', () => ({
         }),
       }
       if (table === 'properties') return {
-        select: () => ({ eq: () => ({ single: () => ({ data: { name: 'Test', owner_id: null } }) }) }),
+        select: () => ({ eq: () => ({ single: () => ({ data: { name: 'Test', owner_id: 'o-1', owners: { auth_user_id: mockPropertyOwnerAuthId } } }) }) }),
       }
       return { select: () => ({ eq: () => ({ single: () => ({ data: null }) }) }) }
     },
@@ -66,6 +68,8 @@ describe('/api/messages', () => {
   beforeEach(() => {
     mockUser = { id: 'user-1', app_metadata: { role: 'admin' } }
     mockCookieValue = null
+    mockPropertyOwnerAuthId = null
+    mockInsert.mockClear()
   })
 
   it('GET requires property_id parameter', async () => {
@@ -111,5 +115,39 @@ describe('/api/messages', () => {
     expect(res.status).toBe(403)
     const json = await res.json()
     expect(json.error).toMatch(/read-only|impersonation/i)
+  })
+
+  // Regression: any logged-in owner could read/post in every property's thread
+  // and post with a client-chosen sender_role of "admin".
+  it("GET forbids an owner from reading another owner's thread", async () => {
+    mockUser = { id: 'owner-user', app_metadata: { role: 'owner' } }
+    mockPropertyOwnerAuthId = 'someone-else'
+    const { GET } = await import('../messages/route')
+    const res = await GET(new Request('http://localhost/api/messages?property_id=prop-1'))
+    expect(res.status).toBe(403)
+  })
+
+  it("POST forbids an owner from posting in another owner's thread", async () => {
+    mockUser = { id: 'owner-user', app_metadata: { role: 'owner' } }
+    mockPropertyOwnerAuthId = 'someone-else'
+    const { POST } = await import('../messages/route')
+    const res = await POST(new Request('http://localhost/api/messages', {
+      method: 'POST',
+      body: JSON.stringify({ property_id: 'prop-1', body: 'hello', sender_role: 'admin' }),
+    }))
+    expect(res.status).toBe(403)
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+
+  it('POST ignores a client-supplied sender_role — an owner always posts as owner', async () => {
+    mockUser = { id: 'owner-user', app_metadata: { role: 'owner' } }
+    mockPropertyOwnerAuthId = 'owner-user'
+    const { POST } = await import('../messages/route')
+    const res = await POST(new Request('http://localhost/api/messages', {
+      method: 'POST',
+      body: JSON.stringify({ property_id: 'prop-1', body: 'hello', sender_role: 'admin' }),
+    }))
+    expect(res.status).toBe(200)
+    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ sender_role: 'owner' }))
   })
 })

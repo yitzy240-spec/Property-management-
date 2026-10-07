@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { exchangeCodeForTokens, storeGmailTokens } from '@/lib/gmail'
+import { isAdminUser } from '@/lib/impersonation'
 
 /**
  * GET /api/auth/gmail/callback
@@ -12,7 +13,8 @@ export async function GET(request: Request) {
   // Verify authenticated
   const supabase = createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  // Only an admin may connect the inbox the bill pipeline reads from.
+  if (!user || !isAdminUser(user)) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

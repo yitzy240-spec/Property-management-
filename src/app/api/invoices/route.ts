@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/encryption'
+import { isAdminUser } from '@/lib/impersonation'
 
 /**
  * POST /api/invoices
@@ -15,9 +16,9 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-
-  // TODO: Add admin role check when role system is implemented
-  // e.g., if (user.app_metadata.role !== 'admin') return 403
+  if (!isAdminUser(user)) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  }
 
   const { billing_month } = await request.json()
 

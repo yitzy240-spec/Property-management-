@@ -1,18 +1,39 @@
 import { NextResponse } from 'next/server'
+import type { User } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAuth, AuthError } from '@/lib/auth'
 import { sendEmail, escapeHtml } from '@/lib/email'
 import { createNotification, notifyAdmins } from '@/lib/notifications'
-import { assertNotImpersonating } from '@/lib/impersonation'
+import { assertNotImpersonating, isAdminUser } from '@/lib/impersonation'
 
 /**
  * GET /api/messages?property_id=xxx — Get messages for a property
  * POST /api/messages — Send a message
  */
+/**
+ * Admins can use every thread; anyone else only their own property's thread.
+ * (Reads/writes use the service-role client, so RLS doesn't protect this.)
+ */
+async function canUseThread(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  user: User,
+  propertyId: string,
+): Promise<boolean> {
+  if (isAdminUser(user)) return true
+  const { data } = await serviceClient
+    .from('properties')
+    .select('owner_id, owners(auth_user_id)')
+    .eq('id', propertyId)
+    .single()
+  const owner = (data as { owners?: { auth_user_id?: string | null } | null } | null)?.owners
+  return !!owner?.auth_user_id && owner.auth_user_id === user.id
+}
+
 export async function GET(request: Request) {
+  let user
   try {
-    await requireAuth()
+    user = await requireAuth()
   } catch (err) {
     if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status })
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -25,6 +46,9 @@ export async function GET(request: Request) {
   }
 
   const serviceClient = createServiceClient()
+  if (!(await canUseThread(serviceClient, user, propertyId))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
   const { data } = await serviceClient
     .from('messages')
     .select('*')
@@ -51,18 +75,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { property_id, body, sender_role } = await request.json()
+  const { property_id, body } = await request.json()
   if (!property_id || !body) {
     return NextResponse.json({ error: 'property_id and body required' }, { status: 400 })
   }
 
   const serviceClient = createServiceClient()
+  if (!(await canUseThread(serviceClient, user, property_id))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  // Decided server-side — a client-supplied role let an owner post "as admin".
+  const sender_role = isAdminUser(user) ? 'admin' : 'owner'
   const { data, error } = await serviceClient
     .from('messages')
     .insert({
       property_id,
       sender_id: user.id,
-      sender_role: sender_role || (user.app_metadata?.role === 'admin' ? 'admin' : 'owner'),
+      sender_role,
       body: body.trim(),
     })
     .select()
@@ -77,11 +106,11 @@ export async function POST(request: Request) {
     .from('messages')
     .update({ is_read: true })
     .eq('property_id', property_id)
-    .neq('sender_role', sender_role || 'admin')
+    .neq('sender_role', sender_role)
     .eq('is_read', false)
 
   // Send email notification to the other side (fire-and-forget)
-  notifyMessageRecipient(serviceClient, property_id, sender_role || 'admin', body.trim()).catch(() => {})
+  notifyMessageRecipient(serviceClient, property_id, sender_role, body.trim()).catch(() => {})
 
   return NextResponse.json({ message: data })
 }
