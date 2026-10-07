@@ -10,7 +10,9 @@ import { assertSyncSafe, bookingPatchToRow, derivedPaymentStatus } from '@/lib/a
 // ── In-memory Supabase stand-in ──
 type Row = Record<string, unknown>
 let tables: Record<string, Row[]>
-const updates: Array<{ table: string; values: Row }> = []
+const allUpdates: Array<{ table: string; values: Row }> = []
+/** Data writes only — excludes the api_tokens.last_used_at bookkeeping. */
+const dataUpdates = () => allUpdates.filter(u => u.table !== 'api_tokens')
 const inserts: Array<{ table: string; values: Row }> = []
 
 function query(table: string) {
@@ -40,7 +42,7 @@ function query(table: string) {
     single: async () => ({ data: rows()[0] ?? null, error: null }),
     then: (resolve: (x: unknown) => void) => {
       if (op === 'update') {
-        updates.push({ table, values })
+        allUpdates.push({ table, values })
         rows().forEach(r => Object.assign(r, values))
         return resolve({ error: null })
       }
@@ -64,7 +66,7 @@ const READ_ONLY = 'aos_readonly'
 const REVOKED = 'aos_revoked'
 
 beforeEach(() => {
-  updates.length = 0
+  allUpdates.length = 0
   inserts.length = 0
   tables = {
     api_tokens: [
@@ -102,14 +104,14 @@ describe('agent API auth', () => {
     const { PATCH } = await import('../agent/v1/bookings/[id]/route')
     const res = await PATCH(req('/bookings/b-manual', { method: 'PATCH', token: READ_ONLY, body: JSON.stringify({ notes: 'x' }) }), { params: { id: 'b-manual' } })
     expect(res.status).toBe(403)
-    expect(updates).toHaveLength(0)
+    expect(dataUpdates()).toHaveLength(0)
   })
 
   it('400 with field details for invalid or unknown fields', async () => {
     const { PATCH } = await import('../agent/v1/bookings/[id]/route')
     const res = await PATCH(req('/bookings/b-manual', { method: 'PATCH', body: JSON.stringify({ checkout: '2026-10-13' }) }), { params: { id: 'b-manual' } })
     expect(res.status).toBe(400)
-    expect(updates).toHaveLength(0)
+    expect(dataUpdates()).toHaveLength(0)
   })
 })
 
@@ -119,7 +121,7 @@ describe('agent API bookings', () => {
     const res = await PATCH(req('/bookings/b-lodgify', { method: 'PATCH', body: JSON.stringify({ check_out: '2026-10-07' }) }), { params: { id: 'b-lodgify' } })
     expect(res.status).toBe(409)
     expect((await res.json()).details.source).toBe('lodgify')
-    expect(updates).toHaveLength(0)
+    expect(dataUpdates()).toHaveLength(0)
     expect(tables.agent_audit_log).toHaveLength(0)
   })
 
@@ -154,7 +156,7 @@ describe('agent API tasks and codes', () => {
     const { PATCH } = await import('../agent/v1/tasks/[id]/route')
     const res = await PATCH(req('/tasks/task-1', { method: 'PATCH', body: JSON.stringify({ due_date: '2026-10-08' }) }), { params: { id: 'task-1' } })
     expect(res.status).toBe(200)
-    expect(updates[0].values).toMatchObject({ due_date: '2026-10-08', schedule_locked: true })
+    expect(dataUpdates()[0].values).toMatchObject({ due_date: '2026-10-08', schedule_locked: true })
   })
 
   it('door-code reads require codes:read and are audited', async () => {

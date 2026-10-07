@@ -87,8 +87,12 @@ async function authenticate(request: Request, db: ServiceClient, scope: AgentSco
     throw new AgentError(403, `This token lacks the "${scope}" scope.`)
   }
 
-  // Best-effort; never block the request on it.
-  void db.from('api_tokens').update({ last_used_at: new Date().toISOString() }).eq('id', token.id)
+  // Best-effort, not awaited. Supabase query builders are lazy — they only run
+  // when .then() is called — so a bare `void db.from(...)` would never execute.
+  db.from('api_tokens')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('id', token.id)
+    .then(() => {}, () => {})
   return { id: token.id, name: token.name, scopes: token.scopes as string[] }
 }
 
