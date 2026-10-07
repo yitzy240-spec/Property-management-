@@ -1,13 +1,12 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/auth'
 import { resolveCanvaDesignUrl } from '@/lib/canva'
 
 export async function createProperty(data: Record<string, unknown>) {
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
+  await requireAdmin()
 
   if ('canva_design_url' in data) {
     data.canva_design_url = await resolveCanvaDesignUrl(data.canva_design_url as string | null)
@@ -22,9 +21,7 @@ export async function createProperty(data: Record<string, unknown>) {
 }
 
 export async function updateProperty(id: string, data: Record<string, unknown>) {
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
+  await requireAdmin()
 
   if ('canva_design_url' in data) {
     data.canva_design_url = await resolveCanvaDesignUrl(data.canva_design_url as string | null)
@@ -41,9 +38,7 @@ export async function updateProperty(id: string, data: Record<string, unknown>) 
 }
 
 export async function createOwner(data: Record<string, unknown>) {
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
+  await requireAdmin()
 
   const serviceClient = createServiceClient()
 
@@ -67,9 +62,7 @@ export async function createOwner(data: Record<string, unknown>) {
 }
 
 export async function updateOwner(id: string, data: Record<string, unknown>) {
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
+  await requireAdmin()
 
   const serviceClient = createServiceClient()
   const { error } = await serviceClient.from('owners').update(data).eq('id', id)
@@ -78,9 +71,7 @@ export async function updateOwner(id: string, data: Record<string, unknown>) {
 }
 
 export async function createTask(data: Record<string, unknown>, checklistItems?: string[]) {
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
+  await requireAdmin()
 
   const serviceClient = createServiceClient()
   const { data: task, error } = await serviceClient
@@ -119,9 +110,7 @@ export async function updateBillStatus(
   paymentMethod?: string,
   edits?: BillEdits
 ) {
-  const supabase = createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
+  const user = await requireAdmin()
 
   const serviceClient = createServiceClient()
 

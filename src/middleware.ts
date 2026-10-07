@@ -27,6 +27,8 @@ export const config = {
     '/owners/:path*',
     '/reports/:path*',
     '/billing/:path*',
+    '/codes/:path*',
+    '/visits/:path*',
     '/notifications/:path*',
     '/owner/:path*',
     '/api/((?!webhooks|cron|contractor|auth).*)',
