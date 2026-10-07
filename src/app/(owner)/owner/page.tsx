@@ -16,6 +16,7 @@ import { VisitList } from '@/components/features/visit-list'
 import { OwnerDocumentVault } from '@/components/features/owner-document-vault'
 import { ImpersonationBanner } from '@/components/features/impersonation-banner'
 import { BillsYearFilter } from '@/components/features/bills-year-filter'
+import { billTypeLabel } from '@/lib/bill-types'
 
 const BILLS_PAGE_SIZE = 10
 
@@ -106,9 +107,11 @@ export default async function OwnerPortalPage({
     { data: documents },
     { data: taskMedia },
     { data: ownerVisits },
+    { data: utilityAccounts },
   ] = await Promise.all([
+    // check_out >= today so a stay that is in progress still shows as upcoming/current.
     propertyIds.length > 0
-      ? dataClient.from('bookings').select('*').in('property_id', propertyIds).gte('check_in', new Date().toISOString().split('T')[0]).eq('is_cancelled', false).order('check_in').limit(5)
+      ? dataClient.from('bookings').select('*').in('property_id', propertyIds).gte('check_out', new Date().toISOString().split('T')[0]).eq('is_cancelled', false).order('check_in').limit(10)
       : Promise.resolve({ data: [] }),
     // Sort by due_date desc so the most-recent due date shows first;
     // null due_dates fall to the bottom. Paginate at 10 per page so
@@ -144,6 +147,10 @@ export default async function OwnerPortalPage({
     propertyIds.length > 0
       ? dataClient.from('visits').select('id, property_id, visited_at, checklist, note, created_at, properties(name)').in('property_id', propertyIds).order('visited_at', { ascending: false }).limit(10)
       : Promise.resolve({ data: [] }),
+    // Read-only for owners. Internal `notes` are deliberately not selected.
+    propertyIds.length > 0
+      ? dataClient.from('property_utility_accounts').select('id, property_id, utility_type, label, account_number, provider_name, autopay').in('property_id', propertyIds).order('utility_type')
+      : Promise.resolve({ data: [] }),
   ])
 
   const bills = billsResult.data
@@ -170,8 +177,9 @@ export default async function OwnerPortalPage({
     m.tasks?.is_cleaning && propertyIds.includes(m.tasks?.property_id)
   )
 
-  const showFinancials = owner.profile === 'investor' || owner.profile === 'hybrid'
-  const showBookings = owner.profile === 'investor' || owner.profile === 'hybrid'
+  // Bills and upcoming stays are shown to every tier; only rental income is
+  // investor/hybrid-only (private owners don't rent out).
+  const showIncome = owner.profile === 'investor' || owner.profile === 'hybrid'
   const showMaintenance = owner.profile === 'hybrid' || owner.profile === 'private'
 
   // Calendar-year total. Computed across ALL approved bills for the
@@ -308,12 +316,12 @@ export default async function OwnerPortalPage({
           <OwnerStatements ownerId={owner.id} />
         </section>
 
-        {/* Financials */}
-        {showFinancials && (
-          <section>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Financials</p>
+        {/* Financials (private owners: bills only, no rental income) */}
+        <section>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">{showIncome ? 'Financials' : 'Bills'}</p>
             <div className="rounded-[10px] border border-border bg-card p-5 shadow-sm">
-              <div className="grid grid-cols-3 gap-3">
+              <div className={`grid gap-3 ${showIncome ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                {showIncome && (
                 <div className="min-w-0">
                   <p className="truncate text-xs text-muted-foreground">
                     {currentYear} Income<span className="text-muted-foreground/70">*</span>
@@ -336,6 +344,7 @@ export default async function OwnerPortalPage({
                     )}
                   </div>
                 </div>
+                )}
                 <div className="min-w-0">
                   <p className="truncate text-xs text-muted-foreground">{currentYear} Bills</p>
                   <CurrencyDisplay agorot={totalBills} variant="expense" className="mt-1 block truncate text-base font-bold tabular-nums" />
@@ -349,9 +358,11 @@ export default async function OwnerPortalPage({
                   cluttering the tile (the inline "After fees &
                   commission" subtitle was forcing the amount to
                   truncate at $26,573...). */}
-              <p className="mt-3 text-[10px] text-muted-foreground">
-                <span className="text-muted-foreground/70">*</span> After Airbnb/Booking.com fees and Marcus Properties commission
-              </p>
+              {showIncome && (
+                <p className="mt-3 text-[10px] text-muted-foreground">
+                  <span className="text-muted-foreground/70">*</span> After Airbnb/Booking.com fees and Marcus Properties commission
+                </p>
+              )}
             </div>
 
             {availableYears.length > 0 && (
@@ -444,13 +455,16 @@ export default async function OwnerPortalPage({
                 </div>
               )
             })()}
-          </section>
-        )}
+        </section>
 
-        {/* Bookings */}
-        {showBookings && bookings && bookings.length > 0 && (
-          <section>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Upcoming Bookings</p>
+        {/* Upcoming stays — all tiers (private owners see their own stays here) */}
+        <section>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Upcoming Stays</p>
+          {!bookings || bookings.length === 0 ? (
+            <div className="rounded-[10px] border border-border bg-card py-6 text-center text-xs text-muted-foreground shadow-sm">
+              No upcoming stays
+            </div>
+          ) : (
             <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
               {bookings.map((booking, i) => (
                 <div key={booking.id} className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}>
@@ -461,10 +475,37 @@ export default async function OwnerPortalPage({
                     </p>
                   </div>
                   {booking.platform && (
-                    <StatusBadge status="neutral" label={booking.platform} size="sm" />
+                    <StatusBadge status="neutral" label={booking.platform === 'owner_stay' ? 'Your stay' : booking.platform} size="sm" />
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </section>
+
+        {/* Utility accounts — read-only, all tiers. Managed by Marcus Properties. */}
+        {utilityAccounts && utilityAccounts.length > 0 && (
+          <section>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Utility Accounts</p>
+            <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+              {utilityAccounts.map((account, i) => {
+                const propertyName = (properties ?? []).find(p => p.id === account.property_id)?.name
+                const subtitle = [account.provider_name, (properties?.length ?? 0) > 1 ? propertyName : null]
+                  .filter(Boolean)
+                  .join(' · ')
+                return (
+                  <div key={account.id} className={`flex items-start justify-between gap-3 px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{account.label || billTypeLabel(account.utility_type)}</p>
+                      <p className="truncate text-xs text-muted-foreground">{subtitle || billTypeLabel(account.utility_type)}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="select-all font-mono text-sm">{account.account_number}</p>
+                      {account.autopay && <p className="text-[10px] text-muted-foreground">Autopay</p>}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </section>
         )}
@@ -521,13 +562,11 @@ export default async function OwnerPortalPage({
           </section>
         )}
 
-        {/* Invoices & Receipts from Green Invoice */}
-        {showFinancials && (
-          <section>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Invoices & Receipts</p>
-            <InvoiceHistory clientFilter={owner.full_name} limit={10} showHeader={false} />
-          </section>
-        )}
+        {/* Invoices & Receipts from Green Invoice — all tiers (these are Marcus's charges to the owner) */}
+        <section>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Invoices & Receipts</p>
+          <InvoiceHistory clientFilter={owner.full_name} limit={10} showHeader={false} />
+        </section>
 
         {/* Document Vault — hidden while impersonating (uploads are mutations) */}
         {!isImpersonating && (
