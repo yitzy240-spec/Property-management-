@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { findOrphanCleaningTaskIds } from './cleaning-reconcile'
+import { findOrphanCleaningTaskIds, findStaleLockedCleaningIds } from './cleaning-reconcile'
 
 describe('findOrphanCleaningTaskIds', () => {
   const A = 'prop-a'
@@ -43,5 +43,28 @@ describe('findOrphanCleaningTaskIds', () => {
       { id: 'valid', property_id: A, due_date: '2026-06-24' },
     ]
     expect(findOrphanCleaningTaskIds(live, tasks)).toEqual([])
+  })
+})
+
+describe('findStaleLockedCleaningIds', () => {
+  const booking = (check_out: string, is_cancelled = false) => ({ check_out, is_cancelled })
+
+  it('keeps a hand-moved clean while its checkout is unchanged (e.g. moved to Thursday)', () => {
+    expect(findStaleLockedCleaningIds([{ id: 't1', checkout_anchor: '2026-10-05', booking: booking('2026-10-05') }])).toEqual([])
+  })
+
+  it('flags a hand-moved clean once its booking is extended or shortened', () => {
+    expect(findStaleLockedCleaningIds([{ id: 't1', checkout_anchor: '2026-10-05', booking: booking('2026-10-09') }])).toEqual(['t1'])
+  })
+
+  it('flags it when the booking is cancelled', () => {
+    expect(findStaleLockedCleaningIds([{ id: 't1', checkout_anchor: '2026-10-05', booking: booking('2026-10-05', true) }])).toEqual(['t1'])
+  })
+
+  it('leaves locked cleans with no anchor or no booking alone', () => {
+    expect(findStaleLockedCleaningIds([
+      { id: 'a', checkout_anchor: null, booking: booking('2026-10-09') },
+      { id: 'b', checkout_anchor: '2026-10-05', booking: null },
+    ])).toEqual([])
   })
 })

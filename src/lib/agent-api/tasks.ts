@@ -39,7 +39,7 @@ export const TASK_COLUMNS =
   'id, property_id, title, description, status, priority, due_date, is_cleaning, booking_id, contractor_id, ' +
   'schedule_locked, notes, completed_at, created_at, updated_at, properties(name), contractors(name)'
 
-type TaskRow = Record<string, unknown> & { id: string }
+type TaskRow = Record<string, unknown> & { id: string; due_date?: unknown; booking_id?: unknown }
 
 export function serializeTask(t: TaskRow) {
   return {

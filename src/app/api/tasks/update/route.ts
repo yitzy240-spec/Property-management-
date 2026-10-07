@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
+import { dateChangeFields } from '@/lib/cleaning-schedule'
 
 /**
  * POST /api/tasks/update — Update task fields (status, contractor, etc.)
@@ -31,9 +32,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true })
   }
 
-  // A date set by hand is deliberate: lock it so the cleaning cron's
-  // reconcile doesn't delete the task for not matching a checkout date.
-  const fields = 'due_date' in updates ? { ...updates, schedule_locked: true } : updates
+  // A date changed by hand is deliberate: lock it (and anchor it to the
+  // booking's current checkout) so the cleaning cron doesn't delete it for not
+  // matching a checkout date. The edit dialog always sends due_date, so only
+  // an actual change counts.
+  let fields = updates
+  if ('due_date' in updates) {
+    const { data: current } = await serviceClient.from('tasks').select('due_date, booking_id').eq('id', taskId).maybeSingle()
+    if (current) fields = { ...updates, ...(await dateChangeFields(serviceClient, current, updates.due_date)) }
+  }
 
   const { error } = await serviceClient
     .from('tasks')

@@ -14,6 +14,7 @@ const allUpdates: Array<{ table: string; values: Row }> = []
 /** Data writes only — excludes the api_tokens.last_used_at bookkeeping. */
 const dataUpdates = () => allUpdates.filter(u => u.table !== 'api_tokens')
 const inserts: Array<{ table: string; values: Row }> = []
+let failAudit = false
 
 function query(table: string) {
   const filters: Array<(r: Row) => boolean> = []
@@ -33,6 +34,9 @@ function query(table: string) {
     update: (v: Row) => { op = 'update'; values = v; return q },
     delete: () => { op = 'delete'; return q },
     insert: (v: Row) => {
+      if (table === 'agent_audit_log' && failAudit) {
+        return { then: (res: (x: unknown) => void) => res({ error: { message: 'db down' } }) }
+      }
       inserts.push({ table, values: v })
       const row = { id: `new-${inserts.length}`, ...v }
       ;(tables[table] ??= []).push(row)
@@ -67,6 +71,7 @@ const REVOKED = 'aos_revoked'
 
 beforeEach(() => {
   allUpdates.length = 0
+  failAudit = false
   inserts.length = 0
   tables = {
     api_tokens: [
@@ -81,6 +86,7 @@ beforeEach(() => {
     ],
     booking_payments: [],
     tasks: [{ id: 'task-1', property_id: 'p1', title: 'Turnover clean', is_cleaning: true, status: 'pending', due_date: '2026-10-05', schedule_locked: false }],
+    owners: [{ id: 'o1', full_name: 'Hager', email: 'hager@example.com', phone: null, profile: 'private', notes: null }],
     properties: [{ id: 'p1', name: 'Agripas 6', entry_code: '1234', building_entry_code: '9', wifi_name: 'Net', wifi_password: 'pw' }],
   }
 })
@@ -165,6 +171,31 @@ describe('agent API tasks and codes', () => {
     const res = await GET(req('/properties/p1/codes'), { params: { id: 'p1' } })
     expect((await res.json()).codes.apartment_code).toBe('1234')
     expect(tables.agent_audit_log.at(-1)).toMatchObject({ action: 'read_codes', resource_id: 'p1' })
+  })
+})
+
+describe('agent API review fixes', () => {
+  it('door codes are NOT returned if the audit log write fails', async () => {
+    failAudit = true
+    const { GET } = await import('../agent/v1/properties/[id]/codes/route')
+    const res = await GET(req('/properties/p1/codes'), { params: { id: 'p1' } })
+    expect(res.status).toBe(500)
+    expect(JSON.stringify(await res.json())).not.toContain('1234')
+  })
+
+  it("an owner's email cannot be changed through the agent (logins are keyed on it)", async () => {
+    tables.api_tokens[0].scopes = ['owners:write']
+    const { PATCH } = await import('../agent/v1/owners/[id]/route')
+    const res = await PATCH(req('/owners/o1', { method: 'PATCH', body: JSON.stringify({ email: 'attacker@evil.test' }) }), { params: { id: 'o1' } })
+    expect(res.status).toBe(400)
+    expect(tables.owners[0].email).toBe('hager@example.com')
+  })
+
+  it('re-sending the same due_date (e.g. only reassigning the cleaner) does not lock the task', async () => {
+    const { PATCH } = await import('../agent/v1/tasks/[id]/route')
+    const res = await PATCH(req('/tasks/task-1', { method: 'PATCH', body: JSON.stringify({ due_date: '2026-10-05', contractor_id: '00000000-0000-4000-8000-000000000001' }) }), { params: { id: 'task-1' } })
+    expect(res.status).toBe(200)
+    expect(dataUpdates()[0].values.schedule_locked).toBeUndefined()
   })
 })
 

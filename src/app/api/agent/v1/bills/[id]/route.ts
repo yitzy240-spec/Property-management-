@@ -21,8 +21,12 @@ export const PATCH = withAgent<Params>('bills:write', async (request, { db, audi
   const { amount_ils, ...rest } = patch
   const row: Record<string, unknown> = { ...rest }
   if (amount_ils !== undefined) row.amount_agorot = toMinor(amount_ils)
-  const { error } = await db.from('bills').update(row).eq('id', id)
+  // Guard in the same statement so an approval landing in between still wins.
+  const { data: changed, error } = await db.from('bills').update(row).eq('id', id).neq('status', 'approved').select('id')
   if (error) throw new AgentError(400, error.message)
+  if (!changed || changed.length === 0) {
+    throw new AgentError(409, 'This bill was approved meanwhile. Ask the admin to change it.')
+  }
 
   const bill = await loadBill(db, id)
   await audit({ resource: 'bill', resourceId: id, action: 'update', before, after: bill })

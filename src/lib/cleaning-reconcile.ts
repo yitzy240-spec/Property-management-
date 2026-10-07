@@ -38,3 +38,20 @@ export function findOrphanCleaningTaskIds(
     .filter((t) => t.due_date && !liveKeys.has(`${t.property_id}_${t.due_date}`))
     .map((t) => t.id)
 }
+
+export interface LockedCleaningTask {
+  id: string
+  checkout_anchor: string | null
+  booking: { check_out: string; is_cancelled: boolean } | null
+}
+
+/**
+ * Hand-scheduled (schedule_locked) cleans whose booking moved or was cancelled
+ * since the date was set — i.e. the checkout they were anchored to is gone.
+ * Locked cleans with no anchor or no booking are left alone.
+ */
+export function findStaleLockedCleaningIds(locked: LockedCleaningTask[]): string[] {
+  return locked
+    .filter(t => t.checkout_anchor && t.booking && (t.booking.is_cancelled || t.booking.check_out !== t.checkout_anchor))
+    .map(t => t.id)
+}

@@ -1,6 +1,7 @@
 import { CLEANING_CHECKLIST } from '@/lib/cleaning-checklist'
 import { AgentError, json, paging, readJson, refreshAdminPages, withAgent } from '@/lib/agent-api/core'
 import { TASK_COLUMNS, TaskCreate, loadTask, serializeTask } from '@/lib/agent-api/tasks'
+import { findCheckoutForCleaning } from '@/lib/cleaning-schedule'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,22 @@ export const POST = withAgent('tasks:write', async (request, { db, audit }) => {
     title = `Cleaning — ${prop?.name ?? 'property'}`
   }
 
+  // Link a cleaning to the checkout it serves (given, or the nearest one
+  // before its date) so the morning automation doesn't add a duplicate.
+  let bookingId = body.booking_id ?? null
+  let checkoutAnchor: string | null = null
+  if (body.is_cleaning && bookingId) {
+    const { data: b } = await db.from('bookings').select('check_out').eq('id', bookingId).maybeSingle()
+    if (!b) throw new AgentError(400, 'booking_id not found.')
+    checkoutAnchor = b.check_out
+  } else if (body.is_cleaning && body.due_date) {
+    const linked = await findCheckoutForCleaning(db, body.property_id, body.due_date)
+    if (linked) {
+      bookingId = linked.id
+      checkoutAnchor = linked.check_out
+    }
+  }
+
   const { data: task, error } = await db
     .from('tasks')
     .insert({
@@ -57,7 +74,8 @@ export const POST = withAgent('tasks:write', async (request, { db, audit }) => {
       is_cleaning: body.is_cleaning,
       due_date: body.due_date ?? null,
       contractor_id: body.contractor_id ?? null,
-      booking_id: body.booking_id ?? null,
+      booking_id: bookingId,
+      checkout_anchor: checkoutAnchor,
       status: body.status,
       priority: body.priority ?? (body.is_cleaning ? 'high' : 'normal'),
       notes: body.notes ?? null,

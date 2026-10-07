@@ -1,5 +1,6 @@
 import { AgentError, json, readJson, refreshAdminPages, withAgent } from '@/lib/agent-api/core'
 import { TaskPatch, loadTask, serializeTask } from '@/lib/agent-api/tasks'
+import { dateChangeFields } from '@/lib/cleaning-schedule'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ export const PATCH = withAgent<Params>('tasks:write', async (request, { db, audi
   const beforeView = serializeTask(before)
 
   const row: Record<string, unknown> = { ...patch }
-  if (patch.due_date !== undefined) row.schedule_locked = true
+  Object.assign(row, await dateChangeFields(db, before, patch.due_date))
   if (patch.status !== undefined) {
     row.completed_at = patch.status === 'completed' ? (before.completed_at ?? new Date().toISOString()) : null
   }

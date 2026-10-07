@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
 import { sendEmail, escapeHtml } from '@/lib/email'
+import { isAdminUser } from '@/lib/impersonation'
 
 /**
  * POST /api/owners/invite
@@ -54,6 +55,13 @@ export async function POST(request: Request) {
           email: owner.email,
         })
         const existing = existingLink?.user
+        if (existing && isAdminUser(existing)) {
+          // Never repurpose an admin login as an owner (it would demote the admin).
+          return NextResponse.json(
+            { error: `${owner.email} belongs to an admin account. Use a different email for this owner.` },
+            { status: 409 },
+          )
+        }
         if (existing) {
           authUserId = existing.id
           // Update their role to owner

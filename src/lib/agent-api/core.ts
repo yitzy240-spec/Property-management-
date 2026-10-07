@@ -109,8 +109,10 @@ export function withAgent<P = Record<string, string>>(
     try {
       const token = await authenticate(request, db, scope)
       const path = new URL(request.url).pathname
+      // Fails closed: if the audit row can't be written, the request errors
+      // (so e.g. door codes are never returned unlogged).
       const audit: AgentContext['audit'] = async (e) => {
-        await db.from('agent_audit_log').insert({
+        const { error } = await db.from('agent_audit_log').insert({
           token_id: token.id,
           token_name: token.name,
           method: request.method,
@@ -121,6 +123,7 @@ export function withAgent<P = Record<string, string>>(
           before: e.before ?? null,
           after: e.after ?? null,
         })
+        if (error) throw new AgentError(500, `Audit log write failed: ${error.message}`)
       }
       return await handler(request, { token, db, audit }, (route?.params ?? {}) as P)
     } catch (err) {

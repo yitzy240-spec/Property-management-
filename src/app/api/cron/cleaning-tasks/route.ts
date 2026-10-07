@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyAdmins } from '@/lib/notifications'
 import { CLEANING_CHECKLIST } from '@/lib/cleaning-checklist'
-import { findOrphanCleaningTaskIds } from '@/lib/cleaning-reconcile'
+import { findOrphanCleaningTaskIds, findStaleLockedCleaningIds } from '@/lib/cleaning-reconcile'
 
 /**
  * GET /api/cron/cleaning-tasks
@@ -86,12 +86,19 @@ export async function GET(request: Request) {
   const existingSet = new Set(
     (existingCleaningTasks ?? []).map(t => `${t.property_id}_${t.due_date}`)
   )
+  // A linked clean only covers the checkout it was scheduled around; if the
+  // booking has since moved, the reconcile above already removed it.
+  const checkoutById = new Map(upcomingCheckouts.map(b => [b.id, b.check_out]))
   const { data: linkedTasks } = await serviceClient
     .from('tasks')
-    .select('booking_id')
+    .select('booking_id, checkout_anchor')
     .eq('is_cleaning', true)
     .in('booking_id', upcomingCheckouts.map(b => b.id))
-  const coveredBookings = new Set((linkedTasks ?? []).map(t => t.booking_id as string))
+  const coveredBookings = new Set(
+    (linkedTasks ?? [])
+      .filter(t => !t.checkout_anchor || t.checkout_anchor === checkoutById.get(t.booking_id as string))
+      .map(t => t.booking_id as string),
+  )
 
   // Build next-check-in map per property (after each checkout)
   const nextCheckInMap = new Map<string, { guest: string; date: string }>()
@@ -134,6 +141,7 @@ export async function GET(request: Request) {
       priority: 'high',
       is_cleaning: true,
       booking_id: booking.id,
+      checkout_anchor: booking.check_out,
       due_date: booking.check_out,
       contractor_id: cleaningContractor?.id || null,
     }).select('id').single()
@@ -205,8 +213,37 @@ async function reconcileOrphanCleaningTasks(
   if (bookingsError || !liveCheckouts) return 0
 
   const orphanIds = findOrphanCleaningTaskIds(liveCheckouts, pendingCleanings ?? [])
-  if (orphanIds.length === 0) return 0
 
-  const { error: deleteError } = await serviceClient.from('tasks').delete().in('id', orphanIds)
-  return deleteError ? 0 : orphanIds.length
+  // Hand-scheduled (locked) cleans are kept off the date check above, but if
+  // the checkout they were scheduled around moved or was cancelled they are
+  // stale — remove them so a fresh clean is created for the new checkout, and
+  // tell the admin, since someone chose that date.
+  const { data: lockedCleanings } = await serviceClient
+    .from('tasks')
+    .select('id, title, due_date, checkout_anchor, bookings(check_out, is_cancelled)')
+    .eq('is_cleaning', true)
+    .eq('status', 'pending')
+    .eq('schedule_locked', true)
+    .not('booking_id', 'is', null)
+    .not('checkout_anchor', 'is', null)
+  const staleIds = new Set(findStaleLockedCleaningIds((lockedCleanings ?? []).map(t => ({
+    id: t.id,
+    checkout_anchor: t.checkout_anchor,
+    booking: t.bookings as unknown as { check_out: string; is_cancelled: boolean } | null,
+  }))))
+  const staleLocked = (lockedCleanings ?? []).filter(t => staleIds.has(t.id))
+
+  const toDelete = [...orphanIds, ...staleLocked.map(t => t.id)]
+  if (toDelete.length === 0) return 0
+
+  const { error: deleteError } = await serviceClient.from('tasks').delete().in('id', toDelete)
+  if (deleteError) return 0
+  if (staleLocked.length > 0) {
+    await notifyAdmins({
+      title: `${staleLocked.length} hand-scheduled clean${staleLocked.length === 1 ? '' : 's'} replaced`,
+      body: `The booking moved or was cancelled: ${staleLocked.map(t => `${t.title} (${t.due_date})`).join(', ')}. A new clean is created for the new checkout.`,
+      link: '/calendar',
+    })
+  }
+  return toDelete.length
 }

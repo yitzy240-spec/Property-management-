@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { AgentError, json, readJson, toMajor, toMinor, withAgent } from '@/lib/agent-api/core'
 import { amountsPaid, derivedPaymentStatus, loadBooking } from '@/lib/agent-api/bookings'
+import { jerusalemToday } from '@/lib/cleaning-schedule'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,7 +61,7 @@ export const POST = withAgent<Params>('bookings:write', async (request, { db, au
       amount_agorot: toMinor(body.amount),
       currency: booking.currency ?? 'ILS',
       method: body.method,
-      payment_date: body.payment_date ?? new Date().toISOString().split('T')[0],
+      payment_date: body.payment_date ?? jerusalemToday(),
       is_deposit: body.is_deposit,
       received_by: body.received_by ?? null,
       notes: body.notes ?? null,

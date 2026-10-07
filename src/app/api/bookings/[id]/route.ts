@@ -27,6 +27,9 @@ export async function DELETE(
 
   const serviceClient = createServiceClient()
 
+  // Its not-yet-started turnover cleans go with it (the FK would otherwise
+  // just unlink them and leave them on the calendar).
+  await serviceClient.from('tasks').delete().eq('booking_id', params.id).eq('is_cleaning', true).eq('status', 'pending')
   const { error } = await serviceClient
     .from('bookings')
     .delete()

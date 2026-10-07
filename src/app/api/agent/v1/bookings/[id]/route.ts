@@ -55,6 +55,9 @@ export const DELETE = withAgent<Params>('bookings:write', async (request, { db, 
   const before = await loadBooking(db, id)
   assertSyncSafe(before, 'delete', force)
 
+  // Its not-yet-started turnover cleans go with it (the FK would otherwise
+  // just unlink them and leave them on the calendar).
+  await db.from('tasks').delete().eq('booking_id', id).eq('is_cleaning', true).eq('status', 'pending')
   const { error } = await db.from('bookings').delete().eq('id', id)
   if (error) throw new AgentError(400, error.message)
   await audit({ resource: 'booking', resourceId: id, action: 'delete', before: serializeBooking(before) })
