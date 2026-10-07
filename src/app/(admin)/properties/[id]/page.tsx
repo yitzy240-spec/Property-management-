@@ -75,12 +75,15 @@ async function renderPropertyPage(
 
   const [
     { data: bookings },
+    { data: pastBookings },
     billsResult,
     { data: tasks },
     { data: documents },
     { data: visitRows },
   ] = await Promise.all([
     serviceClient.from('bookings').select('*').eq('property_id', params.id).eq('is_cancelled', false).gte('check_out', new Date().toISOString().split('T')[0]).order('check_in', { ascending: true }).limit(20),
+    // Past stays, most recent first — listed separately so they can still be reviewed and deleted.
+    serviceClient.from('bookings').select('*').eq('property_id', params.id).eq('is_cancelled', false).lt('check_out', new Date().toISOString().split('T')[0]).order('check_out', { ascending: false }).limit(20),
     // Hide rejected bills from the property view by default — they stay
     // in the DB so the cron's gmail_message_id dedup keeps working, but
     // they're not noise in the admin queue. Active statuses only.
@@ -239,31 +242,27 @@ async function renderPropertyPage(
       <section>
         <div className="mb-3 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Bookings ({bookings?.length ?? 0})
+            Upcoming bookings ({bookings?.length ?? 0})
           </p>
           <BookingAddButton propertyId={params.id} propertyName={property.name} />
         </div>
         {bookings && bookings.length > 0 ? (
           <BookingList
-            bookings={(bookings as Array<Record<string, unknown>>).map(b => ({
-              id: b.id as string,
-              guest_name: b.guest_name as string | null,
-              check_in: b.check_in as string,
-              check_out: b.check_out as string,
-              platform: b.platform as string | null,
-              gross_rental_agorot: b.gross_rental_agorot as number | null,
-              currency: (b.currency as string) || 'ILS',
-              original_amount_cents: b.original_amount_cents as number | null,
-              commission_amount_agorot: b.commission_amount_agorot as number | null,
-              commission_collected: (b.commission_collected as boolean) || false,
-              deposit_amount_agorot: b.deposit_amount_agorot as number | null,
-              payment_status: (b.payment_status as string) || 'pending',
-              notes: b.notes as string | null,
-            }))}
+            bookings={toBookingRows(bookings)}
             commissionRate={property.commission_rate}
           />
         ) : (
-          <div className="rounded-[10px] border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">No bookings yet</div>
+          <div className="rounded-[10px] border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">No upcoming bookings</div>
+        )}
+        {pastBookings && pastBookings.length > 0 && (
+          <details className="mt-3">
+            <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-widest text-muted-foreground hover:text-foreground">
+              Past bookings ({pastBookings.length === 20 ? 'last 20' : pastBookings.length})
+            </summary>
+            <div className="mt-2">
+              <BookingList bookings={toBookingRows(pastBookings)} commissionRate={property.commission_rate} />
+            </div>
+          </details>
         )}
       </section>
 
@@ -419,4 +418,27 @@ async function renderPropertyPage(
       </section>
     </div>
   )
+}
+
+function toBookingRows(rows: unknown[]) {
+  return (rows as Array<Record<string, unknown>>).map(b => ({
+    id: b.id as string,
+    guest_name: b.guest_name as string | null,
+    check_in: b.check_in as string,
+    check_out: b.check_out as string,
+    platform: b.platform as string | null,
+    gross_rental_agorot: b.gross_rental_agorot as number | null,
+    currency: (b.currency as string) || 'ILS',
+    original_amount_cents: b.original_amount_cents as number | null,
+    commission_amount_agorot: b.commission_amount_agorot as number | null,
+    commission_collected: (b.commission_collected as boolean) || false,
+    deposit_amount_agorot: b.deposit_amount_agorot as number | null,
+    payment_status: (b.payment_status as string) || 'pending',
+    notes: b.notes as string | null,
+    source: (typeof b.external_id === 'string' && b.external_id.startsWith('lodgify_')
+      ? 'lodgify'
+      : b.ical_uid
+      ? 'ical'
+      : 'manual') as 'lodgify' | 'ical' | 'manual',
+  }))
 }

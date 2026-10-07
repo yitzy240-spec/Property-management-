@@ -24,6 +24,8 @@ interface BookingRow {
   deposit_amount_agorot: number | null
   payment_status: string
   notes: string | null
+  /** Where the booking came from — synced bookings reappear if deleted only here. */
+  source?: 'lodgify' | 'ical' | 'manual'
 }
 
 interface BookingListProps {
@@ -104,7 +106,13 @@ function BookingAccordionRow({
 
   async function handleDelete() {
     const label = booking.guest_name || `${booking.check_in} → ${booking.check_out}`
-    if (!confirm(`Delete booking "${label}"?\n\nFor iCal-synced bookings (Airbnb, Booking.com), it will reappear on the next sync. Owner stays and manual entries are removed permanently.`)) return
+    const warning =
+      booking.source === 'lodgify'
+        ? 'This booking is linked to Lodgify. Cancel or delete it in Lodgify too, otherwise it will reappear on the next Lodgify sync.'
+        : booking.source === 'ical'
+        ? 'This booking comes from a calendar feed (Airbnb / Booking.com). It will reappear on the next sync unless it is removed there.'
+        : 'This booking was entered manually and will be removed permanently.'
+    if (!confirm(`Delete booking "${label}"?\n\n${warning}`)) return
     setSaving(true)
     try {
       const res = await fetch(`/api/bookings/${booking.id}`, { method: 'DELETE' })
