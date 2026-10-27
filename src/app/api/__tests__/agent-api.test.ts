@@ -155,6 +155,49 @@ describe('agent API bookings', () => {
     expect(body.payment).toMatchObject({ amount: 400, currency: 'USD' })
     expect(body.payment_status).toBe('partial')
   })
+
+  it('a payment recorded wrong can be corrected, and payment_status follows', async () => {
+    tables.booking_payments = [{ id: 'pay-1', booking_id: 'b-manual', amount_agorot: 20000, currency: 'ILS', method: 'cash', is_deposit: false, is_commission: false }]
+    const { PATCH } = await import('../agent/v1/bookings/[id]/payments/[paymentId]/route')
+    const res = await PATCH(
+      req('/bookings/b-manual/payments/pay-1', { method: 'PATCH', body: JSON.stringify({ amount: 500, is_deposit: true }) }),
+      { params: { id: 'b-manual', paymentId: 'pay-1' } },
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.payment).toMatchObject({ amount: 500, is_deposit: true })
+    expect(body.payment_status).toBe('complete')
+    expect(tables.bookings.find(b => b.id === 'b-manual')?.payment_status).toBe('complete')
+    expect(tables.agent_audit_log[0]).toMatchObject({ resource: 'booking_payment', action: 'update', resource_id: 'pay-1' })
+  })
+
+  it('deleting a payment removes it and resets payment_status', async () => {
+    tables.booking_payments = [{ id: 'pay-1', booking_id: 'b-manual', amount_agorot: 20000, currency: 'ILS', method: 'cash', is_deposit: false, is_commission: false }]
+    tables.bookings.find(b => b.id === 'b-manual')!.payment_status = 'partial'
+    const { DELETE } = await import('../agent/v1/bookings/[id]/payments/[paymentId]/route')
+    const res = await DELETE(req('/bookings/b-manual/payments/pay-1', { method: 'DELETE' }), { params: { id: 'b-manual', paymentId: 'pay-1' } })
+    expect(res.status).toBe(200)
+    expect(tables.booking_payments).toHaveLength(0)
+    expect((await res.json()).payment_status).toBe('pending')
+    expect(tables.agent_audit_log[0]).toMatchObject({ resource: 'booking_payment', action: 'delete' })
+  })
+
+  it('will not edit a payment through a different booking, or a commission payment', async () => {
+    tables.booking_payments = [
+      { id: 'pay-1', booking_id: 'b-manual', amount_agorot: 20000, is_commission: false },
+      { id: 'pay-c', booking_id: 'b-manual', amount_agorot: 5000, is_commission: true },
+    ]
+    const { PATCH, DELETE } = await import('../agent/v1/bookings/[id]/payments/[paymentId]/route')
+    const wrongBooking = await PATCH(
+      req('/bookings/b-lodgify/payments/pay-1', { method: 'PATCH', body: JSON.stringify({ amount: 1 }) }),
+      { params: { id: 'b-lodgify', paymentId: 'pay-1' } },
+    )
+    expect(wrongBooking.status).toBe(404)
+    const commission = await DELETE(req('/bookings/b-manual/payments/pay-c', { method: 'DELETE' }), { params: { id: 'b-manual', paymentId: 'pay-c' } })
+    expect(commission.status).toBe(404)
+    expect(tables.booking_payments).toHaveLength(2)
+    expect(dataUpdates()).toHaveLength(0)
+  })
 })
 
 describe('agent API tasks and codes', () => {
