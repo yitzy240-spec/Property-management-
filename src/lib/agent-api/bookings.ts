@@ -147,3 +147,79 @@ export function derivedPaymentStatus(grossMinor: number | null, paidMinor: numbe
   if (paidMinor <= 0) return 'pending'
   return paidMinor >= grossMinor ? 'complete' : 'partial'
 }
+
+const PAYMENT_METHODS = ['bank_transfer', 'cash', 'bit', 'credit_card', 'paypal', 'check', 'other'] as const
+
+/** A guest payment, in major units of the booking currency (shared by the agent API and admin UI). */
+export const PaymentCreate = z
+  .object({
+    amount: z.number().positive(),
+    method: z.enum(PAYMENT_METHODS).default('bank_transfer'),
+    payment_date: date.nullish(),
+    is_deposit: z.boolean().default(false),
+    received_by: z.string().max(200).nullish(),
+    notes: z.string().max(1000).nullish(),
+  })
+  .strict()
+
+export const PaymentPatch = z
+  .object({
+    amount: z.number().positive(),
+    method: z.enum(PAYMENT_METHODS),
+    payment_date: date.nullable(),
+    is_deposit: z.boolean(),
+    received_by: z.string().max(200).nullable(),
+    notes: z.string().max(1000).nullable(),
+  })
+  .partial()
+  .strict()
+
+export function paymentPatchToRow(patch: z.infer<typeof PaymentPatch>): Record<string, unknown> {
+  const row: Record<string, unknown> = {}
+  const copy = ['method', 'payment_date', 'is_deposit', 'received_by', 'notes'] as const
+  for (const k of copy) if (patch[k] !== undefined) row[k] = patch[k]
+  if (patch.amount !== undefined) row.amount_agorot = toMinor(patch.amount)
+  return row
+}
+
+export function serializePayment(p: Record<string, unknown>) {
+  return {
+    id: p.id,
+    amount: toMajor(p.amount_agorot as number),
+    currency: p.currency,
+    method: p.method,
+    payment_date: p.payment_date,
+    is_deposit: p.is_deposit,
+    received_by: p.received_by,
+    notes: p.notes,
+    created_at: p.created_at,
+  }
+}
+
+/** A guest payment on this booking (commission payments are not editable here). */
+export async function loadPayment(db: ServiceClient, bookingId: string, paymentId: string): Promise<Record<string, unknown>> {
+  const { data, error } = await db
+    .from('booking_payments')
+    .select('*')
+    .eq('id', paymentId)
+    .eq('booking_id', bookingId)
+    .eq('is_commission', false)
+    .maybeSingle()
+  if (error) throw new AgentError(500, error.message)
+  if (!data) throw new AgentError(404, 'Payment not found.')
+  return data as Record<string, unknown>
+}
+
+/**
+ * Re-derive payment_status after a payment is added, edited or removed.
+ * Leaves it alone when the booking amount is unknown.
+ */
+export async function syncPaymentStatus(db: ServiceClient, bookingId: string): Promise<{ paid: number; status: string }> {
+  const { data: booking } = await db.from('bookings').select('gross_rental_agorot, payment_status').eq('id', bookingId).maybeSingle()
+  const paid = (await amountsPaid(db, [bookingId])).get(bookingId) ?? 0
+  const derived = derivedPaymentStatus((booking?.gross_rental_agorot as number | null) ?? null, paid)
+  if (derived && derived !== booking?.payment_status) {
+    await db.from('bookings').update({ payment_status: derived }).eq('id', bookingId)
+  }
+  return { paid, status: derived ?? (booking?.payment_status as string) ?? 'pending' }
+}

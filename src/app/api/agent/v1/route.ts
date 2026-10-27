@@ -39,6 +39,8 @@ export function GET() {
       { method: 'DELETE', path: '/bookings/{id}', scope: 'bookings:write', query: 'force=true for synced bookings' },
       { method: 'GET', path: '/bookings/{id}/payments', scope: 'bookings:read' },
       { method: 'POST', path: '/bookings/{id}/payments', scope: 'bookings:write', body: '{amount, method? (bank_transfer|cash|bit|credit_card|paypal|check|other), payment_date?, is_deposit?, received_by?, notes?}', note: 'In the booking currency. Updates amount_paid and payment_status.' },
+      { method: 'PATCH', path: '/bookings/{id}/payments/{paymentId}', scope: 'bookings:write', body: 'any of: amount, method, payment_date, is_deposit, received_by, notes', note: 'Fix a payment recorded wrong instead of adding a correcting note. Re-derives payment_status.' },
+      { method: 'DELETE', path: '/bookings/{id}/payments/{paymentId}', scope: 'bookings:write', note: 'Remove a duplicate or mistaken payment. Re-derives payment_status.' },
       { method: 'GET', path: '/tasks', scope: 'tasks:read', query: 'is_cleaning=true|false, property_id, from, to (due date), status (comma list: pending,in_progress,completed,cancelled), contractor_id, booking_id, limit, offset' },
       { method: 'POST', path: '/tasks', scope: 'tasks:write', body: '{property_id, is_cleaning?, title? (required unless cleaning), due_date?, contractor_id?, booking_id?, description?, status?, priority? (low|normal|high|urgent), notes?}' },
       { method: 'GET', path: '/tasks/{id}', scope: 'tasks:read' },

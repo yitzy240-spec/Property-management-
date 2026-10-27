@@ -16,7 +16,7 @@ import { BillDeleteButton } from '@/components/features/bill-delete-button'
 import { LaundryPickupButton } from '@/components/features/laundry-pickup'
 import { WorkLogButton, WorkLogList } from '@/components/features/work-log'
 import { UtilityAccountsSection } from '@/components/features/utility-accounts'
-import { BookingList } from '@/components/features/booking-list'
+import { BookingList, type BookingPaymentRow } from '@/components/features/booking-list'
 import { VisitList } from '@/components/features/visit-list'
 import { billTypeLabel } from '@/lib/bill-types'
 
@@ -102,6 +102,21 @@ async function renderPropertyPage(
     serviceClient.from('documents').select('*').eq('property_id', params.id).order('created_at', { ascending: false }),
     serviceClient.from('visits').select('*').eq('property_id', params.id).order('visited_at', { ascending: false }).limit(5),
   ])
+
+  // Guest payments for the listed bookings, so they can be reviewed and corrected.
+  const bookingIds = [...(bookings ?? []), ...(pastBookings ?? [])].map(b => b.id as string)
+  const { data: paymentRows } = bookingIds.length
+    ? await serviceClient
+        .from('booking_payments')
+        .select('id, booking_id, amount_agorot, currency, method, payment_date, is_deposit, received_by, notes')
+        .in('booking_id', bookingIds)
+        .eq('is_commission', false)
+        .order('payment_date', { ascending: true })
+    : { data: [] }
+  const paymentsByBooking = new Map<string, BookingPaymentRow[]>()
+  for (const p of (paymentRows ?? []) as BookingPaymentRow[]) {
+    paymentsByBooking.set(p.booking_id, [...(paymentsByBooking.get(p.booking_id) ?? []), p])
+  }
 
   const bills = billsResult.data
   const billsTotal = billsResult.count ?? 0
@@ -248,7 +263,7 @@ async function renderPropertyPage(
         </div>
         {bookings && bookings.length > 0 ? (
           <BookingList
-            bookings={toBookingRows(bookings)}
+            bookings={toBookingRows(bookings, paymentsByBooking)}
             commissionRate={property.commission_rate}
           />
         ) : (
@@ -260,7 +275,7 @@ async function renderPropertyPage(
               Past bookings ({pastBookings.length === 20 ? 'last 20' : pastBookings.length})
             </summary>
             <div className="mt-2">
-              <BookingList bookings={toBookingRows(pastBookings)} commissionRate={property.commission_rate} />
+              <BookingList bookings={toBookingRows(pastBookings, paymentsByBooking)} commissionRate={property.commission_rate} />
             </div>
           </details>
         )}
@@ -420,7 +435,7 @@ async function renderPropertyPage(
   )
 }
 
-function toBookingRows(rows: unknown[]) {
+function toBookingRows(rows: unknown[], paymentsByBooking: Map<string, BookingPaymentRow[]>) {
   return (rows as Array<Record<string, unknown>>).map(b => ({
     id: b.id as string,
     guest_name: b.guest_name as string | null,
@@ -436,6 +451,7 @@ function toBookingRows(rows: unknown[]) {
     deposit_amount_agorot: b.deposit_amount_agorot as number | null,
     payment_status: (b.payment_status as string) || 'pending',
     notes: b.notes as string | null,
+    payments: paymentsByBooking.get(b.id as string) ?? [],
     source: (typeof b.external_id === 'string' && b.external_id.startsWith('lodgify_')
       ? 'lodgify'
       : b.ical_uid

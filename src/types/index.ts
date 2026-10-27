@@ -138,7 +138,7 @@ export interface BookingPayment {
   amount_agorot: number
   currency: CurrencyCode
   original_amount_cents: number | null
-  payment_method: PaymentMethod
+  method: PaymentMethod
   payment_date: string | null
   received_by: string | null
   is_deposit: boolean
