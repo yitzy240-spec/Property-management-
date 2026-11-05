@@ -1,7 +1,9 @@
 import { AgentError, json, paging, readJson, refreshAdminPages, toMinor, withAgent } from '@/lib/agent-api/core'
 import { BILL_COLUMNS, BillCreate, loadBill, serializeBill } from '@/lib/agent-api/utilities'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 /**
  * GET /api/agent/v1/bills — ?property_id= &bill_type= &status=pending_review,approved
@@ -30,25 +32,75 @@ export const GET = withAgent('bills:read', async (request, { db }) => {
  * POST /api/agent/v1/bills — add a bill (amount in ₪). It lands in the admin's
  * review queue as pending_review; approval and payment method stay with the
  * admin because they feed owner statements.
+ * 
+ * Supports both JSON and multipart/form-data. For multipart:
+ *   - "data" field: JSON string with bill fields
+ *   - "file" field: optional PDF or image attachment
  */
 export const POST = withAgent('bills:write', async (request, { db, audit }) => {
-  const body = BillCreate.parse(await readJson(request))
+  const serviceClient = createServiceClient()
+  const contentType = request.headers.get('content-type') ?? ''
+  
+  let body: unknown
+  let pdfFile: File | null = null
+  
+  if (contentType.includes('multipart/form-data')) {
+    const form = await request.formData()
+    const dataField = form.get('data')
+    if (typeof dataField !== 'string') {
+      throw new AgentError(400, 'Multipart requests must include a "data" field with JSON.')
+    }
+    try {
+      body = JSON.parse(dataField)
+    } catch {
+      throw new AgentError(400, 'Invalid JSON in "data" field.')
+    }
+    const fileField = form.get('file')
+    if (fileField instanceof File && fileField.size > 0) pdfFile = fileField
+  } else {
+    body = await readJson(request)
+  }
+  
+  const parsed = BillCreate.parse(body)
+  
+  let pdfStoragePath: string | null = null
+  if (pdfFile) {
+    const ext = pdfFile.name.toLowerCase().endsWith('.pdf') ? 'pdf' : (pdfFile.type.split('/')[1] ?? 'bin')
+    const key = `bills/manual-${crypto.randomUUID()}.${ext}`
+    const buffer = Buffer.from(await pdfFile.arrayBuffer())
+    const { error: uploadError } = await serviceClient.storage
+      .from('documents')
+      .upload(key, buffer, { contentType: pdfFile.type || 'application/pdf' })
+    if (uploadError) {
+      throw new AgentError(500, `Upload failed: ${uploadError.message}`)
+    }
+    pdfStoragePath = key
+  }
+  
   const { data, error } = await db
     .from('bills')
     .insert({
-      property_id: body.property_id,
-      bill_type: body.bill_type,
-      amount_agorot: toMinor(body.amount_ils),
-      due_date: body.due_date ?? null,
-      billing_period_start: body.billing_period_start ?? null,
-      billing_period_end: body.billing_period_end ?? null,
+      property_id: parsed.property_id,
+      bill_type: parsed.bill_type,
+      amount_agorot: toMinor(parsed.amount_ils),
+      due_date: parsed.due_date ?? null,
+      billing_period_start: parsed.billing_period_start ?? null,
+      billing_period_end: parsed.billing_period_end ?? null,
       status: 'pending_review',
+      pdf_storage_path: pdfStoragePath,
     })
     .select('id')
     .single()
-  if (error || !data) throw new AgentError(400, error?.message ?? 'Insert failed')
+  
+  if (error || !data) {
+    if (pdfStoragePath) {
+      await serviceClient.storage.from('documents').remove([pdfStoragePath]).catch(() => {})
+    }
+    throw new AgentError(400, error?.message ?? 'Insert failed')
+  }
+  
   const bill = await loadBill(db, data.id)
   await audit({ resource: 'bill', resourceId: data.id, action: 'create', after: bill })
-  refreshAdminPages('/bills', `/properties/${body.property_id}`)
+  refreshAdminPages('/bills', `/properties/${parsed.property_id}`)
   return json({ bill }, 201)
 })

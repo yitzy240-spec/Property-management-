@@ -7,6 +7,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
 import { TaskActions } from '@/components/features/task-actions'
+import { TaskChecklist } from '@/components/features/task-checklist'
 
 export default async function TaskDetailPage({
   params,
@@ -37,8 +38,6 @@ export default async function TaskDetailPage({
 
   const property = task.properties as { name: string; address: string } | null
   const contractor = task.contractors as { name: string; phone: string | null } | null
-  const completedItems = (checklistItems ?? []).filter(i => i.is_completed).length
-  const totalItems = (checklistItems ?? []).length
 
   return (
     <div className="space-y-6">
@@ -109,29 +108,16 @@ export default async function TaskDetailPage({
       </div>
 
       {/* Checklist */}
-      {totalItems > 0 && (
-        <section>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Checklist ({completedItems}/{totalItems})
-          </p>
-          <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
-            {(checklistItems ?? []).map((item, i) => (
-              <div key={item.id} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-border' : ''}`}>
-                <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                  item.is_completed ? 'border-status-safe bg-status-safe text-white' : 'border-muted-foreground/30'
-                }`}>
-                  {item.is_completed && <span className="text-xs">✓</span>}
-                </div>
-                <span className={`text-sm ${item.is_completed ? 'text-muted-foreground line-through' : ''}`}>
-                  {item.label}
-                </span>
-                {item.ai_generated && (
-                  <span className="text-xs text-muted-foreground/50">AI</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
+      {checklistItems && checklistItems.length > 0 && (
+        <TaskChecklist 
+          items={(checklistItems ?? []).map(item => ({
+            id: item.id,
+            label: item.label,
+            is_completed: item.is_completed,
+            ai_generated: item.ai_generated,
+          }))}
+          taskId={params.id}
+        />
       )}
 
       {/* Media */}
