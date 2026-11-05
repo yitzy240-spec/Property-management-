@@ -58,9 +58,10 @@ export function GET() {
       { method: 'GET', path: '/utility-accounts/{id}', scope: 'utilities:read' },
       { method: 'PATCH', path: '/utility-accounts/{id}', scope: 'utilities:write' },
       { method: 'GET', path: '/bills', scope: 'bills:read', query: 'property_id, bill_type, status (pending_review,approved,flagged,rejected), from, to (due date), limit, offset' },
-      { method: 'POST', path: '/bills', scope: 'bills:write', body: '{property_id, bill_type, amount_ils, due_date?, billing_period_start?, billing_period_end?}' },
+      { method: 'POST', path: '/bills', scope: 'bills:write', body: '{property_id, bill_type, amount_ils, due_date?, billing_period_start?, billing_period_end?}', note: 'Also accepts multipart/form-data: "data" field (JSON) + optional "file" field (PDF/image). Returns has_pdf:true when a PDF is attached.' },
       { method: 'GET', path: '/bills/{id}', scope: 'bills:read' },
       { method: 'PATCH', path: '/bills/{id}', scope: 'bills:write', body: 'any of: property_id, bill_type, amount_ils, due_date, billing_period_start, billing_period_end' },
+      { method: 'POST', path: '/bills/{id}/pdf', scope: 'bills:write', body: 'multipart/form-data: "file" field (PDF/image), optional "replace" field (true to override existing PDF)', note: 'Attach or replace a PDF. Allows backfilling approved bills that lack a PDF.' },
     ],
   })
 }

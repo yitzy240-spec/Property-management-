@@ -100,8 +100,11 @@ export default async function OwnerPortalPage({
 
   const propertyIds = properties?.map(p => p.id) ?? []
 
+  const today = new Date().toISOString().split('T')[0]
+  
   const [
     { data: bookings },
+    { data: pastBookings },
     billsResult,
     { data: tasks },
     { data: documents },
@@ -111,7 +114,11 @@ export default async function OwnerPortalPage({
   ] = await Promise.all([
     // check_out >= today so a stay that is in progress still shows as upcoming/current.
     propertyIds.length > 0
-      ? dataClient.from('bookings').select('*').in('property_id', propertyIds).gte('check_out', new Date().toISOString().split('T')[0]).eq('is_cancelled', false).order('check_in').limit(10)
+      ? dataClient.from('bookings').select('*').in('property_id', propertyIds).gte('check_out', today).eq('is_cancelled', false).order('check_in').limit(10)
+      : Promise.resolve({ data: [] }),
+    // Past bookings: check_out < today, ordered by check_out desc (most recent first)
+    propertyIds.length > 0
+      ? dataClient.from('bookings').select('*, properties(name)').in('property_id', propertyIds).lt('check_out', today).eq('is_cancelled', false).order('check_out', { ascending: false }).limit(10)
       : Promise.resolve({ data: [] }),
     // Sort by due_date desc so the most-recent due date shows first;
     // null due_dates fall to the bottom. Paginate at 10 per page so
@@ -482,6 +489,35 @@ export default async function OwnerPortalPage({
             </div>
           )}
         </section>
+
+        {/* Past bookings — all tiers, read-only history */}
+        {pastBookings && pastBookings.length > 0 && (
+          <section>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Past Bookings ({pastBookings.length})
+            </p>
+            <div className="overflow-hidden rounded-[10px] border border-border bg-card shadow-sm">
+              {pastBookings.map((booking, i) => (
+                <div key={booking.id} className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}>
+                  <div>
+                    <p className="text-sm font-medium">{booking.guest_name || 'Guest'}</p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {booking.check_in} → {booking.check_out}
+                    </p>
+                    {(properties?.length ?? 0) > 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        {(booking.properties as { name: string } | null)?.name}
+                      </p>
+                    )}
+                  </div>
+                  {booking.platform && (
+                    <StatusBadge status="neutral" label={booking.platform === 'owner_stay' ? 'Your stay' : booking.platform} size="sm" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Utility accounts — read-only, all tiers. Managed by Marcus Properties. */}
         {utilityAccounts && utilityAccounts.length > 0 && (
