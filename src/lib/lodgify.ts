@@ -441,14 +441,12 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
       // For existing Airbnb bookings, preserve their stored channel_fees_agorot
       // to avoid repricing when the Airbnb rate changes. Other platforms retain
       // normal amendment sync behavior.
-      const shouldPreserveChannelFees = existing && 
-        existing.channel_fees_agorot !== null && 
-        platform === 'airbnb'
+      const preserve = existing && shouldPreserveChannelFees(existing.channel_fees_agorot, platform)
       
       const financials = grossRentalAgorot
         ? {
             gross_rental_agorot: grossRentalAgorot,
-            ...(shouldPreserveChannelFees
+            ...(preserve
               ? {} // Preserve existing Airbnb channel fee amount only
               : { channel_fees_agorot: channelFeesAgorot }), // Calculate for new/other platforms
             currency,
@@ -491,13 +489,12 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
           // Update existing booking with Lodgify financial data but keep real guest name.
           // Preserve existing Airbnb channel_fees_agorot only; other platforms retain
           // normal amendment sync.
-          const shouldPreserveDateMatchFees = dateMatch.channel_fees_agorot !== null && 
-            platform === 'airbnb'
+          const preserveDateMatch = shouldPreserveChannelFees(dateMatch.channel_fees_agorot, platform)
           
           const dateMatchFinancials = grossRentalAgorot
             ? {
                 gross_rental_agorot: grossRentalAgorot,
-                ...(shouldPreserveDateMatchFees
+                ...(preserveDateMatch
                   ? {} // Preserve existing Airbnb channel fee amount only
                   : { channel_fees_agorot: channelFeesAgorot }), // Calculate for new/other platforms
                 currency,
@@ -593,4 +590,22 @@ export function channelFeeRate(platform: string): number {
 
 function estimateChannelFees(grossAgorot: number, platform: string): number {
   return Math.round(grossAgorot * channelFeeRate(platform))
+}
+
+/**
+ * Determines whether to preserve an existing booking's stored channel_fees_agorot
+ * or recalculate it with the current platform rate.
+ * 
+ * Airbnb fees are preserved to avoid repricing historical bookings when rates change.
+ * Other platforms (Booking.com, VRBO, etc.) retain normal amendment sync behavior.
+ * 
+ * @param existingChannelFees - The currently stored channel_fees_agorot (null if never set)
+ * @param platform - The booking platform ('airbnb', 'booking_com', 'vrbo', etc.)
+ * @returns true if the existing value should be preserved, false to recalculate
+ */
+export function shouldPreserveChannelFees(
+  existingChannelFees: number | null,
+  platform: string
+): boolean {
+  return existingChannelFees !== null && platform === 'airbnb'
 }

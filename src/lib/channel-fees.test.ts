@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { channelFeeRate } from './lodgify'
+import { channelFeeRate, shouldPreserveChannelFees } from './lodgify'
 
 describe('Channel Fee Rates', () => {
   it('airbnb rate is 15.5% (0.155)', () => {
@@ -66,27 +66,20 @@ describe('Channel Fee Calculation - Integer Rounding', () => {
   })
 })
 
-describe('Sync Preservation Logic - Production Behavior', () => {
+describe('Sync Preservation Logic - Production Helper', () => {
   /**
-   * Tests exercising actual production update logic for channel fee preservation.
-   * These test the conditional logic that decides when to preserve vs recalculate.
+   * Tests the ACTUAL production shouldPreserveChannelFees helper used by both sync paths.
+   * These tests will FAIL if the production logic is broken or removed.
    */
 
-  // Helper that mirrors production sync logic for determining whether to preserve fees
-  const shouldPreserveExistingFees = (
-    existingChannelFees: number | null,
-    platform: string
-  ): boolean => {
-    return existingChannelFees !== null && platform === 'airbnb'
-  }
-
   describe('External-ID match path (existing booking)', () => {
-    it('NEW Airbnb booking (null fees): calculates 15.5%', () => {
+    it('NEW Airbnb booking (null fees): does NOT preserve, calculates 15.5%', () => {
       const existing = { channel_fees_agorot: null }
       const platform = 'airbnb'
       const grossAgorot = 100000
 
-      const preserve = shouldPreserveExistingFees(existing.channel_fees_agorot, platform)
+      // Call ACTUAL production helper
+      const preserve = shouldPreserveChannelFees(existing.channel_fees_agorot, platform)
       expect(preserve).toBe(false)
 
       // Production would calculate:
@@ -94,12 +87,13 @@ describe('Sync Preservation Logic - Production Behavior', () => {
       expect(calculatedFee).toBe(15500)
     })
 
-    it('EXISTING Airbnb booking (has 15% fees): preserves old value', () => {
+    it('EXISTING Airbnb booking (has 15% fees): DOES preserve old value', () => {
       const existing = { channel_fees_agorot: 15000 } // Old 15%
       const platform = 'airbnb'
       const grossAgorot = 100000
 
-      const preserve = shouldPreserveExistingFees(existing.channel_fees_agorot, platform)
+      // Call ACTUAL production helper
+      const preserve = shouldPreserveChannelFees(existing.channel_fees_agorot, platform)
       expect(preserve).toBe(true)
 
       // Production would NOT recalculate; existing value preserved
@@ -108,23 +102,25 @@ describe('Sync Preservation Logic - Production Behavior', () => {
       expect(existing.channel_fees_agorot).toBe(15000)
     })
 
-    it('EXISTING Airbnb booking (zero fees): preserves zero', () => {
+    it('EXISTING Airbnb booking (zero fees): DOES preserve zero', () => {
       const existing = { channel_fees_agorot: 0 }
       const platform = 'airbnb'
 
-      const preserve = shouldPreserveExistingFees(existing.channel_fees_agorot, platform)
+      // Call ACTUAL production helper - zero is preserved
+      const preserve = shouldPreserveChannelFees(existing.channel_fees_agorot, platform)
       expect(preserve).toBe(true)
 
       // Production preserves 0, does not recalculate
       expect(existing.channel_fees_agorot).toBe(0)
     })
 
-    it('Booking.com existing booking: allows normal amendment (recalculates)', () => {
+    it('Booking.com existing booking: does NOT preserve, allows normal amendment', () => {
       const existing = { channel_fees_agorot: 14000 } // Some old value
       const platform = 'booking_com'
       const grossAgorot = 100000
 
-      const preserve = shouldPreserveExistingFees(existing.channel_fees_agorot, platform)
+      // Call ACTUAL production helper
+      const preserve = shouldPreserveChannelFees(existing.channel_fees_agorot, platform)
       expect(preserve).toBe(false) // ← KEY: Booking.com NOT preserved
 
       // Production would recalculate with current 15% rate:
@@ -132,12 +128,13 @@ describe('Sync Preservation Logic - Production Behavior', () => {
       expect(calculatedFee).toBe(15000)
     })
 
-    it('VRBO existing booking: allows normal amendment (recalculates)', () => {
+    it('VRBO existing booking: does NOT preserve, allows normal amendment', () => {
       const existing = { channel_fees_agorot: 4500 } // Some old value
       const platform = 'vrbo'
       const grossAgorot = 100000
 
-      const preserve = shouldPreserveExistingFees(existing.channel_fees_agorot, platform)
+      // Call ACTUAL production helper
+      const preserve = shouldPreserveChannelFees(existing.channel_fees_agorot, platform)
       expect(preserve).toBe(false) // ← KEY: VRBO NOT preserved
 
       // Production would recalculate with current 5% rate:
@@ -147,27 +144,30 @@ describe('Sync Preservation Logic - Production Behavior', () => {
   })
 
   describe('DateMatch path (iCal/manual booking)', () => {
-    it('Airbnb dateMatch with existing fees: preserves', () => {
+    it('Airbnb dateMatch with existing fees: DOES preserve', () => {
       const dateMatch = { channel_fees_agorot: 15000 }
       const platform = 'airbnb'
 
-      const preserve = shouldPreserveExistingFees(dateMatch.channel_fees_agorot, platform)
+      // Call ACTUAL production helper
+      const preserve = shouldPreserveChannelFees(dateMatch.channel_fees_agorot, platform)
       expect(preserve).toBe(true)
     })
 
-    it('Airbnb dateMatch without fees: calculates', () => {
+    it('Airbnb dateMatch without fees: does NOT preserve, calculates', () => {
       const dateMatch = { channel_fees_agorot: null }
       const platform = 'airbnb'
 
-      const preserve = shouldPreserveExistingFees(dateMatch.channel_fees_agorot, platform)
+      // Call ACTUAL production helper
+      const preserve = shouldPreserveChannelFees(dateMatch.channel_fees_agorot, platform)
       expect(preserve).toBe(false)
     })
 
-    it('Booking.com dateMatch: allows amendment regardless', () => {
+    it('Booking.com dateMatch: does NOT preserve, allows amendment', () => {
       const dateMatch = { channel_fees_agorot: 14000 }
       const platform = 'booking_com'
 
-      const preserve = shouldPreserveExistingFees(dateMatch.channel_fees_agorot, platform)
+      // Call ACTUAL production helper
+      const preserve = shouldPreserveChannelFees(dateMatch.channel_fees_agorot, platform)
       expect(preserve).toBe(false) // ← Other platforms retain normal behavior
     })
   })
@@ -176,18 +176,33 @@ describe('Sync Preservation Logic - Production Behavior', () => {
     it('only Airbnb triggers preservation', () => {
       const existingFee = 10000
 
-      expect(shouldPreserveExistingFees(existingFee, 'airbnb')).toBe(true)
-      expect(shouldPreserveExistingFees(existingFee, 'booking_com')).toBe(false)
-      expect(shouldPreserveExistingFees(existingFee, 'vrbo')).toBe(false)
-      expect(shouldPreserveExistingFees(existingFee, 'expedia')).toBe(false)
-      expect(shouldPreserveExistingFees(existingFee, 'direct')).toBe(false)
-      expect(shouldPreserveExistingFees(existingFee, 'other')).toBe(false)
+      // Call ACTUAL production helper for each platform
+      expect(shouldPreserveChannelFees(existingFee, 'airbnb')).toBe(true)
+      expect(shouldPreserveChannelFees(existingFee, 'booking_com')).toBe(false)
+      expect(shouldPreserveChannelFees(existingFee, 'vrbo')).toBe(false)
+      expect(shouldPreserveChannelFees(existingFee, 'expedia')).toBe(false)
+      expect(shouldPreserveChannelFees(existingFee, 'direct')).toBe(false)
+      expect(shouldPreserveChannelFees(existingFee, 'other')).toBe(false)
     })
 
     it('null fees never trigger preservation (all platforms)', () => {
-      expect(shouldPreserveExistingFees(null, 'airbnb')).toBe(false)
-      expect(shouldPreserveExistingFees(null, 'booking_com')).toBe(false)
-      expect(shouldPreserveExistingFees(null, 'vrbo')).toBe(false)
+      // Call ACTUAL production helper
+      expect(shouldPreserveChannelFees(null, 'airbnb')).toBe(false)
+      expect(shouldPreserveChannelFees(null, 'booking_com')).toBe(false)
+      expect(shouldPreserveChannelFees(null, 'vrbo')).toBe(false)
+    })
+
+    it('regression: removing platform guard would fail this test', () => {
+      // This test ensures the platform === 'airbnb' check exists
+      // If someone removes it, Booking.com would incorrectly preserve
+      expect(shouldPreserveChannelFees(10000, 'booking_com')).toBe(false)
+      expect(shouldPreserveChannelFees(10000, 'vrbo')).toBe(false)
+    })
+
+    it('regression: removing null check would fail this test', () => {
+      // This test ensures the !== null check exists
+      // If someone removes it, new Airbnb bookings would incorrectly preserve null
+      expect(shouldPreserveChannelFees(null, 'airbnb')).toBe(false)
     })
   })
 })
