@@ -428,7 +428,7 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
       // (the Ari Sonneberg "appears in two apartments" bug).
       const { data: existing } = await supabase
         .from('bookings')
-        .select('id')
+        .select('id, channel_fees_agorot')
         .eq('external_id', `lodgify_${lb.id}`)
         .maybeSingle()
 
@@ -438,8 +438,21 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
       // created in ApartmentOS are pushed to Lodgify WITHOUT an amount, so
       // Lodgify echoes them back with total 0 — overwriting would wipe the
       // amount/currency the admin entered.
+      // For existing Airbnb bookings, preserve their stored channel_fees_agorot
+      // to avoid repricing when the Airbnb rate changes. Other platforms retain
+      // normal amendment sync behavior.
+      const shouldPreserveChannelFees = existing && 
+        existing.channel_fees_agorot !== null && 
+        platform === 'airbnb'
+      
       const financials = grossRentalAgorot
-        ? { gross_rental_agorot: grossRentalAgorot, channel_fees_agorot: channelFeesAgorot, currency }
+        ? {
+            gross_rental_agorot: grossRentalAgorot,
+            ...(shouldPreserveChannelFees
+              ? {} // Preserve existing Airbnb channel fee amount only
+              : { channel_fees_agorot: channelFeesAgorot }), // Calculate for new/other platforms
+            currency,
+          }
         : {}
 
       const bookingData = {
@@ -467,7 +480,7 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
         // (may have been created from iCal sync or manual entry with a real guest name)
         const { data: dateMatch } = await supabase
           .from('bookings')
-          .select('id, guest_name')
+          .select('id, guest_name, channel_fees_agorot')
           .eq('property_id', property.id)
           .eq('check_in', lb.arrival)
           .eq('check_out', lb.departure)
@@ -475,10 +488,25 @@ export async function syncLodgifyBookings(): Promise<SyncResult> {
           .single()
 
         if (dateMatch) {
-          // Update existing booking with Lodgify financial data but keep real guest name
+          // Update existing booking with Lodgify financial data but keep real guest name.
+          // Preserve existing Airbnb channel_fees_agorot only; other platforms retain
+          // normal amendment sync.
+          const shouldPreserveDateMatchFees = dateMatch.channel_fees_agorot !== null && 
+            platform === 'airbnb'
+          
+          const dateMatchFinancials = grossRentalAgorot
+            ? {
+                gross_rental_agorot: grossRentalAgorot,
+                ...(shouldPreserveDateMatchFees
+                  ? {} // Preserve existing Airbnb channel fee amount only
+                  : { channel_fees_agorot: channelFeesAgorot }), // Calculate for new/other platforms
+                currency,
+              }
+            : {}
+          
           const updateData: Record<string, unknown> = {
             external_id: `lodgify_${lb.id}`,
-            ...financials,
+            ...dateMatchFinancials,
             platform: platform || dateMatch.guest_name ? undefined : platform,
             synced_at: new Date().toISOString(),
           }
@@ -548,10 +576,10 @@ function mapSourceToPlatform(source: string | null): string {
  * statement number should be based on.
  *
  * Per Ariel: Airbnb's host service fee + payment processing eats
- * roughly 15% of the gross. Direct bookings have no platform cut.
+ * roughly 15.5% of the gross as of Nov 2026. Direct bookings have no platform cut.
  */
 const CHANNEL_FEE_RATES: Record<string, number> = {
-  airbnb: 0.15,
+  airbnb: 0.155,
   booking_com: 0.15,
   vrbo: 0.05,
   expedia: 0.15,

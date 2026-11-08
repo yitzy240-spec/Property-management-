@@ -367,7 +367,7 @@ export default async function OwnerPortalPage({
                   truncate at $26,573...). */}
               {showIncome && (
                 <p className="mt-3 text-[10px] text-muted-foreground">
-                  <span className="text-muted-foreground/70">*</span> After Airbnb/Booking.com fees and Marcus Properties commission
+                  <span className="text-muted-foreground/70">*</span> After platform fees and Marcus Properties commission
                 </p>
               )}
             </div>

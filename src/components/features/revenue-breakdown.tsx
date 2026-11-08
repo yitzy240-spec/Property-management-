@@ -17,7 +17,7 @@ interface BookingRevenue {
 }
 
 /** Amount the host actually receives after the booking platform's
- * cut. Airbnb takes ~15%, Booking.com ~15%, direct = full gross. */
+ * cut. Platform fees vary by channel and are stored per booking. */
 function netAgorot(b: { gross_rental_agorot: number | null; channel_fees_agorot: number | null }): number {
   const gross = b.gross_rental_agorot ?? 0
   const fees = b.channel_fees_agorot ?? 0
@@ -123,7 +123,7 @@ export function RevenueBreakdown() {
             Revenue Breakdown
           </p>
           <p className="text-[10px] text-muted-foreground">
-            Net of platform fees (Airbnb / Booking.com take ~15%)
+            Net of platform fees (varies by platform and booking date)
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
