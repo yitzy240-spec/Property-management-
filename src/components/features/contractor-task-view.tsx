@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Check, Camera, Receipt, ExternalLink, CheckCircle2, Minus, Plus, Globe, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -147,6 +148,7 @@ export function ContractorTaskView({
   })
   const t = translations[lang]
   const isRtl = lang === 'he'
+  const router = useRouter()
 
   const [checklist, setChecklist] = useState(initialItems)
   const [completed, setCompleted] = useState(false)
@@ -161,6 +163,32 @@ export function ContractorTaskView({
   const [laundrySubmitting, setLaundrySubmitting] = useState(false)
   const [uploading, setUploading] = useState(false)
 
+  useEffect(() => {
+    setChecklist(initialItems)
+  }, [initialItems])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !uploading && !submitting && !laundrySubmitting) {
+        router.refresh()
+      }
+    }
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        router.refresh()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pageshow', handlePageShow)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pageshow', handlePageShow)
+    }
+  }, [router, uploading, submitting, laundrySubmitting])
+
   const completedCount = checklist.filter((i) => i.is_completed).length
   const totalCount = checklist.length
   const allChecked = totalCount > 0 && completedCount === totalCount
@@ -174,19 +202,39 @@ export function ContractorTaskView({
   }
 
   async function toggleItem(itemId: string) {
+    const item = checklist.find(i => i.id === itemId)
+    if (!item) return
+
+    const newCompletedState = !item.is_completed
+
     setChecklist((prev) =>
       prev.map((item) =>
         item.id === itemId
-          ? { ...item, is_completed: !item.is_completed }
+          ? { ...item, is_completed: newCompletedState }
           : item
       )
     )
 
-    await fetch('/api/contractor/checklist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, item_id: itemId }),
-    })
+    try {
+      const res = await fetch('/api/contractor/checklist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, item_id: itemId, is_completed: newCompletedState }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to update checklist')
+      }
+    } catch (error) {
+      console.error('Failed to toggle checklist item:', error)
+      setChecklist((prev) =>
+        prev.map((i) =>
+          i.id === itemId ? { ...i, is_completed: item.is_completed } : i
+        )
+      )
+      toast.error(error instanceof Error ? error.message : 'Failed to update checklist item')
+    }
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>, type: 'photo' | 'receipt') {

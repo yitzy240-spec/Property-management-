@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin, AuthError } from '@/lib/auth'
+import { computeChecklistUpdate } from '@/lib/checklist-update'
 
 /**
- * POST /api/tasks/checklist — Toggle a task checklist item (admin only).
+ * POST /api/tasks/checklist — Set a task checklist item to a specific completed state (admin only).
  * Uses service client to bypass RLS.
  */
 export async function POST(request: Request) {
@@ -14,14 +15,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { itemId } = await request.json()
+  const { itemId, isCompleted } = await request.json()
   if (!itemId) return NextResponse.json({ error: 'itemId required' }, { status: 400 })
+  if (typeof isCompleted !== 'boolean') {
+    return NextResponse.json({ error: 'isCompleted (boolean) required' }, { status: 400 })
+  }
 
   const serviceClient = createServiceClient()
 
   const { data: item } = await serviceClient
     .from('task_checklist_items')
-    .select('is_completed')
+    .select('id')
     .eq('id', itemId)
     .single()
 
@@ -31,15 +35,12 @@ export async function POST(request: Request) {
 
   const { error } = await serviceClient
     .from('task_checklist_items')
-    .update({
-      is_completed: !item.is_completed,
-      completed_at: !item.is_completed ? new Date().toISOString() : null,
-    })
+    .update(computeChecklistUpdate(isCompleted))
     .eq('id', itemId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true, is_completed: !item.is_completed })
+  return NextResponse.json({ success: true, is_completed: isCompleted })
 }

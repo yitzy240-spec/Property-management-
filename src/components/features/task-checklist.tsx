@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface ChecklistItem {
@@ -20,20 +20,50 @@ export function TaskChecklist({ items, taskId }: TaskChecklistProps) {
   const [optimisticItems, setOptimisticItems] = useState(items)
   const [loading, setLoading] = useState<Set<string>>(new Set())
 
+  useEffect(() => {
+    setOptimisticItems(items)
+  }, [items])
+
+  useEffect(() => {
+    router.refresh()
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        router.refresh()
+      }
+    }
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        router.refresh()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pageshow', handlePageShow)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pageshow', handlePageShow)
+    }
+  }, [router])
+
   const handleToggle = async (itemId: string) => {
     const item = optimisticItems.find(i => i.id === itemId)
     if (!item) return
 
+    const newCompletedState = !item.is_completed
+
     setLoading(prev => new Set(prev).add(itemId))
     setOptimisticItems(prev => prev.map(i => 
-      i.id === itemId ? { ...i, is_completed: !i.is_completed } : i
+      i.id === itemId ? { ...i, is_completed: newCompletedState } : i
     ))
 
     try {
       const res = await fetch('/api/tasks/checklist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId }),
+        body: JSON.stringify({ itemId, isCompleted: newCompletedState }),
       })
 
       if (!res.ok) {
