@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { verifyAndCheckMagicLink } from '@/lib/magic-links'
+import { computeChecklistUpdate } from '@/lib/checklist-update'
 
-/** POST — Toggle a checklist item (public, token-verified + scoped) */
+/** POST — Set a checklist item to a specific completed state (public, token-verified + scoped) */
 export async function POST(request: Request) {
-  const { token, item_id } = await request.json()
+  const { token, item_id, is_completed } = await request.json()
 
   let payload
   try {
@@ -13,12 +14,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid or expired link' }, { status: 401 })
   }
 
+  if (typeof is_completed !== 'boolean') {
+    return NextResponse.json({ error: 'is_completed (boolean) required' }, { status: 400 })
+  }
+
   const serviceClient = createServiceClient()
 
   // Get item and verify it belongs to the token's task
   const { data: item } = await serviceClient
     .from('task_checklist_items')
-    .select('task_id, is_completed')
+    .select('task_id')
     .eq('id', item_id)
     .single()
 
@@ -30,18 +35,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Toggle
   const { error } = await serviceClient
     .from('task_checklist_items')
-    .update({
-      is_completed: !item.is_completed,
-      completed_at: !item.is_completed ? new Date().toISOString() : null,
-    })
+    .update(computeChecklistUpdate(is_completed))
     .eq('id', item_id)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true, is_completed: !item.is_completed })
+  return NextResponse.json({ success: true, is_completed })
 }
