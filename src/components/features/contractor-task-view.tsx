@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Check, Camera, Receipt, ExternalLink, CheckCircle2, Minus, Plus, Globe, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -147,6 +148,7 @@ export function ContractorTaskView({
   })
   const t = translations[lang]
   const isRtl = lang === 'he'
+  const router = useRouter()
 
   const [checklist, setChecklist] = useState(initialItems)
   const [completed, setCompleted] = useState(false)
@@ -167,14 +169,14 @@ export function ContractorTaskView({
 
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        window.location.reload()
+      if (document.visibilityState === 'visible' && !uploading && !submitting && !laundrySubmitting) {
+        router.refresh()
       }
     }
 
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
-        window.location.reload()
+        router.refresh()
       }
     }
 
@@ -185,7 +187,7 @@ export function ContractorTaskView({
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('pageshow', handlePageShow)
     }
-  }, [])
+  }, [router, uploading, submitting, laundrySubmitting])
 
   const completedCount = checklist.filter((i) => i.is_completed).length
   const totalCount = checklist.length
