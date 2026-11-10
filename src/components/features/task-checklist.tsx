@@ -21,8 +21,13 @@ export function TaskChecklist({ items, taskId }: TaskChecklistProps) {
   const [loading, setLoading] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    setOptimisticItems(items)
-  }, [items])
+    setOptimisticItems(prev => 
+      items.map(item => {
+        const inFlight = prev.find(p => p.id === item.id && loading.has(p.id))
+        return inFlight || item
+      })
+    )
+  }, [items, loading])
 
   useEffect(() => {
     router.refresh()
