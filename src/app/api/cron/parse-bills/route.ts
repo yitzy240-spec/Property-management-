@@ -244,10 +244,14 @@ async function runParseBills(lookbackDays: number, labelFilter: string | null = 
               const pdfBuffer = Buffer.from(attachData.data, 'base64url')
               // Use messageId-only key — pdfFilename can be Hebrew (utility companies),
               // and Supabase Storage rejects non-ASCII keys.
-              storagePath = `bills/${msgRef.id}.pdf`
-              await serviceClient.storage
+              const uploadPath = `bills/${msgRef.id}.pdf`
+              const { error: uploadError } = await serviceClient.storage
                 .from('documents')
-                .upload(storagePath, pdfBuffer, { contentType: 'application/pdf' })
+                .upload(uploadPath, pdfBuffer, { contentType: 'application/pdf' })
+              // Only save the path if upload succeeded
+              if (!uploadError) {
+                storagePath = uploadPath
+              }
             }
           } catch {
             // PDF download failed — will use HTML body instead
@@ -264,6 +268,12 @@ async function runParseBills(lookbackDays: number, labelFilter: string | null = 
           }
         } catch {
           // AI parsing failed — bill created with null data for manual entry
+        }
+
+        // Respect the parser's is_bill flag — don't create bills for
+        // replies, notifications, or other non-bill emails
+        if (aiParsedData && aiParsedData.is_bill === false) {
+          continue
         }
 
         const billType = aiParsedData?.bill_type || 'other'
@@ -333,6 +343,58 @@ async function runParseBills(lookbackDays: number, labelFilter: string | null = 
           anomalyNote = !storagePath
             ? 'Email notification only — no PDF attached. Amount needs manual entry.'
             : 'AI could not extract amount from this document. Needs manual review.'
+        }
+
+        // Content-based deduplication: skip if a bill already exists with
+        // the same property + bill_type + amount + overlapping period/time.
+        // Excludes rejected bills (don't let rejected junk block real bills).
+        let skipDuplicate = false
+        if (finalPropertyId && amountAgorot > 0) {
+          const twentyDaysAgo = new Date()
+          twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20)
+
+          const dupQuery = serviceClient
+            .from('bills')
+            .select('id, due_date, billing_period_start, billing_period_end')
+            .eq('property_id', finalPropertyId)
+            .eq('bill_type', billType)
+            .eq('amount_agorot', amountAgorot)
+            .neq('status', 'rejected')
+            .gte('created_at', twentyDaysAgo.toISOString())
+            .limit(5)
+
+          const { data: candidates } = await dupQuery
+          if (candidates && candidates.length > 0) {
+            for (const candidate of candidates) {
+              // If both have periods, check for overlap
+              if (periodStart && periodEnd && candidate.billing_period_start && candidate.billing_period_end) {
+                const overlap = periodStart <= candidate.billing_period_end && periodEnd >= candidate.billing_period_start
+                if (overlap) {
+                  skipDuplicate = true
+                  break
+                }
+              }
+              // If new bill has a due_date and candidate has one, compare them
+              else if (dueDate && candidate.due_date) {
+                const daysDiff = Math.abs(
+                  (new Date(dueDate).getTime() - new Date(candidate.due_date).getTime()) / (1000 * 60 * 60 * 24)
+                )
+                if (daysDiff < 20) {
+                  skipDuplicate = true
+                  break
+                }
+              }
+              // Neither period nor due_date comparison available: time-bound match is enough
+              else {
+                skipDuplicate = true
+                break
+              }
+            }
+          }
+        }
+        if (skipDuplicate) {
+          skipped++
+          continue
         }
 
         const { error: billError } = await serviceClient

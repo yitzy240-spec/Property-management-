@@ -184,16 +184,16 @@ const hebrewProperties = [
     hebrewAliases: ['מסילה', 'דרך הרכבת', 'הרכבת ', 'בניין המסילה'],
   },
   {
-    id: 'prop-agripas-6',
+    id: '22222222-aaaa-0000-0000-000000000002',
     address: 'Agripas 6, Apt 7',
     name: 'Agripas 6',
-    hebrewAliases: ['אגריפס 6', 'אגריפס 6/7'],
+    hebrewAliases: ['אגריפס 6', 'אג"פ 6'],
   },
   {
-    id: 'prop-agripas-8',
+    id: '22222222-aaaa-0000-0000-000000000003',
     address: 'Agripas 8, Apt 40',
     name: 'Agripas 8',
-    hebrewAliases: ['אגריפס 8 ד 40', 'אגריפס 8/40'],
+    hebrewAliases: ['אגריפס 8', 'אגריפס 8ב'],
   },
   {
     id: 'prop-keren-26',
@@ -245,7 +245,130 @@ describe('resolveBillRoutingWithoutLabel — Hebrew aliases', () => {
     })
     expect(result.confidence).toBe('verified')
     expect(result.signal).toBe('address_match')
-    expect(result.propertyId).toBe('prop-agripas-6')
+    expect(result.propertyId).toBe('22222222-aaaa-0000-0000-000000000002')
+  })
+
+  it('Agripas 6-8 apt 40 format 1: with כניסה אגף ב׳', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 6-8, כניסה אגף ב\' דירה מספר 40, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.signal).toBe('address_match')
+    expect(result.propertyId).toBe('22222222-aaaa-0000-0000-000000000003')
+    expect(result.reason).toContain('Agripas 8')
+  })
+
+  it('Agripas 6-8 apt 40 format 2: with entrance B unicode variant', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 6-8, כניסה אגף ב׳ דירה 40, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.propertyId).toBe('22222222-aaaa-0000-0000-000000000003')
+  })
+
+  it('Agripas 6-8 apt 40 format 3: without כניסה word', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 6-8 כניסה אגף ב׳ דירה 40, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.propertyId).toBe('22222222-aaaa-0000-0000-000000000003')
+  })
+
+  it('Agripas 6-8 apt 40 format 4: with multiple commas', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 6-8, כניסה אגף ב\', דירה 40, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.propertyId).toBe('22222222-aaaa-0000-0000-000000000003')
+  })
+
+  it('Agripas 6-8 entrance B only (no apt number) routes to Agripas 8', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 6-8, כניסה אגף ב, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.propertyId).toBe('22222222-aaaa-0000-0000-000000000003')
+    expect(result.reason).toContain('entrance B')
+  })
+
+  it('Agripas 6-8 apt 7 with entrance A routes to Agripas 6', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 6-8 דירה מספר 7 כניסה / אגף א\'' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.propertyId).toBe('22222222-aaaa-0000-0000-000000000002')
+    expect(result.reason).toContain('Agripas 6')
+  })
+
+  it('Agripas 6-8 building-only (no apt or entrance) is ambiguous without label', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 6-8 ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('label_only')
+    expect(result.propertyId).toBeNull()
+    expect(result.reason).toContain('flagged for manual review')
+  })
+
+  it('Agripas 6-8 building-only defers to Gmail label (verifyBillRouting)', () => {
+    const result = verifyBillRouting({
+      labelPropertyId: '22222222-aaaa-0000-0000-000000000003',
+      parsedPdf: { address: 'אגריפס 6-8 ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('label_only')
+    expect(result.propertyId).toBe('22222222-aaaa-0000-0000-000000000003')
+    expect(result.reason).toContain('trusting Gmail label')
+  })
+
+  it('Mislabeled: "אגריפס 8 דירה 7" routes to Agripas 6 (not 8)', () => {
+    // Real-world case: IEC and water company address Agripas 6 as "Agripas 8 apt 7"
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 8 דירה 7, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.propertyId).toBe('22222222-aaaa-0000-0000-000000000002')
+    expect(result.reason).toContain('apartment 7')
+    expect(result.reason).toContain('Agripas 6')
+  })
+
+  it('Correctly labeled: "אגריפס 8 ד 40" routes to Agripas 8', () => {
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 8 ד 40, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.propertyId).toBe('22222222-aaaa-0000-0000-000000000003')
+    expect(result.reason).toContain('apartment 40')
+    expect(result.reason).toContain('Agripas 8')
+  })
+
+  it('Generic Agripas 6 address without apartment still works via alias', () => {
+    // Address just says "אגריפס 6" with no apartment - should match alias
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 6, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.propertyId).toBe('22222222-aaaa-0000-0000-000000000002')
   })
 
   it('Mesila vaad bill routes correctly via Hebrew alias', () => {
@@ -279,5 +402,16 @@ describe('resolveBillRoutingWithoutLabel — Hebrew aliases', () => {
     })
     expect(result.confidence).toBe('verified')
     expect(result.propertyId).toBe('prop-keren-26')
+  })
+
+  it('Apartment parsing does not affect non-Agripas properties', () => {
+    // Mesila has "ד" in "ועד" but no apartment numbers - should still work
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'המסילה, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.propertyId).toBe('prop-mesila')
   })
 })
