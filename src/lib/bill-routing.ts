@@ -65,15 +65,26 @@ interface PropertyRow {
  */
 export const HEBREW_ALIASES: Record<string, string[]> = {
   // Agripas 6, Apt 7 — utility companies sometimes mislabel this as
-  // "Agripas 8 apt 7". Apartment/entrance parsing handles "אגריפס 6-8"
-  // disambiguation, so we can include bare "אגריפס 6" safely now.
+  // "Agripas 8 apt 7" (per Ariel: "the IEC is annoying. Water company
+  // as well"). Discriminator vs Agripas 8 is the APT number (7 vs 40).
   '22222222-aaaa-0000-0000-000000000002': [
     'אגריפס 6',
+    'אגריפס 6/7',
+    'אגריפס 7/6',
+    'אגריפס 8 ד 7',
+    'אגריפס 8 דירה 7',
+    'אגריפס 8/7',
     'אג"פ 6',
+    'אג"פ 6/7',
   ],
-  // Agripas 8, Apt 40 — apartment/entrance parsing handles disambiguation.
+  // Agripas 8, Apt 40 — MUST include apt-40 in the alias so the bare
+  // "אגריפס 8" doesn't grab the apt-7 mislabels (those are Agripas 6).
   '22222222-aaaa-0000-0000-000000000003': [
-    'אגריפס 8',
+    'אגריפס 8 ד 40',
+    'אגריפס 8 דירה 40',
+    'אגריפס 8/40',
+    'אגריפס 8ב ד 40',
+    'אגריפס 8 ב 40',
     'אגריפס 8ב',
   ],
   // Jerusalem Skyline (Jaffa 105, JTower)
@@ -108,10 +119,11 @@ function extractApartmentInfo(address: string): { apartment: number | null; entr
   const normalized = address.toLowerCase().replace(/׳/g, "'").replace(/'/g, "'")
 
   // Extract apartment number: "דירה 40", "דירה מספר 40", "ד' 40", "ד 40"
+  // Anchor ד pattern to word boundary to avoid matching ד at end of words like "ועד"
   const aptPatterns = [
     /דירה\s*מספר\s*(\d+)/,
     /דירה\s+(\d+)/,
-    /ד['׳]?\s*(\d+)/,
+    /(?:^|[\s,])[דּ]['׳]?\s*(\d+)/,
   ]
   let apartment: number | null = null
   for (const pattern of aptPatterns) {
@@ -142,16 +154,19 @@ function matchesHebrewAlias(pdfAddress: string, aliases: string[] | undefined): 
   return aliases.find(a => lower.includes(a.toLowerCase())) ?? null
 }
 
-/** Resolve Agripas 6-8 shared building by parsing apartment number and entrance.
- * Returns { propertyId, confidence, reason } or null if not Agripas 6-8. */
-function resolveAgripas68SharedBuilding(
+/** Resolve Agripas street addresses by apartment number and entrance.
+ * Handles both "אגריפס 6-8" shared building and mislabeled addresses
+ * (e.g. "אגריפס 8 דירה 7" which is actually Agripas 6).
+ * Returns { propertyId, confidence, reason } or null if not an Agripas address. */
+function resolveAgripasStreetByApartment(
   pdfAddress: string,
   properties: PropertyRow[],
   labelPropertyId?: string,
 ): { propertyId: string | null; confidence: RoutingConfidence; reason: string } | null {
-  // Only handle if address mentions the building
   const normalized = pdfAddress.toLowerCase()
-  if (!normalized.includes('אגריפס 6-8') && !normalized.includes('אגריפס 8-6')) {
+  
+  // Only handle if address mentions Agripas street
+  if (!normalized.includes('אגריפס') && !normalized.includes('אג"פ')) {
     return null
   }
 
@@ -161,12 +176,15 @@ function resolveAgripas68SharedBuilding(
   if (apartment === 40 || entrance === 'ב') {
     const prop = properties.find(p => p.id === '22222222-aaaa-0000-0000-000000000003')
     if (prop) {
+      const addressType = normalized.includes('6-8') || normalized.includes('8-6') 
+        ? 'Agripas 6-8' 
+        : 'Agripas'
       return {
         propertyId: prop.id,
         confidence: 'verified',
         reason: apartment === 40
-          ? `Agripas 6-8 apartment 40 → Agripas 8`
-          : `Agripas 6-8 entrance B (אגף ב׳) → Agripas 8`,
+          ? `${addressType} apartment 40 → Agripas 8`
+          : `${addressType} entrance B (אגף ב׳) → Agripas 8`,
       }
     }
   }
@@ -175,36 +193,43 @@ function resolveAgripas68SharedBuilding(
   if (apartment === 7 || entrance === 'א') {
     const prop = properties.find(p => p.id === '22222222-aaaa-0000-0000-000000000002')
     if (prop) {
+      const addressType = normalized.includes('6-8') || normalized.includes('8-6')
+        ? 'Agripas 6-8'
+        : 'Agripas'
       return {
         propertyId: prop.id,
         confidence: 'verified',
         reason: apartment === 7
-          ? `Agripas 6-8 apartment 7 → Agripas 6`
-          : `Agripas 6-8 entrance A (אגף א׳) → Agripas 6`,
+          ? `${addressType} apartment 7 → Agripas 6`
+          : `${addressType} entrance A (אגף א׳) → Agripas 6`,
       }
     }
   }
 
-  // Building-only (no apt or entrance): ambiguous
-  // If we have a label, defer to it (label_only confidence)
-  // Otherwise return a special "ambiguous" marker (propertyId=null, confidence=label_only)
-  if (labelPropertyId) {
-    const labelProp = properties.find(p => p.id === labelPropertyId)
-    if (labelProp && (labelProp.id === '22222222-aaaa-0000-0000-000000000002' || labelProp.id === '22222222-aaaa-0000-0000-000000000003')) {
-      return {
-        propertyId: labelPropertyId,
-        confidence: 'label_only',
-        reason: `Agripas 6-8 building-only address (no apartment or entrance) — trusting Gmail label.`,
+  // Special case: Agripas 6-8 building-only (no apt or entrance) is ambiguous
+  if (normalized.includes('6-8') || normalized.includes('8-6')) {
+    // If we have a label for one of these two properties, defer to it
+    if (labelPropertyId) {
+      const labelProp = properties.find(p => p.id === labelPropertyId)
+      if (labelProp && (labelProp.id === '22222222-aaaa-0000-0000-000000000002' || labelProp.id === '22222222-aaaa-0000-0000-000000000003')) {
+        return {
+          propertyId: labelPropertyId,
+          confidence: 'label_only',
+          reason: `Agripas 6-8 building-only address (no apartment or entrance) — trusting Gmail label.`,
+        }
       }
+    }
+
+    // No label, ambiguous: return marker to prevent fallback to generic aliases
+    return {
+      propertyId: null,
+      confidence: 'label_only',
+      reason: 'Agripas 6-8 building-only address (no apartment or entrance) — flagged for manual review.',
     }
   }
 
-  // No label, ambiguous: return marker to prevent fallback to generic aliases
-  return {
-    propertyId: null,
-    confidence: 'label_only',
-    reason: 'Agripas 6-8 building-only address (no apartment or entrance) — flagged for manual review.',
-  }
+  // Other Agripas addresses without apartment info: let aliases handle it
+  return null
 }
 
 /** Attach the embedded Hebrew alias dictionary to a list of property rows.
@@ -298,9 +323,9 @@ export function verifyBillRouting(args: VerifyBillRoutingArgs): RoutingResult {
     }
   }
 
-  // 2b) Agripas 6-8 shared-building parsing (apartment/entrance extraction)
+  // 2b) Agripas street apartment/entrance parsing (handles 6-8 building and mislabeled addresses)
   if (parsedPdf.address) {
-    const agripasResult = resolveAgripas68SharedBuilding(parsedPdf.address, properties, labelPropertyId)
+    const agripasResult = resolveAgripasStreetByApartment(parsedPdf.address, properties, labelPropertyId)
     if (agripasResult) {
       if (agripasResult.propertyId === labelPropertyId || agripasResult.confidence === 'label_only') {
         return {
@@ -401,9 +426,9 @@ export function resolveBillRoutingWithoutLabel(
   }
 
   if (parsedPdf.address) {
-    // Check for Agripas 6-8 shared building FIRST (before generic aliases)
-    // to avoid false matches on bare "אגריפס 6" inside "אגריפס 6-8"
-    const agripasResult = resolveAgripas68SharedBuilding(parsedPdf.address, properties)
+    // Check for Agripas street apartment/entrance FIRST (before generic aliases)
+    // to handle apartment-based routing and avoid false matches
+    const agripasResult = resolveAgripasStreetByApartment(parsedPdf.address, properties)
     if (agripasResult) {
       return {
         propertyId: agripasResult.propertyId,
