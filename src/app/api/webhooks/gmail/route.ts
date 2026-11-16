@@ -120,6 +120,17 @@ export async function POST(request: Request) {
       const headers = metaData.payload?.headers || []
       const subject = headers.find((h: { name: string }) => h.name === 'Subject')?.value || ''
       const from = headers.find((h: { name: string }) => h.name === 'From')?.value || ''
+      const threadId = metaData.threadId || null
+
+      // Skip if we've already processed any message from this thread
+      if (threadId) {
+        const { data: threadBills } = await serviceClient
+          .from('bills')
+          .select('id')
+          .eq('ai_parsed_data->>gmail_thread_id', threadId)
+          .limit(1)
+        if (threadBills && threadBills.length > 0) continue
+      }
 
       // Stage 1: Quick AI classification — is this a bill?
       const isBill = await classifyAsBill(subject, from)
@@ -186,10 +197,14 @@ export async function POST(request: Request) {
             const pdfBuffer = Buffer.from(pdfBase64 as string, 'base64url')
             // Use messageId-only key — pdfFilename can be Hebrew (utility companies),
             // and Supabase Storage rejects non-ASCII keys.
-            storagePath = `bills/${messageId}.pdf`
-            await serviceClient.storage
+            const uploadPath = `bills/${messageId}.pdf`
+            const { error: uploadError } = await serviceClient.storage
               .from('documents')
-              .upload(storagePath, pdfBuffer, { contentType: 'application/pdf' })
+              .upload(uploadPath, pdfBuffer, { contentType: 'application/pdf' })
+            // Only save the path if upload succeeded
+            if (!uploadError) {
+              storagePath = uploadPath
+            }
           }
         } catch {
           // PDF download failed
@@ -208,6 +223,12 @@ export async function POST(request: Request) {
         }
       } catch {
         // Extraction failed — bill still gets inserted for manual entry below
+      }
+
+      // Respect the parser's is_bill flag — don't create bills for
+      // replies, notifications, or other non-bill emails
+      if (aiParsedData && aiParsedData.is_bill === false) {
+        continue
       }
 
       // Property routing — same shared helpers as the cron, so
@@ -262,16 +283,49 @@ export async function POST(request: Request) {
         routing.propertyId ??
         (routing.confidence === 'mismatch' ? labelPropertyId : null)
 
+      const billType = aiParsedData?.bill_type || 'other'
+      const amountAgorot = aiParsedData?.amount_agorot || 0
+      const periodStart = aiParsedData?.period_start || null
+      const periodEnd = aiParsedData?.period_end || null
+
+      // Content-based deduplication: skip if a bill already exists with
+      // the same property + bill_type + amount + overlapping period
+      if (propertyId && amountAgorot > 0) {
+        let dupQuery = serviceClient
+          .from('bills')
+          .select('id')
+          .eq('property_id', propertyId)
+          .eq('bill_type', billType)
+          .eq('amount_agorot', amountAgorot)
+          .limit(1)
+
+        if (periodStart && periodEnd) {
+          // Check for overlapping periods
+          dupQuery = dupQuery.or(
+            `and(billing_period_start.lte.${periodEnd},billing_period_end.gte.${periodStart}),` +
+            `and(billing_period_start.is.null,billing_period_end.is.null)`
+          )
+        } else {
+          // If no period, check for bills within ~30 days
+          const thirtyDaysAgo = new Date()
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+          dupQuery = dupQuery.gte('created_at', thirtyDaysAgo.toISOString())
+        }
+
+        const { data: duplicates } = await dupQuery
+        if (duplicates && duplicates.length > 0) continue
+      }
+
       // Create bill — UNIQUE index on gmail_message_id makes the
       // insert idempotent, so concurrent webhook invocations from
       // Pub/Sub at-least-once delivery can't produce duplicates.
       const { error: billError } = await serviceClient.from('bills').insert({
         property_id: propertyId,
-        bill_type: aiParsedData?.bill_type || 'other',
-        amount_agorot: aiParsedData?.amount_agorot || 0,
+        bill_type: billType,
+        amount_agorot: amountAgorot,
         due_date: aiParsedData?.due_date || null,
-        billing_period_start: aiParsedData?.period_start || null,
-        billing_period_end: aiParsedData?.period_end || null,
+        billing_period_start: periodStart,
+        billing_period_end: periodEnd,
         status: 'pending_review',
         is_anomaly: routing.confidence === 'mismatch',
         anomaly_note: routing.confidence === 'mismatch' ? routing.reason ?? null : null,
@@ -283,6 +337,9 @@ export async function POST(request: Request) {
           match_method: routing.signal,
           routing_reason: routing.reason,
           source: 'webhook',
+          email_from: from,
+          email_subject: subject,
+          gmail_thread_id: threadId,
         },
       })
 

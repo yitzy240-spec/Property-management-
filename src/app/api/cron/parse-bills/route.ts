@@ -244,10 +244,14 @@ async function runParseBills(lookbackDays: number, labelFilter: string | null = 
               const pdfBuffer = Buffer.from(attachData.data, 'base64url')
               // Use messageId-only key — pdfFilename can be Hebrew (utility companies),
               // and Supabase Storage rejects non-ASCII keys.
-              storagePath = `bills/${msgRef.id}.pdf`
-              await serviceClient.storage
+              const uploadPath = `bills/${msgRef.id}.pdf`
+              const { error: uploadError } = await serviceClient.storage
                 .from('documents')
-                .upload(storagePath, pdfBuffer, { contentType: 'application/pdf' })
+                .upload(uploadPath, pdfBuffer, { contentType: 'application/pdf' })
+              // Only save the path if upload succeeded
+              if (!uploadError) {
+                storagePath = uploadPath
+              }
             }
           } catch {
             // PDF download failed — will use HTML body instead
@@ -264,6 +268,12 @@ async function runParseBills(lookbackDays: number, labelFilter: string | null = 
           }
         } catch {
           // AI parsing failed — bill created with null data for manual entry
+        }
+
+        // Respect the parser's is_bill flag — don't create bills for
+        // replies, notifications, or other non-bill emails
+        if (aiParsedData && aiParsedData.is_bill === false) {
+          continue
         }
 
         const billType = aiParsedData?.bill_type || 'other'
@@ -333,6 +343,37 @@ async function runParseBills(lookbackDays: number, labelFilter: string | null = 
           anomalyNote = !storagePath
             ? 'Email notification only — no PDF attached. Amount needs manual entry.'
             : 'AI could not extract amount from this document. Needs manual review.'
+        }
+
+        // Content-based deduplication: skip if a bill already exists with
+        // the same property + bill_type + amount + overlapping period
+        if (finalPropertyId && amountAgorot > 0) {
+          let dupQuery = serviceClient
+            .from('bills')
+            .select('id')
+            .eq('property_id', finalPropertyId)
+            .eq('bill_type', billType)
+            .eq('amount_agorot', amountAgorot)
+            .limit(1)
+
+          if (periodStart && periodEnd) {
+            // Check for overlapping periods
+            dupQuery = dupQuery.or(
+              `and(billing_period_start.lte.${periodEnd},billing_period_end.gte.${periodStart}),` +
+              `and(billing_period_start.is.null,billing_period_end.is.null)`
+            )
+          } else {
+            // If no period, check for bills within ~30 days
+            const thirtyDaysAgo = new Date()
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+            dupQuery = dupQuery.gte('created_at', thirtyDaysAgo.toISOString())
+          }
+
+          const { data: duplicates } = await dupQuery
+          if (duplicates && duplicates.length > 0) {
+            skipped++
+            continue
+          }
         }
 
         const { error: billError } = await serviceClient

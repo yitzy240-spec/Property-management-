@@ -187,13 +187,13 @@ const hebrewProperties = [
     id: 'prop-agripas-6',
     address: 'Agripas 6, Apt 7',
     name: 'Agripas 6',
-    hebrewAliases: ['אגריפס 6', 'אגריפס 6/7'],
+    hebrewAliases: ['אגריפס 6/7', 'אגריפס 6 דירה 7', 'אגריפס 8 דירה 7', 'אגריפס 6-8 דירה 7'],
   },
   {
     id: 'prop-agripas-8',
     address: 'Agripas 8, Apt 40',
     name: 'Agripas 8',
-    hebrewAliases: ['אגריפס 8 ד 40', 'אגריפס 8/40'],
+    hebrewAliases: ['אגריפס 8 ד 40', 'אגריפס 8 דירה 40', 'אגריפס 8/40', 'אגריפס 6-8 דירה 40'],
   },
   {
     id: 'prop-keren-26',
@@ -246,6 +246,32 @@ describe('resolveBillRoutingWithoutLabel — Hebrew aliases', () => {
     expect(result.confidence).toBe('verified')
     expect(result.signal).toBe('address_match')
     expect(result.propertyId).toBe('prop-agripas-6')
+  })
+
+  it('shared building with apartment 40 routes to Agripas 8 (not Agripas 6)', () => {
+    // Real-world bug: "אגריפס 6-8 דירה 40" matched "אגריפס 6" and
+    // routed to the wrong property. Apartment 40 is Agripas 8.
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 6-8 דירה 40, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.signal).toBe('address_match')
+    expect(result.propertyId).toBe('prop-agripas-8')
+    expect(result.reason).toContain('Agripas 8')
+  })
+
+  it('shared building with apartment 7 routes to Agripas 6 (not Agripas 8)', () => {
+    // Apartment 7 in the same building is Agripas 6
+    const result = resolveBillRoutingWithoutLabel({
+      parsedPdf: { address: 'אגריפס 6-8 דירה 7, ירושלים' },
+      utilityAccounts: [],
+      properties: hebrewProperties,
+    })
+    expect(result.confidence).toBe('verified')
+    expect(result.propertyId).toBe('prop-agripas-6')
+    expect(result.reason).toContain('אגריפס 6')
   })
 
   it('Mesila vaad bill routes correctly via Hebrew alias', () => {

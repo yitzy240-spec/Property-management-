@@ -67,13 +67,17 @@ export const HEBREW_ALIASES: Record<string, string[]> = {
   // Agripas 6, Apt 7 — utility companies sometimes mislabel this as
   // "Agripas 8 apt 7" (per Ariel: "the IEC is annoying. Water company
   // as well"). Discriminator vs Agripas 8 is the APT number (7 vs 40).
+  // NOTE: "אגריפס 6" alone is intentionally NOT included to avoid
+  // false matches on "אגריפס 6-8" (the building complex name).
   '22222222-aaaa-0000-0000-000000000002': [
-    'אגריפס 6',
     'אגריפס 6/7',
+    'אגריפס 6 דירה 7',
+    'אגריפס 6 ד 7',
     'אגריפס 7/6',
     'אגריפס 8 ד 7',
     'אגריפס 8 דירה 7',
     'אגריפס 8/7',
+    'אגריפס 6-8 דירה 7',
     'אג"פ 6',
     'אג"פ 6/7',
   ],
@@ -86,6 +90,8 @@ export const HEBREW_ALIASES: Record<string, string[]> = {
     'אגריפס 8ב ד 40',
     'אגריפס 8 ב 40',
     'אגריפס 8ב',
+    'אגריפס 6-8 דירה 40',
+    'אגריפס 6-8 ד 40',
   ],
   // Jerusalem Skyline (Jaffa 105, JTower)
   'dace8043-80ad-4e9d-a530-7e3c3ba0efec': ['יפו 105', 'ג\'אפא 105', 'ג\'יי טאואר', 'jtower'],
@@ -114,11 +120,39 @@ export const HEBREW_ALIASES: Record<string, string[]> = {
 }
 
 /** True when the parsed PDF address contains any of the property's
- * Hebrew aliases. Case-insensitive substring match. */
+ * Hebrew aliases. Case-insensitive substring match.
+ * Returns the matched alias, or null if none match. */
 function matchesHebrewAlias(pdfAddress: string, aliases: string[] | undefined): string | null {
   if (!aliases || aliases.length === 0) return null
   const lower = pdfAddress.toLowerCase()
   return aliases.find(a => lower.includes(a.toLowerCase())) ?? null
+}
+
+/** Find the best Hebrew alias match across all properties, preferring
+ * more specific matches (with apartment numbers) over generic ones.
+ * Returns { property, matchedAlias } or null. */
+function findBestHebrewAliasMatch(
+  pdfAddress: string,
+  properties: PropertyRow[],
+): { property: PropertyRow; matchedAlias: string } | null {
+  const matches: Array<{ property: PropertyRow; matchedAlias: string; specificity: number }> = []
+
+  for (const prop of properties) {
+    const match = matchesHebrewAlias(pdfAddress, prop.hebrewAliases)
+    if (match) {
+      // Calculate specificity: prefer aliases with apartment/דירה numbers
+      let specificity = match.length
+      if (/\d{2,}/.test(match)) specificity += 100  // Has 2+ digit number (apartment)
+      if (/ד(?:ירה)?\s*\d/.test(match)) specificity += 50  // Has "ד" or "דירה" + number
+      matches.push({ property: prop, matchedAlias: match, specificity })
+    }
+  }
+
+  if (matches.length === 0) return null
+
+  // Return the most specific match
+  matches.sort((a, b) => b.specificity - a.specificity)
+  return { property: matches[0].property, matchedAlias: matches[0].matchedAlias }
 }
 
 /** Attach the embedded Hebrew alias dictionary to a list of property rows.
@@ -215,29 +249,25 @@ export function verifyBillRouting(args: VerifyBillRoutingArgs): RoutingResult {
   // 2b) Hebrew alias match. PDFs are in Hebrew but property.address is
   // English transliteration, so the English fuzzy match above usually
   // fails. The alias dictionary gives us a Hebrew bridge.
+  // Use best-match logic to prefer specific aliases (with apt numbers).
   if (parsedPdf.address) {
-    const labelAliasHit = labelProperty
-      ? matchesHebrewAlias(parsedPdf.address, labelProperty.hebrewAliases)
-      : null
-    if (labelAliasHit) {
-      return {
-        propertyId: labelPropertyId,
-        confidence: 'verified',
-        signal: 'address_match',
-        reason: `PDF address "${parsedPdf.address}" matches Hebrew alias "${labelAliasHit}" for label property.`,
-      }
-    }
-    // Did a *different* property's alias match? That's a routing
-    // mismatch — surface it instead of silently trusting the label.
-    const otherAliasMatch = properties.find(
-      p => p.id !== labelPropertyId && matchesHebrewAlias(parsedPdf.address as string, p.hebrewAliases),
-    )
-    if (otherAliasMatch) {
-      return {
-        propertyId: null,
-        confidence: 'mismatch',
-        signal: 'address_match',
-        reason: `PDF address "${parsedPdf.address}" matches a Hebrew alias for property "${otherAliasMatch.name}", not the Gmail label. Manual routing required.`,
+    const bestMatch = findBestHebrewAliasMatch(parsedPdf.address, properties)
+    if (bestMatch) {
+      if (bestMatch.property.id === labelPropertyId) {
+        return {
+          propertyId: labelPropertyId,
+          confidence: 'verified',
+          signal: 'address_match',
+          reason: `PDF address "${parsedPdf.address}" matches Hebrew alias "${bestMatch.matchedAlias}" for label property.`,
+        }
+      } else {
+        // Different property matched — that's a mismatch
+        return {
+          propertyId: null,
+          confidence: 'mismatch',
+          signal: 'address_match',
+          reason: `PDF address "${parsedPdf.address}" matches Hebrew alias "${bestMatch.matchedAlias}" for property "${bestMatch.property.name}", not the Gmail label. Manual routing required.`,
+        }
       }
     }
   }
@@ -307,18 +337,15 @@ export function resolveBillRoutingWithoutLabel(
         reason: `PDF address matches property "${match.address}".`,
       }
     }
-    // Hebrew alias fallback — same dictionary the recheck-routing
-    // endpoint uses, so vaad bills (where the management company
-    // sends Hebrew-only PDFs) route correctly without a sender mapping.
-    for (const p of properties) {
-      const hit = matchesHebrewAlias(parsedPdf.address as string, p.hebrewAliases)
-      if (hit) {
-        return {
-          propertyId: p.id,
-          confidence: 'verified',
-          signal: 'address_match',
-          reason: `PDF address matches Hebrew alias "${hit}" for property "${p.name}".`,
-        }
+    // Hebrew alias fallback — use best-match logic to prefer specific
+    // aliases with apartment numbers over generic building names
+    const bestMatch = findBestHebrewAliasMatch(parsedPdf.address, properties)
+    if (bestMatch) {
+      return {
+        propertyId: bestMatch.property.id,
+        confidence: 'verified',
+        signal: 'address_match',
+        reason: `PDF address matches Hebrew alias "${bestMatch.matchedAlias}" for property "${bestMatch.property.name}".`,
       }
     }
   }
