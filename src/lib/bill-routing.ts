@@ -65,33 +65,16 @@ interface PropertyRow {
  */
 export const HEBREW_ALIASES: Record<string, string[]> = {
   // Agripas 6, Apt 7 — utility companies sometimes mislabel this as
-  // "Agripas 8 apt 7" (per Ariel: "the IEC is annoying. Water company
-  // as well"). Discriminator vs Agripas 8 is the APT number (7 vs 40).
-  // NOTE: "אגריפס 6" alone is intentionally NOT included to avoid
-  // false matches on "אגריפס 6-8" (the building complex name).
+  // "Agripas 8 apt 7". Apartment/entrance parsing handles "אגריפס 6-8"
+  // disambiguation, so we can include bare "אגריפס 6" safely now.
   '22222222-aaaa-0000-0000-000000000002': [
-    'אגריפס 6/7',
-    'אגריפס 6 דירה 7',
-    'אגריפס 6 ד 7',
-    'אגריפס 7/6',
-    'אגריפס 8 ד 7',
-    'אגריפס 8 דירה 7',
-    'אגריפס 8/7',
-    'אגריפס 6-8 דירה 7',
+    'אגריפס 6',
     'אג"פ 6',
-    'אג"פ 6/7',
   ],
-  // Agripas 8, Apt 40 — MUST include apt-40 in the alias so the bare
-  // "אגריפס 8" doesn't grab the apt-7 mislabels (those are Agripas 6).
+  // Agripas 8, Apt 40 — apartment/entrance parsing handles disambiguation.
   '22222222-aaaa-0000-0000-000000000003': [
-    'אגריפס 8 ד 40',
-    'אגריפס 8 דירה 40',
-    'אגריפס 8/40',
-    'אגריפס 8ב ד 40',
-    'אגריפס 8 ב 40',
+    'אגריפס 8',
     'אגריפס 8ב',
-    'אגריפס 6-8 דירה 40',
-    'אגריפס 6-8 ד 40',
   ],
   // Jerusalem Skyline (Jaffa 105, JTower)
   'dace8043-80ad-4e9d-a530-7e3c3ba0efec': ['יפו 105', 'ג\'אפא 105', 'ג\'יי טאואר', 'jtower'],
@@ -119,6 +102,37 @@ export const HEBREW_ALIASES: Record<string, string[]> = {
   '22222222-aaaa-0000-0000-000000000004': ['ראול ולנברג', 'סביון'],
 }
 
+/** Extract apartment number and entrance from Hebrew address.
+ * Returns { apartment: number | null, entrance: 'א' | 'ב' | null } */
+function extractApartmentInfo(address: string): { apartment: number | null; entrance: 'א' | 'ב' | null } {
+  const normalized = address.toLowerCase().replace(/׳/g, "'").replace(/'/g, "'")
+
+  // Extract apartment number: "דירה 40", "דירה מספר 40", "ד' 40", "ד 40"
+  const aptPatterns = [
+    /דירה\s*מספר\s*(\d+)/,
+    /דירה\s+(\d+)/,
+    /ד['׳]?\s*(\d+)/,
+  ]
+  let apartment: number | null = null
+  for (const pattern of aptPatterns) {
+    const match = normalized.match(pattern)
+    if (match) {
+      apartment = parseInt(match[1], 10)
+      break
+    }
+  }
+
+  // Extract entrance: "אגף א", "אגף ב", "כניסה אגף א", "כניסה א", "אגף א'"
+  let entrance: 'א' | 'ב' | null = null
+  if (/(?:אגף|כניסה)\s*(?:אגף\s*)?[בּ]['׳]?/.test(normalized)) {
+    entrance = 'ב'
+  } else if (/(?:אגף|כניסה)\s*(?:אגף\s*)?[אַ]['׳]?/.test(normalized)) {
+    entrance = 'א'
+  }
+
+  return { apartment, entrance }
+}
+
 /** True when the parsed PDF address contains any of the property's
  * Hebrew aliases. Case-insensitive substring match.
  * Returns the matched alias, or null if none match. */
@@ -128,31 +142,69 @@ function matchesHebrewAlias(pdfAddress: string, aliases: string[] | undefined): 
   return aliases.find(a => lower.includes(a.toLowerCase())) ?? null
 }
 
-/** Find the best Hebrew alias match across all properties, preferring
- * more specific matches (with apartment numbers) over generic ones.
- * Returns { property, matchedAlias } or null. */
-function findBestHebrewAliasMatch(
+/** Resolve Agripas 6-8 shared building by parsing apartment number and entrance.
+ * Returns { propertyId, confidence, reason } or null if not Agripas 6-8. */
+function resolveAgripas68SharedBuilding(
   pdfAddress: string,
   properties: PropertyRow[],
-): { property: PropertyRow; matchedAlias: string } | null {
-  const matches: Array<{ property: PropertyRow; matchedAlias: string; specificity: number }> = []
+  labelPropertyId?: string,
+): { propertyId: string | null; confidence: RoutingConfidence; reason: string } | null {
+  // Only handle if address mentions the building
+  const normalized = pdfAddress.toLowerCase()
+  if (!normalized.includes('אגריפס 6-8') && !normalized.includes('אגריפס 8-6')) {
+    return null
+  }
 
-  for (const prop of properties) {
-    const match = matchesHebrewAlias(pdfAddress, prop.hebrewAliases)
-    if (match) {
-      // Calculate specificity: prefer aliases with apartment/דירה numbers
-      let specificity = match.length
-      if (/\d{2,}/.test(match)) specificity += 100  // Has 2+ digit number (apartment)
-      if (/ד(?:ירה)?\s*\d/.test(match)) specificity += 50  // Has "ד" or "דירה" + number
-      matches.push({ property: prop, matchedAlias: match, specificity })
+  const { apartment, entrance } = extractApartmentInfo(pdfAddress)
+
+  // Apartment 40 or entrance B → Agripas 8
+  if (apartment === 40 || entrance === 'ב') {
+    const prop = properties.find(p => p.id === '22222222-aaaa-0000-0000-000000000003')
+    if (prop) {
+      return {
+        propertyId: prop.id,
+        confidence: 'verified',
+        reason: apartment === 40
+          ? `Agripas 6-8 apartment 40 → Agripas 8`
+          : `Agripas 6-8 entrance B (אגף ב׳) → Agripas 8`,
+      }
     }
   }
 
-  if (matches.length === 0) return null
+  // Apartment 7 or entrance A → Agripas 6
+  if (apartment === 7 || entrance === 'א') {
+    const prop = properties.find(p => p.id === '22222222-aaaa-0000-0000-000000000002')
+    if (prop) {
+      return {
+        propertyId: prop.id,
+        confidence: 'verified',
+        reason: apartment === 7
+          ? `Agripas 6-8 apartment 7 → Agripas 6`
+          : `Agripas 6-8 entrance A (אגף א׳) → Agripas 6`,
+      }
+    }
+  }
 
-  // Return the most specific match
-  matches.sort((a, b) => b.specificity - a.specificity)
-  return { property: matches[0].property, matchedAlias: matches[0].matchedAlias }
+  // Building-only (no apt or entrance): ambiguous
+  // If we have a label, defer to it (label_only confidence)
+  // Otherwise return a special "ambiguous" marker (propertyId=null, confidence=label_only)
+  if (labelPropertyId) {
+    const labelProp = properties.find(p => p.id === labelPropertyId)
+    if (labelProp && (labelProp.id === '22222222-aaaa-0000-0000-000000000002' || labelProp.id === '22222222-aaaa-0000-0000-000000000003')) {
+      return {
+        propertyId: labelPropertyId,
+        confidence: 'label_only',
+        reason: `Agripas 6-8 building-only address (no apartment or entrance) — trusting Gmail label.`,
+      }
+    }
+  }
+
+  // No label, ambiguous: return marker to prevent fallback to generic aliases
+  return {
+    propertyId: null,
+    confidence: 'label_only',
+    reason: 'Agripas 6-8 building-only address (no apartment or entrance) — flagged for manual review.',
+  }
 }
 
 /** Attach the embedded Hebrew alias dictionary to a list of property rows.
@@ -246,28 +298,51 @@ export function verifyBillRouting(args: VerifyBillRoutingArgs): RoutingResult {
     }
   }
 
-  // 2b) Hebrew alias match. PDFs are in Hebrew but property.address is
-  // English transliteration, so the English fuzzy match above usually
-  // fails. The alias dictionary gives us a Hebrew bridge.
-  // Use best-match logic to prefer specific aliases (with apt numbers).
+  // 2b) Agripas 6-8 shared-building parsing (apartment/entrance extraction)
   if (parsedPdf.address) {
-    const bestMatch = findBestHebrewAliasMatch(parsedPdf.address, properties)
-    if (bestMatch) {
-      if (bestMatch.property.id === labelPropertyId) {
+    const agripasResult = resolveAgripas68SharedBuilding(parsedPdf.address, properties, labelPropertyId)
+    if (agripasResult) {
+      if (agripasResult.propertyId === labelPropertyId || agripasResult.confidence === 'label_only') {
         return {
-          propertyId: labelPropertyId,
-          confidence: 'verified',
+          propertyId: agripasResult.propertyId,
+          confidence: agripasResult.confidence,
           signal: 'address_match',
-          reason: `PDF address "${parsedPdf.address}" matches Hebrew alias "${bestMatch.matchedAlias}" for label property.`,
+          reason: agripasResult.reason,
         }
       } else {
-        // Different property matched — that's a mismatch
+        // Parsed apt/entrance points to different property than label
         return {
           propertyId: null,
           confidence: 'mismatch',
           signal: 'address_match',
-          reason: `PDF address "${parsedPdf.address}" matches Hebrew alias "${bestMatch.matchedAlias}" for property "${bestMatch.property.name}", not the Gmail label. Manual routing required.`,
+          reason: `${agripasResult.reason}, but Gmail label points to a different property. Manual routing required.`,
         }
+      }
+    }
+  }
+
+  // 2c) Hebrew alias match fallback (generic properties without special parsing)
+  if (parsedPdf.address) {
+    const pdfAddr = parsedPdf.address // Type guard for TypeScript
+    const match = matchesHebrewAlias(pdfAddr, labelProperty?.hebrewAliases)
+    if (match) {
+      return {
+        propertyId: labelPropertyId,
+        confidence: 'verified',
+        signal: 'address_match',
+        reason: `PDF address "${pdfAddr}" matches Hebrew alias "${match}" for label property.`,
+      }
+    }
+    // Did a *different* property's alias match? That's a mismatch
+    const otherMatch = properties.find(
+      p => p.id !== labelPropertyId && matchesHebrewAlias(pdfAddr, p.hebrewAliases),
+    )
+    if (otherMatch) {
+      return {
+        propertyId: null,
+        confidence: 'mismatch',
+        signal: 'address_match',
+        reason: `PDF address "${pdfAddr}" matches a Hebrew alias for property "${otherMatch.name}", not the Gmail label. Manual routing required.`,
       }
     }
   }
@@ -326,6 +401,19 @@ export function resolveBillRoutingWithoutLabel(
   }
 
   if (parsedPdf.address) {
+    // Check for Agripas 6-8 shared building FIRST (before generic aliases)
+    // to avoid false matches on bare "אגריפס 6" inside "אגריפס 6-8"
+    const agripasResult = resolveAgripas68SharedBuilding(parsedPdf.address, properties)
+    if (agripasResult) {
+      return {
+        propertyId: agripasResult.propertyId,
+        confidence: agripasResult.confidence,
+        signal: 'address_match',
+        reason: agripasResult.reason,
+      }
+    }
+
+    // English address fuzzy match
     const match = properties.find(p =>
       addressFuzzyMatches(parsedPdf.address as string, p.address),
     )
@@ -337,15 +425,17 @@ export function resolveBillRoutingWithoutLabel(
         reason: `PDF address matches property "${match.address}".`,
       }
     }
-    // Hebrew alias fallback — use best-match logic to prefer specific
-    // aliases with apartment numbers over generic building names
-    const bestMatch = findBestHebrewAliasMatch(parsedPdf.address, properties)
-    if (bestMatch) {
-      return {
-        propertyId: bestMatch.property.id,
-        confidence: 'verified',
-        signal: 'address_match',
-        reason: `PDF address matches Hebrew alias "${bestMatch.matchedAlias}" for property "${bestMatch.property.name}".`,
+
+    // Hebrew alias fallback (generic properties)
+    for (const p of properties) {
+      const hit = matchesHebrewAlias(parsedPdf.address, p.hebrewAliases)
+      if (hit) {
+        return {
+          propertyId: p.id,
+          confidence: 'verified',
+          signal: 'address_match',
+          reason: `PDF address matches Hebrew alias "${hit}" for property "${p.name}".`,
+        }
       }
     }
   }

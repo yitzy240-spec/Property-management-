@@ -122,16 +122,6 @@ export async function POST(request: Request) {
       const from = headers.find((h: { name: string }) => h.name === 'From')?.value || ''
       const threadId = metaData.threadId || null
 
-      // Skip if we've already processed any message from this thread
-      if (threadId) {
-        const { data: threadBills } = await serviceClient
-          .from('bills')
-          .select('id')
-          .eq('ai_parsed_data->>gmail_thread_id', threadId)
-          .limit(1)
-        if (threadBills && threadBills.length > 0) continue
-      }
-
       // Stage 1: Quick AI classification — is this a bill?
       const isBill = await classifyAsBill(subject, from)
       classified++
@@ -289,32 +279,53 @@ export async function POST(request: Request) {
       const periodEnd = aiParsedData?.period_end || null
 
       // Content-based deduplication: skip if a bill already exists with
-      // the same property + bill_type + amount + overlapping period
+      // the same property + bill_type + amount + overlapping period/time.
+      // Excludes rejected bills (don't let rejected junk block real bills).
+      let skipDuplicate = false
       if (propertyId && amountAgorot > 0) {
-        let dupQuery = serviceClient
+        const twentyDaysAgo = new Date()
+        twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20)
+
+        const dupQuery = serviceClient
           .from('bills')
-          .select('id')
+          .select('id, due_date, billing_period_start, billing_period_end')
           .eq('property_id', propertyId)
           .eq('bill_type', billType)
           .eq('amount_agorot', amountAgorot)
-          .limit(1)
+          .neq('status', 'rejected')
+          .gte('created_at', twentyDaysAgo.toISOString())
+          .limit(5)
 
-        if (periodStart && periodEnd) {
-          // Check for overlapping periods
-          dupQuery = dupQuery.or(
-            `and(billing_period_start.lte.${periodEnd},billing_period_end.gte.${periodStart}),` +
-            `and(billing_period_start.is.null,billing_period_end.is.null)`
-          )
-        } else {
-          // If no period, check for bills within ~30 days
-          const thirtyDaysAgo = new Date()
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-          dupQuery = dupQuery.gte('created_at', thirtyDaysAgo.toISOString())
+        const { data: candidates } = await dupQuery
+        if (candidates && candidates.length > 0) {
+          for (const candidate of candidates) {
+            // If both have periods, check for overlap
+            if (periodStart && periodEnd && candidate.billing_period_start && candidate.billing_period_end) {
+              const overlap = periodStart <= candidate.billing_period_end && periodEnd >= candidate.billing_period_start
+              if (overlap) {
+                skipDuplicate = true
+                break
+              }
+            }
+            // If new bill has a due_date and candidate has one, compare them
+            else if (aiParsedData?.due_date && candidate.due_date) {
+              const daysDiff = Math.abs(
+                (new Date(aiParsedData.due_date).getTime() - new Date(candidate.due_date).getTime()) / (1000 * 60 * 60 * 24)
+              )
+              if (daysDiff < 20) {
+                skipDuplicate = true
+                break
+              }
+            }
+            // Neither period nor due_date comparison available: time-bound match is enough
+            else {
+              skipDuplicate = true
+              break
+            }
+          }
         }
-
-        const { data: duplicates } = await dupQuery
-        if (duplicates && duplicates.length > 0) continue
       }
+      if (skipDuplicate) continue
 
       // Create bill — UNIQUE index on gmail_message_id makes the
       // insert idempotent, so concurrent webhook invocations from

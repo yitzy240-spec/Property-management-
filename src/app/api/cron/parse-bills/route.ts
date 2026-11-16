@@ -346,34 +346,55 @@ async function runParseBills(lookbackDays: number, labelFilter: string | null = 
         }
 
         // Content-based deduplication: skip if a bill already exists with
-        // the same property + bill_type + amount + overlapping period
+        // the same property + bill_type + amount + overlapping period/time.
+        // Excludes rejected bills (don't let rejected junk block real bills).
+        let skipDuplicate = false
         if (finalPropertyId && amountAgorot > 0) {
-          let dupQuery = serviceClient
+          const twentyDaysAgo = new Date()
+          twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20)
+
+          const dupQuery = serviceClient
             .from('bills')
-            .select('id')
+            .select('id, due_date, billing_period_start, billing_period_end')
             .eq('property_id', finalPropertyId)
             .eq('bill_type', billType)
             .eq('amount_agorot', amountAgorot)
-            .limit(1)
+            .neq('status', 'rejected')
+            .gte('created_at', twentyDaysAgo.toISOString())
+            .limit(5)
 
-          if (periodStart && periodEnd) {
-            // Check for overlapping periods
-            dupQuery = dupQuery.or(
-              `and(billing_period_start.lte.${periodEnd},billing_period_end.gte.${periodStart}),` +
-              `and(billing_period_start.is.null,billing_period_end.is.null)`
-            )
-          } else {
-            // If no period, check for bills within ~30 days
-            const thirtyDaysAgo = new Date()
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-            dupQuery = dupQuery.gte('created_at', thirtyDaysAgo.toISOString())
+          const { data: candidates } = await dupQuery
+          if (candidates && candidates.length > 0) {
+            for (const candidate of candidates) {
+              // If both have periods, check for overlap
+              if (periodStart && periodEnd && candidate.billing_period_start && candidate.billing_period_end) {
+                const overlap = periodStart <= candidate.billing_period_end && periodEnd >= candidate.billing_period_start
+                if (overlap) {
+                  skipDuplicate = true
+                  break
+                }
+              }
+              // If new bill has a due_date and candidate has one, compare them
+              else if (dueDate && candidate.due_date) {
+                const daysDiff = Math.abs(
+                  (new Date(dueDate).getTime() - new Date(candidate.due_date).getTime()) / (1000 * 60 * 60 * 24)
+                )
+                if (daysDiff < 20) {
+                  skipDuplicate = true
+                  break
+                }
+              }
+              // Neither period nor due_date comparison available: time-bound match is enough
+              else {
+                skipDuplicate = true
+                break
+              }
+            }
           }
-
-          const { data: duplicates } = await dupQuery
-          if (duplicates && duplicates.length > 0) {
-            skipped++
-            continue
-          }
+        }
+        if (skipDuplicate) {
+          skipped++
+          continue
         }
 
         const { error: billError } = await serviceClient

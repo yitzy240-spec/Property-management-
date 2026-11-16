@@ -3,30 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 /**
  * Tests for bill ingestion deduplication and validation logic.
  * These tests verify the fixes for:
- * 1. Thread reply skipping
- * 2. is_bill=false skipping
- * 3. Content-based deduplication
- * 4. Storage upload error handling
+ * 1. is_bill=false skipping
+ * 2. Content-based deduplication
+ * 3. Storage upload error handling
  */
-
-describe('Bill ingestion - thread deduplication', () => {
-  it('should skip processing when thread already has a bill', () => {
-    // Mock scenario: thread "thread-123" already produced bill "bill-abc"
-    const existingBills = [{ id: 'bill-abc' }]
-    const threadId = 'thread-123'
-
-    // If we query for bills with this thread_id and find any, skip
-    expect(existingBills.length).toBeGreaterThan(0)
-  })
-
-  it('should process when thread is new (no existing bills)', () => {
-    const existingBills: unknown[] = []
-    const threadId = 'thread-456'
-
-    // No bills from this thread, so we should process
-    expect(existingBills.length).toBe(0)
-  })
-})
 
 describe('Bill ingestion - is_bill flag', () => {
   it('should skip when parser returns is_bill=false', () => {
