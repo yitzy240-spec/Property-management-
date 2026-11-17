@@ -15,21 +15,29 @@ export const GET = withAgent('bills:read', async (request, { db }) => {
   const url = new URL(request.url)
   const p = url.searchParams
   const { limit, offset } = paging(url)
+  const propertyId = p.get('property_id')
+  const billType = p.get('bill_type')
+  const status = p.get('status')
+  const from = p.get('from')
+  const to = p.get('to')
+  
   let q = db
     .from('bills')
     .select(BILL_COLUMNS)
     .order('due_date', { ascending: false, nullsFirst: false })
     .range(offset, offset + limit - 1)
-  if (p.get('property_id')) q = q.eq('property_id', p.get('property_id')!')
-  if (p.get('bill_type')) q = q.eq('bill_type', p.get('bill_type')!')
+  
+  if (propertyId) q = q.eq('property_id', propertyId)
+  if (billType) q = q.eq('bill_type', billType)
   // If status is explicitly provided, use it; otherwise exclude rejected
-  if (p.get('status')) {
-    q = q.in('status', p.get('status')!.split(',').map(s => s.trim()))
+  if (status) {
+    q = q.in('status', status.split(',').map(s => s.trim()))
   } else {
     q = q.neq('status', 'rejected')
   }
-  if (p.get('from')) q = q.gte('due_date', p.get('from')!)
-  if (p.get('to')) q = q.lte('due_date', p.get('to')!)
+  if (from) q = q.gte('due_date', from)
+  if (to) q = q.lte('due_date', to)
+  
   const { data, error } = await q
   if (error) throw new AgentError(500, error.message)
   return json({ bills: ((data ?? []) as unknown as Array<Record<string, unknown>>).map(serializeBill), limit, offset })
