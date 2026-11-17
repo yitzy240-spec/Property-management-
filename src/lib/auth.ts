@@ -27,6 +27,25 @@ export async function requireAdmin() {
 }
 
 /**
+ * Check if the current user is an admin (without throwing).
+ * Returns true if admin, false otherwise.
+ */
+export async function isAdmin() {
+  const supabase = createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return false
+
+  const role = user.app_metadata?.role
+  if (role === 'admin') return true
+
+  const adminEmail = process.env.ADMIN_EMAIL
+  if (adminEmail && user.email === adminEmail) return true
+
+  return false
+}
+
+/**
  * Verify the current user is authenticated (any role).
  */
 export async function requireAuth() {

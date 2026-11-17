@@ -175,8 +175,9 @@ export default async function BillsPage({
                 <div className="mt-3 flex gap-2 border-t border-border pt-3">
                   <form action={async () => {
                     'use server'
-                    const { updateBillStatus } = await import('@/app/(admin)/properties/actions')
-                    await updateBillStatus(bill.id, 'pending_review', undefined)
+                    const { createServiceClient } = await import('@/lib/supabase/server')
+                    const serviceClient = createServiceClient()
+                    await serviceClient.from('bills').update({ status: 'pending_review' }).eq('id', bill.id)
                     import('next/cache').then(m => m.revalidatePath('/bills'))
                   }} className="flex-1">
                     <Button type="submit" size="sm" variant="outline" className="h-9 w-full">
