@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin, isAdmin } from '@/lib/auth'
+import { isWithinVisitEditWindow, serializeVisitForViewer } from '@/lib/visits'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,8 +36,8 @@ export async function GET(
     return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
   }
   
-  // Fetch media (RLS will filter for owners)
-  const { data: media, error: mediaError } = await client
+  // Fetch ALL media (we'll filter is_private in code for non-admins)
+  const { data: media, error: mediaError } = await serviceClient
     .from('visit_media')
     .select('*')
     .eq('visit_id', params.id)
@@ -46,9 +47,12 @@ export async function GET(
     return NextResponse.json({ error: mediaError.message }, { status: 500 })
   }
   
-  // Generate signed URLs for media
+  // Explicitly filter is_private media for non-admins (don't rely only on RLS)
+  const filteredMedia = userIsAdmin ? (media ?? []) : (media ?? []).filter(m => !m.is_private)
+  
+  // Generate signed URLs for filtered media
   const mediaWithUrls = await Promise.all(
-    (media ?? []).map(async (m) => {
+    filteredMedia.map(async (m) => {
       let signedUrl: string | null = null
       
       // Generate signed URL (60 minute expiry)
@@ -71,23 +75,13 @@ export async function GET(
   )
   
   // Check if editable (admin only, within 24h)
-  const createdAt = new Date(visit.created_at)
-  const now = new Date()
-  const hoursSinceCreation = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60)
-  const canEdit = userIsAdmin && hoursSinceCreation < 24
+  const canEdit = userIsAdmin && isWithinVisitEditWindow(visit.created_at)
   
-  // Remove admin_note for owners
+  // Serialize visit for viewer (strips admin_note for non-admins)
+  const serialized = serializeVisitForViewer(visit, mediaWithUrls, userIsAdmin)
+  
   const responseVisit = {
-    id: visit.id,
-    property_id: visit.property_id,
-    visited_at: visit.visited_at,
-    checklist: visit.checklist,
-    note: visit.note,
-    admin_note: userIsAdmin ? visit.admin_note : null,
-    created_by: visit.created_by,
-    created_at: visit.created_at,
-    properties: visit.properties,
-    media: mediaWithUrls,
+    ...serialized,
     can_edit: canEdit,
   }
   

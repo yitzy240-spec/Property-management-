@@ -1,6 +1,7 @@
 import { AgentError, json, paging, readJson, refreshAdminPages, toMinor, withAgent } from '@/lib/agent-api/core'
 import { BILL_COLUMNS, BillCreate, loadBill, serializeBill } from '@/lib/agent-api/utilities'
 import { createServiceClient } from '@/lib/supabase/server'
+import { buildBillsStatusFilter } from '@/lib/bills'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -17,7 +18,7 @@ export const GET = withAgent('bills:read', async (request, { db }) => {
   const { limit, offset } = paging(url)
   const propertyId = p.get('property_id')
   const billType = p.get('bill_type')
-  const status = p.get('status')
+  const statusParam = p.get('status')
   const from = p.get('from')
   const to = p.get('to')
   
@@ -29,12 +30,15 @@ export const GET = withAgent('bills:read', async (request, { db }) => {
   
   if (propertyId) q = q.eq('property_id', propertyId)
   if (billType) q = q.eq('bill_type', billType)
-  // If status is explicitly provided, use it; otherwise exclude rejected
-  if (status) {
-    q = q.in('status', status.split(',').map(s => s.trim()))
+  
+  // Apply status filter using helper
+  const statusFilter = buildBillsStatusFilter(statusParam)
+  if (statusFilter.mode === 'explicit' && statusFilter.statuses) {
+    q = q.in('status', statusFilter.statuses)
   } else {
     q = q.neq('status', 'rejected')
   }
+  
   if (from) q = q.gte('due_date', from)
   if (to) q = q.lte('due_date', to)
   

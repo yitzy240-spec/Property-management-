@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
-import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth'
-import type { ChecklistKey } from '@/types'
+import { isWithinVisitEditWindow } from '@/lib/visits'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,11 +37,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
   }
 
-  const createdAt = new Date(visit.created_at)
-  const now = new Date()
-  const hoursSinceCreation = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60)
-
-  if (hoursSinceCreation >= 24) {
+  if (!isWithinVisitEditWindow(visit.created_at)) {
     return NextResponse.json({ 
       error: 'Visit can only be edited within 24 hours of creation' 
     }, { status: 403 })
