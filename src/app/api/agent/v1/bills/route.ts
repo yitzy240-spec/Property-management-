@@ -8,6 +8,8 @@ export const maxDuration = 60
 /**
  * GET /api/agent/v1/bills — ?property_id= &bill_type= &status=pending_review,approved
  *   &from=YYYY-MM-DD &to=YYYY-MM-DD (due date) &limit= &offset=
+ * 
+ * By default excludes rejected bills. Pass ?status=rejected or a comma list including it to see rejected bills.
  */
 export const GET = withAgent('bills:read', async (request, { db }) => {
   const url = new URL(request.url)
@@ -18,9 +20,14 @@ export const GET = withAgent('bills:read', async (request, { db }) => {
     .select(BILL_COLUMNS)
     .order('due_date', { ascending: false, nullsFirst: false })
     .range(offset, offset + limit - 1)
-  if (p.get('property_id')) q = q.eq('property_id', p.get('property_id')!)
-  if (p.get('bill_type')) q = q.eq('bill_type', p.get('bill_type')!)
-  if (p.get('status')) q = q.in('status', p.get('status')!.split(',').map(s => s.trim()))
+  if (p.get('property_id')) q = q.eq('property_id', p.get('property_id')!')
+  if (p.get('bill_type')) q = q.eq('bill_type', p.get('bill_type')!')
+  // If status is explicitly provided, use it; otherwise exclude rejected
+  if (p.get('status')) {
+    q = q.in('status', p.get('status')!.split(',').map(s => s.trim()))
+  } else {
+    q = q.neq('status', 'rejected')
+  }
   if (p.get('from')) q = q.gte('due_date', p.get('from')!)
   if (p.get('to')) q = q.lte('due_date', p.get('to')!)
   const { data, error } = await q

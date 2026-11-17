@@ -126,7 +126,7 @@ export default async function BillsPage({
                   <CurrencyDisplay agorot={bill.amount_agorot} className="text-lg font-bold" />
                   <div className="flex items-center gap-1">
                     <StatusBadge status={bill.status} size="sm" />
-                    {(bill.status === 'rejected') && (
+                    {bill.status !== 'approved' && (
                       <BillEditFullDrawer
                         bill={bill as Bill}
                         propertyName={(bill.properties as { name: string } | null)?.name || null}

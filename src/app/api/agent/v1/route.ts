@@ -57,7 +57,7 @@ export function GET() {
       { method: 'POST', path: '/utility-accounts', scope: 'utilities:write', body: '{property_id, utility_type, label, account_number, provider_name?, autopay?, notes?}', note: 'account_number is used to route incoming bills — keep it exact.' },
       { method: 'GET', path: '/utility-accounts/{id}', scope: 'utilities:read' },
       { method: 'PATCH', path: '/utility-accounts/{id}', scope: 'utilities:write' },
-      { method: 'GET', path: '/bills', scope: 'bills:read', query: 'property_id, bill_type, status (pending_review,approved,flagged,rejected), from, to (due date), limit, offset' },
+      { method: 'GET', path: '/bills', scope: 'bills:read', query: 'property_id, bill_type, status (pending_review,approved,flagged,rejected), from, to (due date), limit, offset', note: 'By default excludes rejected bills. Pass ?status=rejected or a comma list including it to see rejected bills.' },
       { method: 'POST', path: '/bills', scope: 'bills:write', body: '{property_id, bill_type, amount_ils, due_date?, billing_period_start?, billing_period_end?}', note: 'Also accepts multipart/form-data: "data" field (JSON) + optional "file" field (PDF/image). Returns has_pdf:true when a PDF is attached.' },
       { method: 'GET', path: '/bills/{id}', scope: 'bills:read' },
       { method: 'PATCH', path: '/bills/{id}', scope: 'bills:write', body: 'any of: property_id, bill_type, amount_ils, due_date, billing_period_start, billing_period_end', note: 'Approved bills are locked and cannot be edited.' },
