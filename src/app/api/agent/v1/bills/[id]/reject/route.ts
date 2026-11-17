@@ -29,7 +29,7 @@ export const POST = withAgent<Params>('bills:write', async (_request, { db, audi
   if (error) throw new AgentError(400, error.message)
   
   const bill = await loadBill(db, id)
-  await audit({ resource: 'bill', resourceId: id, action: 'reject', before, after: bill })
+  await audit({ resource: 'bill', resourceId: id, action: 'update', before, after: bill })
   refreshAdminPages('/bills', `/properties/${bill.property_id}`)
   return json({ bill })
 })
