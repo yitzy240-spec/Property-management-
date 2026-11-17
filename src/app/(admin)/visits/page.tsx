@@ -5,7 +5,7 @@ import { ArrowLeft, Trash2 } from 'lucide-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getPropertyVisitStatuses } from '@/lib/visits'
 import { Button } from '@/components/ui/button'
-import { VisitList } from '@/components/features/visit-list'
+import { VisitDetailDrawer } from '@/components/features/visit-detail-drawer'
 import { DeleteVisitButton } from '@/components/features/delete-visit-button'
 
 function daysUntil(dateStr: string): number {
@@ -66,24 +66,31 @@ export default async function VisitsPage({
               const checkedCount = Object.values(checklist).filter(Boolean).length
 
               return (
-                <div key={visit.id} className={`px-4 py-3.5 ${i > 0 ? 'border-t border-border' : ''}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">
-                        {new Date(visit.visited_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {checkedCount} item{checkedCount !== 1 ? 's' : ''} checked
-                      </p>
-                      {visit.note && (
-                        <p className="mt-1 text-xs text-muted-foreground">{visit.note}</p>
-                      )}
-                      {visit.admin_note && (
-                        <p className="mt-1 text-[11px] text-accent">📌 {visit.admin_note}</p>
-                      )}
-                    </div>
-                    <DeleteVisitButton visitId={visit.id} />
-                  </div>
+                <div key={visit.id} className={`${i > 0 ? 'border-t border-border' : ''}`}>
+                  <VisitDetailDrawer
+                    visitId={visit.id}
+                    trigger={
+                      <div className="flex cursor-pointer items-start justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-muted/40">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold">
+                            {new Date(visit.visited_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {checkedCount} item{checkedCount !== 1 ? 's' : ''} checked
+                          </p>
+                          {visit.note && (
+                            <p className="mt-1 text-xs text-muted-foreground">{visit.note}</p>
+                          )}
+                          {visit.admin_note && (
+                            <p className="mt-1 text-[11px] text-accent">📌 {visit.admin_note}</p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="text-xs text-muted-foreground">›</span>
+                        </div>
+                      </div>
+                    }
+                  />
                 </div>
               )
             })}

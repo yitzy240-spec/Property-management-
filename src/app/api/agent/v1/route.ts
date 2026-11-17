@@ -60,7 +60,11 @@ export function GET() {
       { method: 'GET', path: '/bills', scope: 'bills:read', query: 'property_id, bill_type, status (pending_review,approved,flagged,rejected), from, to (due date), limit, offset' },
       { method: 'POST', path: '/bills', scope: 'bills:write', body: '{property_id, bill_type, amount_ils, due_date?, billing_period_start?, billing_period_end?}', note: 'Also accepts multipart/form-data: "data" field (JSON) + optional "file" field (PDF/image). Returns has_pdf:true when a PDF is attached.' },
       { method: 'GET', path: '/bills/{id}', scope: 'bills:read' },
-      { method: 'PATCH', path: '/bills/{id}', scope: 'bills:write', body: 'any of: property_id, bill_type, amount_ils, due_date, billing_period_start, billing_period_end' },
+      { method: 'PATCH', path: '/bills/{id}', scope: 'bills:write', body: 'any of: property_id, bill_type, amount_ils, due_date, billing_period_start, billing_period_end', note: 'Approved bills are locked and cannot be edited.' },
+      { method: 'DELETE', path: '/bills/{id}', scope: 'bills:write', note: 'Permanently delete a bill and its PDF. Use for test bills or duplicates. Prefer reject for real bills.' },
+      { method: 'POST', path: '/bills/{id}/approve', scope: 'bills:write', note: 'Set status=approved. Bill becomes visible to owners and can be included in monthly statements.' },
+      { method: 'POST', path: '/bills/{id}/reject', scope: 'bills:write', note: 'Set status=rejected. Bill is hidden from owners but kept in DB to prevent re-ingestion.' },
+      { method: 'GET', path: '/bills/{id}/pdf', scope: 'bills:read', note: 'Returns 302 redirect to a short-lived (60s) signed URL for the PDF. 404 if no PDF is attached.' },
       { method: 'POST', path: '/bills/{id}/pdf', scope: 'bills:write', body: 'multipart/form-data: "file" field (PDF/image), optional "replace" field (true to override existing PDF)', note: 'Attach or replace a PDF. Allows backfilling approved bills that lack a PDF.' },
     ],
   })
