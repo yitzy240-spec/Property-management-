@@ -314,6 +314,7 @@ export default async function OwnerPortalPage({
               properties: v.properties as { name: string } | null,
             }))}
             showPropertyName
+            isOwner
           />
         </section>
 

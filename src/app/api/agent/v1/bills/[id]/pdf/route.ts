@@ -8,6 +8,47 @@ export const maxDuration = 60
 type Params = { id: string }
 
 /**
+ * GET /api/agent/v1/bills/:id/pdf — Download a bill's PDF.
+ * 
+ * Returns a 302 redirect to a short-lived (60 second) signed URL for the PDF.
+ * The signed URL can be used directly in browsers or downloaded programmatically.
+ */
+export const GET = withAgent<Params>('bills:read', async (_request, { db }, { id }) => {
+  const { createServiceClient } = await import('@/lib/supabase/server')
+  const serviceClient = createServiceClient()
+  
+  const { data: bill, error } = await db
+    .from('bills')
+    .select('pdf_storage_path')
+    .eq('id', id)
+    .single()
+  
+  if (error || !bill) {
+    throw new AgentError(404, 'Bill not found')
+  }
+  
+  if (!bill.pdf_storage_path) {
+    throw new AgentError(404, 'Bill has no PDF attachment')
+  }
+  
+  const { data: signedUrl, error: signError } = await serviceClient.storage
+    .from('documents')
+    .createSignedUrl(bill.pdf_storage_path, 60) // 60 second expiry
+  
+  if (signError || !signedUrl) {
+    throw new AgentError(500, 'Failed to generate signed URL')
+  }
+  
+  // Return 302 redirect to the signed URL
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: signedUrl.signedUrl,
+    },
+  })
+})
+
+/**
  * POST /api/agent/v1/bills/:id/pdf — Attach a PDF to an existing bill.
  * 
  * Accepts multipart/form-data with a "file" field containing the PDF or image.

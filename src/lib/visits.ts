@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import type { ChecklistKey } from '@/types'
 
 interface PropertyVisitStatus {
   id: string
@@ -137,4 +138,85 @@ export async function getOwnerVisits(
     .limit(limit)
 
   return data ?? []
+}
+
+/**
+ * Check if a visit is within the 24-hour edit window.
+ * Returns true if the visit can be edited, false otherwise.
+ */
+export function isWithinVisitEditWindow(createdAt: Date | string, now: Date = new Date()): boolean {
+  const created = createdAt instanceof Date ? createdAt : new Date(createdAt)
+  const hoursSinceCreation = (now.getTime() - created.getTime()) / (1000 * 60 * 60)
+  return hoursSinceCreation < 24
+}
+
+interface VisitMediaRow {
+  id: string
+  file_path: string
+  file_type: 'image' | 'video'
+  is_private: boolean
+  signed_url?: string | null
+}
+
+interface VisitRow {
+  id: string
+  property_id: string
+  visited_at: string
+  checklist: Partial<Record<ChecklistKey, boolean>>
+  note: string | null
+  admin_note: string | null
+  created_by: string
+  created_at: string
+  properties?: { name: string }
+}
+
+/**
+ * Serialize visit for viewer, respecting permissions.
+ * Non-admins: strips admin_note and filters out is_private media.
+ */
+export function serializeVisitForViewer(
+  visit: VisitRow,
+  media: VisitMediaRow[],
+  isAdmin: boolean
+) {
+  // Filter media for non-admins: exclude is_private=true
+  const filteredMedia = isAdmin ? media : media.filter(m => !m.is_private)
+
+  return {
+    ...visit,
+    admin_note: isAdmin ? visit.admin_note : null,
+    media: filteredMedia,
+  }
+}
+
+interface CheckedItem {
+  key: ChecklistKey
+  label: string
+}
+
+export function getChecklistCheckedItems(
+  checklist: Record<string, boolean> | null | undefined
+): CheckedItem[] {
+  if (!checklist) return []
+  
+  const labelMap: Record<ChecklistKey, string> = {
+    electricity_working: 'Electricity working',
+    run_sinks: 'Run sinks',
+    run_showers: 'Run showers',
+    flush_toilets: 'Flush toilets',
+    refrigerator_freezer: 'Refrigerator and Freezer working',
+    soap_stock: 'Soap stock',
+    boiler_off: 'Boiler off',
+    washer_door_open: 'Washer door open',
+    dryer_lint: 'Check dryer lint',
+    bedrooms_no_mold: 'Bedrooms no mold or leaking on walls',
+    check_mailbox: 'Check mailbox',
+  }
+  
+  return Object.entries(checklist)
+    .filter(([_, val]) => val)
+    .map(([key, _]) => ({
+      key: key as ChecklistKey,
+      label: labelMap[key as ChecklistKey] ?? key,
+    }))
 }

@@ -1,12 +1,15 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { AlertTriangle, FileText, Image as ImageIcon } from 'lucide-react'
+import { AlertTriangle, FileText, Image as ImageIcon, Pencil } from 'lucide-react'
+import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { CurrencyDisplay } from '@/components/ui/currency-display'
+import { Button } from '@/components/ui/button'
 import { BillAddButton } from '@/components/features/bill-add'
 import { BillEditDrawer } from '@/components/features/bill-edit'
+import { BillEditFullDrawer } from '@/components/features/bill-edit-full'
 import { BillDeleteButton } from '@/components/features/bill-delete-button'
 import { cn } from '@/lib/utils'
 import type { Bill } from '@/types'
@@ -38,11 +41,13 @@ export default async function BillsPage({
   const pending = bills?.filter((b) => b.status === 'pending_review') ?? []
   const flagged = bills?.filter((b) => b.status === 'flagged') ?? []
   const approved = bills?.filter((b) => b.status === 'approved') ?? []
+  const rejected = bills?.filter((b) => b.status === 'rejected') ?? []
 
   const tabs = [
     { key: 'pending', label: 'Pending', count: pending.length, items: pending },
     { key: 'flagged', label: 'Flagged', count: flagged.length, items: flagged },
     { key: 'approved', label: 'Approved', count: approved.length, items: approved },
+    { key: 'rejected', label: 'Rejected', count: rejected.length, items: rejected },
   ]
 
   const activeTab = searchParams.tab || 'pending'
@@ -61,7 +66,7 @@ export default async function BillsPage({
       </div>
 
       {/* Tab bar — clickable KPI counts */}
-      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[10px] border border-border bg-border">
+      <div className="grid grid-cols-4 gap-px overflow-hidden rounded-[10px] border border-border bg-border">
         {tabs.map((tab) => (
           <Link
             key={tab.key}
@@ -76,6 +81,7 @@ export default async function BillsPage({
               tab.key === 'pending' && 'text-status-warning',
               tab.key === 'flagged' && 'text-status-danger',
               tab.key === 'approved' && 'text-status-safe',
+              tab.key === 'rejected' && 'text-muted-foreground',
             )}>{tab.count}</p>
             <p className={cn(
               'text-xs',
@@ -120,6 +126,17 @@ export default async function BillsPage({
                   <CurrencyDisplay agorot={bill.amount_agorot} className="text-lg font-bold" />
                   <div className="flex items-center gap-1">
                     <StatusBadge status={bill.status} size="sm" />
+                    {bill.status !== 'approved' && (
+                      <BillEditFullDrawer
+                        bill={bill as Bill}
+                        propertyName={(bill.properties as { name: string } | null)?.name || null}
+                        trigger={
+                          <button className="rounded-[var(--radius-badge)] p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary" aria-label="Edit bill">
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        }
+                      />
+                    )}
                     <BillDeleteButton
                       billId={bill.id}
                       label={`${billTypeLabels[bill.bill_type] || bill.bill_type}${bill.due_date ? ` · ${bill.due_date}` : ''}`}
@@ -154,7 +171,26 @@ export default async function BillsPage({
                 </div>
               )}
 
-              {(bill.status === 'pending_review' || bill.status === 'flagged') && (
+              {bill.status === 'rejected' ? (
+                <div className="mt-3 flex gap-2 border-t border-border pt-3">
+                  <form action={async () => {
+                    'use server'
+                    const { createServiceClient } = await import('@/lib/supabase/server')
+                    const serviceClient = createServiceClient()
+                    await serviceClient.from('bills').update({ status: 'pending_review' }).eq('id', bill.id)
+                    import('next/cache').then(m => m.revalidatePath('/bills'))
+                  }} className="flex-1">
+                    <Button type="submit" size="sm" variant="outline" className="h-9 w-full">
+                      Move to Pending
+                    </Button>
+                  </form>
+                  <BillDeleteButton
+                    billId={bill.id}
+                    label={`${billTypeLabels[bill.bill_type] || bill.bill_type}${bill.due_date ? ` · ${bill.due_date}` : ''}`}
+                    size="text"
+                  />
+                </div>
+              ) : (bill.status === 'pending_review' || bill.status === 'flagged') && (
                 <div className="mt-3 border-t border-border pt-3">
                   <BillEditDrawer
                     bill={bill as Bill}
@@ -169,6 +205,7 @@ export default async function BillsPage({
         <div className="rounded-[10px] border border-border bg-card py-6 text-center text-sm text-muted-foreground shadow-sm">
           {activeTab === 'pending' ? 'No bills awaiting review. Bills are parsed from Gmail every 15 minutes.' :
            activeTab === 'flagged' ? 'No flagged bills. Bills with unusual amounts appear here.' :
+           activeTab === 'rejected' ? 'No rejected bills.' :
            'No approved bills yet.'}
         </div>
       )}

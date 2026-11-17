@@ -12,6 +12,7 @@ import { MagicLinkGenerator } from '@/components/features/magic-link-generator'
 import { BookingAddButton } from '@/components/features/booking-add'
 import { TaskCreateDialog } from '@/components/features/task-create-dialog'
 import { BillAddButton } from '@/components/features/bill-add'
+import { BillEditFullDrawer } from '@/components/features/bill-edit-full'
 import { BillDeleteButton } from '@/components/features/bill-delete-button'
 import { LaundryPickupButton } from '@/components/features/laundry-pickup'
 import { WorkLogButton, WorkLogList } from '@/components/features/work-log'
@@ -311,6 +312,17 @@ async function renderPropertyPage(
                     >
                       PDF
                     </a>
+                  )}
+                  {bill.status !== 'approved' && (
+                    <BillEditFullDrawer
+                      bill={bill as unknown as import('@/types').Bill}
+                      propertyName={property?.name ?? null}
+                      trigger={
+                        <button className="rounded-[var(--radius-badge)] p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary" aria-label="Edit bill">
+                          <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+                        </button>
+                      }
+                    />
                   )}
                   <BillDeleteButton
                     billId={bill.id}

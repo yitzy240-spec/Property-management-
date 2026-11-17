@@ -33,3 +33,26 @@ export const PATCH = withAgent<Params>('bills:write', async (request, { db, audi
   refreshAdminPages('/bills', `/properties/${bill.property_id}`)
   return json({ bill })
 })
+
+/** DELETE /api/agent/v1/bills/:id — delete a bill and its PDF. */
+export const DELETE = withAgent<Params>('bills:write', async (_request, { db, audit }, { id }) => {
+  const { createServiceClient } = await import('@/lib/supabase/server')
+  const serviceClient = createServiceClient()
+  
+  const before = await loadBill(db, id)
+  
+  // Delete PDF from storage if present
+  if (before.has_pdf) {
+    const { data: bill } = await db.from('bills').select('pdf_storage_path').eq('id', id).single()
+    if (bill?.pdf_storage_path) {
+      await serviceClient.storage.from('documents').remove([bill.pdf_storage_path]).catch(() => {})
+    }
+  }
+  
+  const { error } = await db.from('bills').delete().eq('id', id)
+  if (error) throw new AgentError(400, error.message)
+  
+  await audit({ resource: 'bill', resourceId: id, action: 'delete', before, after: null })
+  refreshAdminPages('/bills', `/properties/${before.property_id}`)
+  return json({ success: true })
+})
