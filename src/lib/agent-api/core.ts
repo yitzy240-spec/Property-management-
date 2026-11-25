@@ -39,6 +39,9 @@ export interface AgentToken {
   id: string
   name: string
   scopes: string[]
+  revoked_at: string | null
+  last_used_at: string | null
+  created_by: string | null
 }
 
 export function hashToken(raw: string): string {
@@ -64,8 +67,8 @@ export function json(data: unknown, status = 200) {
 export interface AgentContext {
   token: AgentToken
   db: ServiceClient
-  /** Admin user ID for created_by fields */
-  userId: string
+  /** Admin user ID for created_by fields (the admin who minted the token; null if unknown) */
+  userId: string | null
   /** Record a write (or a sensitive read) in the audit log. */
   audit: (entry: {
     resource: string
@@ -83,7 +86,7 @@ async function authenticate(request: Request, db: ServiceClient, scope: AgentSco
 
   const { data: token } = await db
     .from('api_tokens')
-    .select('id, name, scopes, revoked_at')
+    .select('id, name, scopes, revoked_at, last_used_at, created_by')
     .eq('token_hash', hashToken(match[1]))
     .maybeSingle()
 
@@ -98,7 +101,15 @@ async function authenticate(request: Request, db: ServiceClient, scope: AgentSco
     .update({ last_used_at: new Date().toISOString() })
     .eq('id', token.id)
     .then(() => {}, () => {})
-  return { id: token.id, name: token.name, scopes: token.scopes as string[] }
+  
+  return {
+    id: token.id,
+    name: token.name,
+    scopes: token.scopes as string[],
+    revoked_at: token.revoked_at,
+    last_used_at: token.last_used_at,
+    created_by: token.created_by,
+  }
 }
 
 /**
@@ -130,19 +141,9 @@ export function withAgent<P = Record<string, string>>(
         })
         if (error) throw new AgentError(500, `Audit log write failed: ${error.message}`)
       }
-      // Get an admin user ID for created_by fields (best-effort)
-      let userId = '00000000-0000-0000-0000-000000000000'
-      try {
-        const { data: adminUser } = await db
-          .from('auth.users')
-          .select('id')
-          .contains('raw_app_meta_data', { role: 'admin' })
-          .limit(1)
-          .maybeSingle()
-        if (adminUser?.id) userId = adminUser.id
-      } catch {
-        // Fallback to default UUID if query fails (e.g. in tests)
-      }
+      // Use the token's created_by as the context userId (the admin who minted the token)
+      // If null, we pass null — no fake UUID
+      const userId = token.created_by ?? null
       
       return await handler(request, { token, db, userId, audit }, (route?.params ?? {}) as P)
     } catch (err) {

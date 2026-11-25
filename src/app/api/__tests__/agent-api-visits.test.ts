@@ -15,9 +15,47 @@ function query(table: string) {
   const filters: Array<(r: Row) => boolean> = []
   let op: 'select' | 'update' | 'delete' | 'insert' = 'select'
   let values: Row = {}
-  const rows = () => (tables[table] ?? []).filter(r => filters.every(f => f(r)))
+  let selectCols: string[] | null = null
+  
+  const rows = () => {
+    let matched = (tables[table] ?? []).filter(r => filters.every(f => f(r)))
+    // Apply column projection if select() was called with specific columns
+    if (selectCols) {
+      matched = matched.map(r => {
+        const projected: Row = {}
+        selectCols!.forEach(col => {
+          // Handle Supabase joins like `properties(name)` - extract base field
+          const baseCol = col.includes('(') ? col.substring(0, col.indexOf('(')) : col
+          if (baseCol in r) projected[baseCol] = r[baseCol]
+        })
+        return projected
+      })
+    }
+    return matched
+  }
+  
   const q: Record<string, unknown> = {
-    select: () => q,
+    select: (cols?: string) => { 
+      if (cols && cols !== '*') {
+        // Handle Supabase joins like `properties(name)` - keep them intact
+        // Split on commas that are not inside parentheses
+        selectCols = []
+        let current = ''
+        let depth = 0
+        for (const char of cols) {
+          if (char === '(') depth++
+          else if (char === ')') depth--
+          else if (char === ',' && depth === 0) {
+            selectCols.push(current.trim())
+            current = ''
+            continue
+          }
+          current += char
+        }
+        if (current) selectCols.push(current.trim())
+      }
+      return q 
+    },
     order: () => q,
     range: () => q,
     limit: () => q,
@@ -42,7 +80,9 @@ function query(table: string) {
     then: (resolve: (x: unknown) => void) => {
       if (op === 'update') {
         allUpdates.push({ table, values })
-        rows().forEach(r => Object.assign(r, values))
+        // Update the actual table rows, not projected ones
+        const realRows = (tables[table] ?? []).filter(r => filters.every(f => f(r)))
+        realRows.forEach(r => Object.assign(r, values))
         return resolve({ error: null })
       }
       if (op === 'delete') {
@@ -88,16 +128,18 @@ beforeEach(() => {
   const mediaId = '00000000-0000-0000-0000-000000000021'
   const adminId = '00000000-0000-0000-0000-000000000031'
   
+  const tokenRow = { 
+    id: 't1', 
+    name: 'Test Token', 
+    token_hash: hashToken(GOOD_TOKEN), 
+    scopes: ['visits:read', 'visits:write'], 
+    revoked_at: null,
+    last_used_at: null,
+    created_by: adminId,
+  }
+  
   tables = {
-    api_tokens: [
-      { 
-        id: 't1', 
-        name: 'Test Token', 
-        token_hash: hashToken(GOOD_TOKEN), 
-        scopes: ['visits:read', 'visits:write'], 
-        revoked_at: null 
-      },
-    ],
+    api_tokens: [tokenRow],
     agent_audit_log: [],
     visits: [
       { 
@@ -260,6 +302,40 @@ describe('POST /api/agent/v1/visits', () => {
     const auditLog = inserts.find(i => i.table === 'agent_audit_log')
     expect(auditLog?.values.resource).toBe('visit')
     expect(auditLog?.values.action).toBe('create')
+  })
+
+  it('sets created_by from token.created_by, never uses zero UUID', async () => {
+    const adminId = '00000000-0000-0000-0000-000000000031'
+    // Token already has created_by from beforeEach
+    expect(tables.api_tokens[0].created_by).toBe(adminId)
+    
+    const { POST } = await import('@/app/api/agent/v1/visits/route')
+    const res = await POST(req('/visits', {
+      method: 'POST',
+      body: JSON.stringify({ property_id: propId, checklist: {} }),
+    }))
+    
+    expect(res.status).toBe(201)
+    const visitInsert = inserts.find(i => i.table === 'visits')
+    expect(visitInsert).toBeDefined()
+    expect(visitInsert?.values.created_by).toBe(adminId)
+    expect(visitInsert?.values.created_by).not.toBe('00000000-0000-0000-0000-000000000000')
+  })
+
+  it('stores created_by as null when token.created_by is null', async () => {
+    tables.api_tokens[0].created_by = null
+    
+    const { POST } = await import('@/app/api/agent/v1/visits/route')
+    const res = await POST(req('/visits', {
+      method: 'POST',
+      body: JSON.stringify({ property_id: propId, checklist: {} }),
+    }))
+    
+    expect(res.status).toBe(201)
+    const visitInsert = inserts.find(i => i.table === 'visits')
+    expect(visitInsert).toBeDefined()
+    expect(visitInsert?.values.created_by).toBeNull()
+    expect(visitInsert?.values.created_by).not.toBe('00000000-0000-0000-0000-000000000000')
   })
 })
 
