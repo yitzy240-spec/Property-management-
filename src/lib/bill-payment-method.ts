@@ -3,14 +3,16 @@
  * 
  * Shared constants for bill payment_method field values across the codebase.
  * This field tracks who paid the bill and how (used in statements and admin UI).
+ * 
+ * Production data: 170 rows with 'paid_by_owner_cc', 249 rows with null
  */
 
 export const BILL_PAYMENT_METHODS = {
-  /** Bill not yet paid or payment method not recorded */
+  /** Bill not yet paid or payment method not recorded (249 rows in prod) */
   UNSET: null,
   /** Owner paid by cash */
   PAID_BY_OWNER_CASH: 'paid_by_owner_cash',
-  /** Owner paid by credit card */
+  /** Owner paid by credit card (170 rows in prod) */
   PAID_BY_OWNER_CC: 'paid_by_owner_cc',
   /** Admin (Marcus Properties) paid on owner's behalf */
   PAID_BY_ADMIN: 'paid_by_admin',

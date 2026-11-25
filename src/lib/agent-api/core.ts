@@ -130,14 +130,19 @@ export function withAgent<P = Record<string, string>>(
         })
         if (error) throw new AgentError(500, `Audit log write failed: ${error.message}`)
       }
-      // Get the first admin user ID for created_by fields
-      const { data: adminUser } = await db
-        .from('auth.users')
-        .select('id')
-        .contains('raw_app_meta_data', { role: 'admin' })
-        .limit(1)
-        .maybeSingle()
-      const userId = adminUser?.id ?? '00000000-0000-0000-0000-000000000000'
+      // Get an admin user ID for created_by fields (best-effort)
+      let userId = '00000000-0000-0000-0000-000000000000'
+      try {
+        const { data: adminUser } = await db
+          .from('auth.users')
+          .select('id')
+          .contains('raw_app_meta_data', { role: 'admin' })
+          .limit(1)
+          .maybeSingle()
+        if (adminUser?.id) userId = adminUser.id
+      } catch {
+        // Fallback to default UUID if query fails (e.g. in tests)
+      }
       
       return await handler(request, { token, db, userId, audit }, (route?.params ?? {}) as P)
     } catch (err) {

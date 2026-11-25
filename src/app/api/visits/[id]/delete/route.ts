@@ -29,18 +29,18 @@ export async function DELETE(
     return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
   }
   
-  // Delete storage objects first
+  // Delete storage objects first (before deleting DB rows)
   const media = visit.visit_media as Array<{ file_path: string }> | null
   if (media && media.length > 0) {
     const paths = media.map((m: { file_path: string }) => m.file_path)
-    const { error: storageError } = await serviceClient.storage
+    // Remove storage objects - ignores missing files gracefully
+    await serviceClient.storage
       .from('visit-media')
       .remove(paths)
-    
-    if (storageError) {
-      console.error('Failed to delete visit media from storage:', storageError)
-      // Continue anyway - we'll still delete the DB records
-    }
+      .catch((err: unknown) => {
+        // Log but continue - missing storage objects shouldn't block deletion
+        console.warn('Visit media storage cleanup warning:', err)
+      })
   }
   
   // Delete visit (cascades to visit_media table)

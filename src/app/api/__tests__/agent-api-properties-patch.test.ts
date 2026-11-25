@@ -9,17 +9,25 @@ import { hashToken } from '@/lib/agent-api/core'
 type Row = Record<string, unknown>
 let tables: Record<string, Row[]>
 const allUpdates: Array<{ table: string; values: Row }> = []
+/** Data writes only — excludes the api_tokens.last_used_at bookkeeping. */
+const dataUpdates = () => allUpdates.filter(u => u.table !== 'api_tokens')
 const inserts: Array<{ table: string; values: Row }> = []
 
 function query(table: string) {
   const filters: Array<(r: Row) => boolean> = []
-  let op: 'select' | 'update' | 'delete' = 'select'
+  let op: 'select' | 'update' | 'delete' | 'insert' = 'select'
   let values: Row = {}
   const rows = () => (tables[table] ?? []).filter(r => filters.every(f => f(r)))
   const q: Record<string, unknown> = {
     select: () => q,
     eq: (col: string, val: unknown) => { filters.push(r => r[col] === val); return q },
     update: (v: Row) => { op = 'update'; values = v; return q },
+    insert: (v: Row) => {
+      inserts.push({ table, values: v })
+      const row = { id: `new-${inserts.length}`, ...v }
+      ;(tables[table] ??= []).push(row)
+      return { then: (res: (x: unknown) => void) => res({ error: null }) }
+    },
     maybeSingle: async () => ({ data: rows()[0] ?? null, error: null }),
     then: (resolve: (x: unknown) => void) => {
       if (op === 'update') {
@@ -113,9 +121,9 @@ describe('PATCH /api/agent/v1/properties/{id}', () => {
     }), { params: { id: 'prop-1' } })
     
     expect(res.status).toBe(200)
-    expect(allUpdates).toHaveLength(1)
-    expect(allUpdates[0].values.name).toBe('Agripas 6 Updated')
-    expect(allUpdates[0].values.address).toBe('6A Agripas Street')
+    expect(dataUpdates()).toHaveLength(1)
+    expect(dataUpdates()[0].values.name).toBe('Agripas 6 Updated')
+    expect(dataUpdates()[0].values.address).toBe('6A Agripas Street')
   })
 
   it('updates entry codes and wifi', async () => {
@@ -133,7 +141,7 @@ describe('PATCH /api/agent/v1/properties/{id}', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.property).toBeDefined()
-    expect(allUpdates[0].values.entry_code).toBe('5678')
+    expect(dataUpdates()[0].values.entry_code).toBe('5678')
   })
 
   it('updates financial rates (converts ILS to agorot)', async () => {
@@ -148,9 +156,9 @@ describe('PATCH /api/agent/v1/properties/{id}', () => {
     }), { params: { id: 'prop-1' } })
     
     expect(res.status).toBe(200)
-    expect(allUpdates[0].values.commission_rate).toBe(0.25)
-    expect(allUpdates[0].values.management_fee_agorot).toBe(150000)
-    expect(allUpdates[0].values.hourly_rate_agorot).toBe(20000)
+    expect(dataUpdates()[0].values.commission_rate).toBe(0.25)
+    expect(dataUpdates()[0].values.management_fee_agorot).toBe(150000)
+    expect(dataUpdates()[0].values.hourly_rate_agorot).toBe(20000)
   })
 
   it('updates property with nullable fields', async () => {
@@ -165,9 +173,9 @@ describe('PATCH /api/agent/v1/properties/{id}', () => {
     }), { params: { id: 'prop-1' } })
     
     expect(res.status).toBe(200)
-    expect(allUpdates[0].values.youtube_tutorial_url).toBe('https://youtube.com/watch?v=xyz')
-    expect(allUpdates[0].values.entry_instructions).toBe('Take elevator to floor 3')
-    expect(allUpdates[0].values.neighborhood).toBeNull()
+    expect(dataUpdates()[0].values.youtube_tutorial_url).toBe('https://youtube.com/watch?v=xyz')
+    expect(dataUpdates()[0].values.entry_instructions).toBe('Take elevator to floor 3')
+    expect(dataUpdates()[0].values.neighborhood).toBeNull()
   })
 
   it('requires at least one field to update', async () => {

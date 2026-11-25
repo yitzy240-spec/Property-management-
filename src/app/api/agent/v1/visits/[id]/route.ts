@@ -80,11 +80,13 @@ export const DELETE = withAgent<Params>('visits:write', async (_request, { db, a
   
   const before = serializeVisit(visit as unknown as Record<string, unknown>, media ?? [])
   
-  // Delete storage objects
+  // Delete storage objects first (before deleting DB rows)
   if (media && media.length > 0) {
     const paths = media.map(m => m.file_path)
-    await serviceClient.storage.from('visit-media').remove(paths).catch(() => {
-      // Log but don't fail — visit will still be deleted
+    // Remove storage objects - ignores missing files gracefully
+    await serviceClient.storage.from('visit-media').remove(paths).catch((err: unknown) => {
+      // Log but continue - missing storage objects shouldn't block deletion
+      console.warn('Visit media storage cleanup warning:', err)
     })
   }
   

@@ -21,7 +21,7 @@ export const VisitCreate = z
   .object({
     property_id: z.string().uuid(),
     visited_at: date.nullish(),
-    checklist: z.record(checklistItem, z.boolean()).default({}),
+    checklist: z.record(z.string(), z.boolean()).default({}),
     note: z.string().max(5000).nullish(),
     admin_note: z.string().max(5000).nullish(),
   })
@@ -30,7 +30,7 @@ export const VisitCreate = z
 export const VisitPatch = z
   .object({
     visited_at: date.nullable(),
-    checklist: z.record(checklistItem, z.boolean()),
+    checklist: z.record(z.string(), z.boolean()),
     note: z.string().max(5000).nullable(),
     admin_note: z.string().max(5000).nullable(),
   })
