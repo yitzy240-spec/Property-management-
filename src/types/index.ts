@@ -157,6 +157,7 @@ export interface Bill {
   billing_period_start: string | null
   billing_period_end: string | null
   status: BillStatus
+  payment_method: string | null
   is_anomaly: boolean
   anomaly_note: string | null
   pdf_storage_path: string | null

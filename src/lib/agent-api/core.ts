@@ -18,6 +18,7 @@ export const AGENT_SCOPES = {
   'tasks:read': 'Read tasks (incl. cleaning) and contractors',
   'tasks:write': 'Create, move, reassign and delete tasks',
   'properties:read': 'Read properties (no codes)',
+  'properties:write': 'Edit properties',
   'owners:read': 'Read owners',
   'owners:write': 'Edit owner records',
   'utilities:read': 'Read utility accounts',
@@ -25,6 +26,8 @@ export const AGENT_SCOPES = {
   'bills:read': 'Read bills',
   'bills:write': 'Add and edit bills (approval stays with the admin)',
   'codes:read': 'Read door codes and WiFi (every read is logged)',
+  'visits:read': 'Read property visit records with media',
+  'visits:write': 'Create, edit and delete visit records',
 } as const
 
 export type AgentScope = keyof typeof AGENT_SCOPES
@@ -36,6 +39,9 @@ export interface AgentToken {
   id: string
   name: string
   scopes: string[]
+  revoked_at: string | null
+  last_used_at: string | null
+  created_by: string | null
 }
 
 export function hashToken(raw: string): string {
@@ -61,6 +67,8 @@ export function json(data: unknown, status = 200) {
 export interface AgentContext {
   token: AgentToken
   db: ServiceClient
+  /** Admin user ID for created_by fields (the admin who minted the token; null if unknown) */
+  userId: string | null
   /** Record a write (or a sensitive read) in the audit log. */
   audit: (entry: {
     resource: string
@@ -78,7 +86,7 @@ async function authenticate(request: Request, db: ServiceClient, scope: AgentSco
 
   const { data: token } = await db
     .from('api_tokens')
-    .select('id, name, scopes, revoked_at')
+    .select('id, name, scopes, revoked_at, last_used_at, created_by')
     .eq('token_hash', hashToken(match[1]))
     .maybeSingle()
 
@@ -93,7 +101,15 @@ async function authenticate(request: Request, db: ServiceClient, scope: AgentSco
     .update({ last_used_at: new Date().toISOString() })
     .eq('id', token.id)
     .then(() => {}, () => {})
-  return { id: token.id, name: token.name, scopes: token.scopes as string[] }
+  
+  return {
+    id: token.id,
+    name: token.name,
+    scopes: token.scopes as string[],
+    revoked_at: token.revoked_at,
+    last_used_at: token.last_used_at,
+    created_by: token.created_by,
+  }
 }
 
 /**
@@ -125,7 +141,11 @@ export function withAgent<P = Record<string, string>>(
         })
         if (error) throw new AgentError(500, `Audit log write failed: ${error.message}`)
       }
-      return await handler(request, { token, db, audit }, (route?.params ?? {}) as P)
+      // Use the token's created_by as the context userId (the admin who minted the token)
+      // If null, we pass null — no fake UUID
+      const userId = token.created_by ?? null
+      
+      return await handler(request, { token, db, userId, audit }, (route?.params ?? {}) as P)
     } catch (err) {
       if (err instanceof AgentError) return json({ error: err.message, details: err.details }, err.status)
       if (err instanceof ZodError) {

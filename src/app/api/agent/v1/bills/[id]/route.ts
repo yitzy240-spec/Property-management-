@@ -9,20 +9,28 @@ export const GET = withAgent<Params>('bills:read', async (_request, { db }, { id
   return json({ bill: await loadBill(db, id) })
 })
 
-/** PATCH /api/agent/v1/bills/:id — fix amount/dates/type/property. Approved bills are locked. */
+/** PATCH /api/agent/v1/bills/:id — fix amount/dates/type/property. payment_method can be changed on approved bills. */
 export const PATCH = withAgent<Params>('bills:write', async (request, { db, audit }, { id }) => {
   const patch = BillPatch.parse(await readJson(request))
   if (Object.keys(patch).length === 0) throw new AgentError(400, 'No fields to update.')
   const before = structuredClone(await loadBill(db, id))
-  if (before.status === 'approved') {
-    throw new AgentError(409, 'This bill is already approved (it may be on an owner statement). Ask the admin to change it.')
+  
+  // Payment method is metadata and can be changed on approved bills.
+  // All other fields are locked once approved.
+  const isPaymentMethodOnly = Object.keys(patch).length === 1 && 'payment_method' in patch
+  if (before.status === 'approved' && !isPaymentMethodOnly) {
+    throw new AgentError(409, 'This bill is already approved (it may be on an owner statement). Only payment_method can be changed.')
   }
 
   const { amount_ils, ...rest } = patch
   const row: Record<string, unknown> = { ...rest }
   if (amount_ils !== undefined) row.amount_agorot = toMinor(amount_ils)
-  // Guard in the same statement so an approval landing in between still wins.
-  const { data: changed, error } = await db.from('bills').update(row).eq('id', id).neq('status', 'approved').select('id')
+  
+  // Guard in the same statement so an approval landing in between still wins (unless payment_method only).
+  let query = db.from('bills').update(row).eq('id', id)
+  if (!isPaymentMethodOnly) query = query.neq('status', 'approved')
+  const { data: changed, error } = await query.select('id')
+  
   if (error) throw new AgentError(400, error.message)
   if (!changed || changed.length === 0) {
     throw new AgentError(409, 'This bill was approved meanwhile. Ask the admin to change it.')

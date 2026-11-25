@@ -32,6 +32,7 @@ export function BillAddButton({ preselectedPropertyId }: { preselectedPropertyId
     due_date: null,
     period_start: null,
     period_end: null,
+    payment_method: null,
   })
 
   useEffect(() => {
@@ -82,6 +83,7 @@ export function BillAddButton({ preselectedPropertyId }: { preselectedPropertyId
       due_date: values.due_date,
       billing_period_start: values.period_start,
       billing_period_end: values.period_end,
+      payment_method: values.payment_method,
       status: 'approved',
       is_anomaly: false,
     }
@@ -133,6 +135,7 @@ export function BillAddButton({ preselectedPropertyId }: { preselectedPropertyId
               }}
               properties={properties}
               onChange={setValues}
+              showPaymentMethod={true}
             />
 
             <div className="space-y-1.5">

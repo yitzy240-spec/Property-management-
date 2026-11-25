@@ -105,6 +105,7 @@ export const POST = withAgent('bills:write', async (request, { db, audit }) => {
       due_date: parsed.due_date ?? null,
       billing_period_start: parsed.billing_period_start ?? null,
       billing_period_end: parsed.billing_period_end ?? null,
+      payment_method: parsed.payment_method ?? null,
       status: 'pending_review',
       pdf_storage_path: pdfStoragePath,
     })

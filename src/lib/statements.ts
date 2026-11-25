@@ -29,6 +29,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import type { StatementLineItemData, StatementDirection, LineItemSection, LineItemCategory } from '@/types'
 import { toIlsAgorot } from '@/lib/booking-currency'
+import { BILL_PAYMENT_METHODS } from '@/lib/bill-payment-method'
 
 const CC_SURCHARGE_RATE = 0.035
 
@@ -121,7 +122,7 @@ export async function calculateMonthlyStatements(
     .from('bills')
     .select('id, property_id, bill_type, amount_agorot, due_date')
     .eq('status', 'approved')
-    .eq('payment_method', 'paid_by_admin')
+    .eq('payment_method', BILL_PAYMENT_METHODS.PAID_BY_ADMIN)
     .gte('approved_at', start + 'T00:00:00Z')
     .lte('approved_at', end + 'T23:59:59Z')
 
