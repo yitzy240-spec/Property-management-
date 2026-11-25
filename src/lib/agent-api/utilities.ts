@@ -1,8 +1,14 @@
 import { z } from 'zod'
 import { AgentError, toMajor, type ServiceClient } from './core'
+import { BILL_PAYMENT_METHODS } from '@/lib/bill-payment-method'
 
 const utilityType = z.enum(['iec', 'water', 'gas', 'internet', 'arnona', 'vaad_bayit', 'other'])
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+const paymentMethod = z.enum([
+  BILL_PAYMENT_METHODS.PAID_BY_OWNER_CASH,
+  BILL_PAYMENT_METHODS.PAID_BY_OWNER_CC,
+  BILL_PAYMENT_METHODS.PAID_BY_ADMIN,
+]).nullable()
 
 export const UtilityAccountCreate = z
   .object({
@@ -52,6 +58,7 @@ export const BillCreate = z
     due_date: date.nullish(),
     billing_period_start: date.nullish(),
     billing_period_end: date.nullish(),
+    payment_method: paymentMethod.nullish(),
   })
   .strict()
 
@@ -63,6 +70,7 @@ export const BillPatch = z
     due_date: date.nullable(),
     billing_period_start: date.nullable(),
     billing_period_end: date.nullable(),
+    payment_method: paymentMethod,
   })
   .partial()
   .strict()

@@ -196,6 +196,30 @@ export function VisitDetailDrawer({ visitId, trigger, isOwner = false }: VisitDe
     }
   }
 
+  async function handleDeleteVisit() {
+    if (!confirm('Delete this entire visit? This will permanently delete the visit and all its photos/videos.')) return
+
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/visits/${visitId}/delete`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Failed to delete visit')
+      }
+
+      toast.success('Visit deleted')
+      setOpen(false)
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete visit')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const checkedItems = VISIT_CHECKLIST_ITEMS.filter(
     item => visit?.checklist[item.key]
   )
@@ -386,9 +410,9 @@ export function VisitDetailDrawer({ visitId, trigger, isOwner = false }: VisitDe
                 )}
               </div>
 
-              {/* Edit/Save buttons (if within 24h and not owner) */}
+              {/* Edit/Save/Delete buttons (admin or within 24h creator) */}
               {visit.can_edit && !isOwner && (
-                <div className="border-t border-border pt-4">
+                <div className="border-t border-border pt-4 space-y-2">
                   {isEditing ? (
                     <div className="flex gap-2">
                       <Button
@@ -415,15 +439,27 @@ export function VisitDetailDrawer({ visitId, trigger, isOwner = false }: VisitDe
                       </Button>
                     </div>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => setIsEditing(true)}
-                    >
-                      <Edit className="mr-1.5 h-3.5 w-3.5" />
-                      Edit Visit
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        <Edit className="mr-1.5 h-3.5 w-3.5" />
+                        Edit Visit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full border-status-danger text-status-danger hover:bg-status-danger/5"
+                        onClick={handleDeleteVisit}
+                        disabled={saving}
+                      >
+                        <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                        Delete Visit
+                      </Button>
+                    </>
                   )}
                 </div>
               )}

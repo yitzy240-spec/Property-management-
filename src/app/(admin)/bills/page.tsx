@@ -11,6 +11,7 @@ import { BillAddButton } from '@/components/features/bill-add'
 import { BillEditDrawer } from '@/components/features/bill-edit'
 import { BillEditFullDrawer } from '@/components/features/bill-edit-full'
 import { BillDeleteButton } from '@/components/features/bill-delete-button'
+import { formatPaymentMethod } from '@/lib/bill-payment-method'
 import { cn } from '@/lib/utils'
 import type { Bill } from '@/types'
 
@@ -119,6 +120,11 @@ export default async function BillsPage({
                   {bill.billing_period_start && bill.billing_period_end && (
                     <p className="mt-1 font-mono text-xs text-muted-foreground">
                       {bill.billing_period_start} → {bill.billing_period_end}
+                    </p>
+                  )}
+                  {bill.payment_method && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      💳 {formatPaymentMethod(bill.payment_method)}
                     </p>
                   )}
                 </div>

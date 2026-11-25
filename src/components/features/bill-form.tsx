@@ -13,6 +13,7 @@ export interface BillFormValues {
   due_date: string | null
   period_start: string | null
   period_end: string | null
+  payment_method?: string | null
 }
 
 interface BillFormProps {
@@ -26,6 +27,8 @@ interface BillFormProps {
   hideProperty?: boolean
   /** Field name prefix for `name=` attributes (default: no prefix). */
   formIdPrefix?: string
+  /** When true, shows the payment method dropdown */
+  showPaymentMethod?: boolean
 }
 
 const BILL_TYPE_OPTIONS: { value: BillType; label: string }[] = [
@@ -45,7 +48,7 @@ const BILL_TYPE_OPTIONS: { value: BillType; label: string }[] = [
  * Period Start, Period End. Internal state is controlled — parent
  * receives current values via `onChange`.
  */
-export function BillForm({ initial, properties, onChange, hideProperty, formIdPrefix }: BillFormProps) {
+export function BillForm({ initial, properties, onChange, hideProperty, formIdPrefix, showPaymentMethod }: BillFormProps) {
   const [propertyId, setPropertyId] = useState(initial?.property_id ?? '')
   const [billType, setBillType] = useState<BillType>(initial?.bill_type ?? 'other')
   // Display the amount as ILS (not agorot) for human entry.
@@ -55,6 +58,7 @@ export function BillForm({ initial, properties, onChange, hideProperty, formIdPr
   const [dueDate, setDueDate] = useState(initial?.due_date ?? '')
   const [periodStart, setPeriodStart] = useState(initial?.period_start ?? '')
   const [periodEnd, setPeriodEnd] = useState(initial?.period_end ?? '')
+  const [paymentMethod, setPaymentMethod] = useState(initial?.payment_method ?? '')
 
   function emitChange(next: Partial<BillFormValues>) {
     if (!onChange) return
@@ -67,6 +71,7 @@ export function BillForm({ initial, properties, onChange, hideProperty, formIdPr
       due_date: next.due_date !== undefined ? next.due_date : (dueDate || null),
       period_start: next.period_start !== undefined ? next.period_start : (periodStart || null),
       period_end: next.period_end !== undefined ? next.period_end : (periodEnd || null),
+      payment_method: next.payment_method !== undefined ? next.payment_method : (paymentMethod || null),
     }
     onChange(merged)
   }
@@ -162,6 +167,26 @@ export function BillForm({ initial, properties, onChange, hideProperty, formIdPr
           />
         </div>
       </div>
+      
+      {showPaymentMethod && (
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Payment Method</Label>
+          <NativeSelect
+            name={`${prefix}payment_method`}
+            value={paymentMethod ?? ''}
+            onChange={(e) => {
+              setPaymentMethod(e.target.value)
+              emitChange({ payment_method: e.target.value || null })
+            }}
+            options={[
+              { value: '', label: 'Not set' },
+              { value: 'paid_by_owner_cash', label: 'Owner paid (Cash)' },
+              { value: 'paid_by_owner_cc', label: 'Owner paid (Credit Card)' },
+              { value: 'paid_by_admin', label: 'Paid by admin' },
+            ]}
+          />
+        </div>
+      )}
     </div>
   )
 }

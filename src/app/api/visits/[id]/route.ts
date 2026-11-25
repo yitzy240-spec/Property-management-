@@ -74,8 +74,8 @@ export async function GET(
     })
   )
   
-  // Check if editable (admin only, within 24h)
-  const canEdit = userIsAdmin && isWithinVisitEditWindow(visit.created_at)
+  // Admin can always edit; non-admin creators can edit within 24h
+  const canEdit = userIsAdmin || isWithinVisitEditWindow(visit.created_at)
   
   // Serialize visit for viewer (strips admin_note for non-admins)
   const serialized = serializeVisitForViewer(visit, mediaWithUrls, userIsAdmin)

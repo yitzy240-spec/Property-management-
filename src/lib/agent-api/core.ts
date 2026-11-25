@@ -18,6 +18,7 @@ export const AGENT_SCOPES = {
   'tasks:read': 'Read tasks (incl. cleaning) and contractors',
   'tasks:write': 'Create, move, reassign and delete tasks',
   'properties:read': 'Read properties (no codes)',
+  'properties:write': 'Edit properties',
   'owners:read': 'Read owners',
   'owners:write': 'Edit owner records',
   'utilities:read': 'Read utility accounts',
@@ -25,6 +26,8 @@ export const AGENT_SCOPES = {
   'bills:read': 'Read bills',
   'bills:write': 'Add and edit bills (approval stays with the admin)',
   'codes:read': 'Read door codes and WiFi (every read is logged)',
+  'visits:read': 'Read property visit records with media',
+  'visits:write': 'Create, edit and delete visit records',
 } as const
 
 export type AgentScope = keyof typeof AGENT_SCOPES
@@ -61,6 +64,8 @@ export function json(data: unknown, status = 200) {
 export interface AgentContext {
   token: AgentToken
   db: ServiceClient
+  /** Admin user ID for created_by fields */
+  userId: string
   /** Record a write (or a sensitive read) in the audit log. */
   audit: (entry: {
     resource: string
@@ -125,7 +130,16 @@ export function withAgent<P = Record<string, string>>(
         })
         if (error) throw new AgentError(500, `Audit log write failed: ${error.message}`)
       }
-      return await handler(request, { token, db, audit }, (route?.params ?? {}) as P)
+      // Get the first admin user ID for created_by fields
+      const { data: adminUser } = await db
+        .from('auth.users')
+        .select('id')
+        .contains('raw_app_meta_data', { role: 'admin' })
+        .limit(1)
+        .maybeSingle()
+      const userId = adminUser?.id ?? '00000000-0000-0000-0000-000000000000'
+      
+      return await handler(request, { token, db, userId, audit }, (route?.params ?? {}) as P)
     } catch (err) {
       if (err instanceof AgentError) return json({ error: err.message, details: err.details }, err.status)
       if (err instanceof ZodError) {

@@ -41,6 +41,7 @@ export function BillEditFullDrawer({ bill, propertyName, trigger }: BillEditFull
     due_date: bill.due_date ?? null,
     period_start: bill.billing_period_start ?? null,
     period_end: bill.billing_period_end ?? null,
+    payment_method: bill.payment_method ?? null,
   })
 
   useEffect(() => {
@@ -75,6 +76,7 @@ export function BillEditFullDrawer({ bill, propertyName, trigger }: BillEditFull
           property_id: values.property_id,
           billing_period_start: values.period_start,
           billing_period_end: values.period_end,
+          payment_method: values.payment_method,
         }),
       })
 
@@ -170,10 +172,12 @@ export function BillEditFullDrawer({ bill, propertyName, trigger }: BillEditFull
               due_date: bill.due_date,
               period_start: bill.billing_period_start,
               period_end: bill.billing_period_end,
+              payment_method: bill.payment_method,
             }}
             properties={properties}
             onChange={setValues}
             formIdPrefix="edit-full"
+            showPaymentMethod={true}
           />
 
           {/* PDF Upload */}
